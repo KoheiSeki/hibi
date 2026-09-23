@@ -22,6 +22,7 @@ def _response(problem: ProblemDetails) -> JSONResponse:
     return JSONResponse(
         status_code=problem.status,
         content=problem.model_dump(by_alias=True, exclude_none=True),
+        headers={"X-Request-ID": problem.request_id},
         media_type="application/problem+json",
     )
 

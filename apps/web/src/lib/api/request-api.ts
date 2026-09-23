@@ -35,29 +35,9 @@ export async function requestApi<T>(
   path: string,
   init?: RequestInit,
 ): Promise<ApiResult<T>> {
+  let response: Response;
   try {
-    const response = await fetch(path, init);
-    const body: unknown = await response.json();
-    if (!response.ok) {
-      return isProblem(body)
-        ? { ok: false, error: { kind: "problem", problem: body } }
-        : {
-            ok: false,
-            error: {
-              kind: "invalid-response",
-              message: "Error response was not RFC 9457 Problem Details.",
-            },
-          };
-    }
-    if (!isRecord(body) || !("data" in body))
-      return {
-        ok: false,
-        error: {
-          kind: "invalid-response",
-          message: "Success response did not contain data.",
-        },
-      };
-    return { ok: true, data: body.data as T };
+    response = await fetch(path, init);
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError")
       return { ok: false, error: { kind: "aborted" } };
@@ -70,4 +50,40 @@ export async function requestApi<T>(
       },
     };
   }
+
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError")
+      return { ok: false, error: { kind: "aborted" } };
+    return {
+      ok: false,
+      error: {
+        kind: "invalid-response",
+        message: "Response body was not valid JSON.",
+      },
+    };
+  }
+
+  if (!response.ok) {
+    return isProblem(body)
+      ? { ok: false, error: { kind: "problem", problem: body } }
+      : {
+          ok: false,
+          error: {
+            kind: "invalid-response",
+            message: "Error response was not RFC 9457 Problem Details.",
+          },
+        };
+  }
+  if (!isRecord(body) || !("data" in body))
+    return {
+      ok: false,
+      error: {
+        kind: "invalid-response",
+        message: "Success response did not contain data.",
+      },
+    };
+  return { ok: true, data: body.data as T };
 }

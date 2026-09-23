@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from hibi.api.dependencies import get_principal
 from hibi.api.exception_handlers import register_exception_handlers
+from hibi.api.openapi import ProblemDetailsFastAPI, problem_responses
 from hibi.api.schemas import (
     ApiResponse,
     EchoRequest,
@@ -26,7 +27,7 @@ def _default_resource_lookup(user_id: UUID) -> str:
 
 
 def create_app(resource_lookup: ResourceLookup = _default_resource_lookup) -> FastAPI:
-    app = FastAPI(title="Hibi API", version="0.1.0")
+    app = ProblemDetailsFastAPI(title="Hibi API", version="0.1.0")
     settings = get_settings()
     app.add_middleware(
         CORSMiddleware,
@@ -43,15 +44,30 @@ def create_app(resource_lookup: ResourceLookup = _default_resource_lookup) -> Fa
         response.headers["X-Request-ID"] = request.state.request_id
         return response
 
-    @app.get("/api/v1/health", response_model=ApiResponse[HealthResponse], operation_id="getHealth")
+    @app.get(
+        "/api/v1/health",
+        response_model=ApiResponse[HealthResponse],
+        operation_id="getHealth",
+        responses=problem_responses(500),
+    )
     async def get_health() -> ApiResponse[HealthResponse]:
         return ApiResponse(data=HealthResponse(status="ok"))
 
-    @app.post("/api/v1/echo", response_model=ApiResponse[EchoResponse], operation_id="echoMessage")
+    @app.post(
+        "/api/v1/echo",
+        response_model=ApiResponse[EchoResponse],
+        operation_id="echoMessage",
+        responses=problem_responses(422, 500),
+    )
     async def echo_message(request: EchoRequest) -> ApiResponse[EchoResponse]:
         return ApiResponse(data=EchoResponse(message=request.message))
 
-    @app.get("/api/v1/me", response_model=ApiResponse[UserResponse], operation_id="getCurrentUser")
+    @app.get(
+        "/api/v1/me",
+        response_model=ApiResponse[UserResponse],
+        operation_id="getCurrentUser",
+        responses=problem_responses(401, 500),
+    )
     async def get_current_user(
         principal: Principal = Depends(get_principal),
     ) -> ApiResponse[UserResponse]:
@@ -61,6 +77,7 @@ def create_app(resource_lookup: ResourceLookup = _default_resource_lookup) -> Fa
         "/api/v1/protected-resource",
         response_model=ApiResponse[ProtectedResourceResponse],
         operation_id="getProtectedResource",
+        responses=problem_responses(401, 404, 500),
     )
     async def get_protected_resource(
         principal: Principal = Depends(get_principal),

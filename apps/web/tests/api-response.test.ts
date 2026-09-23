@@ -58,4 +58,36 @@ describe("requestApi", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.kind).toBe("invalid-response");
   });
+
+  it("classifies malformed JSON as an invalid response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response("{not-json", {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          }),
+      ),
+    );
+
+    const result = await requestApi("/health");
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.kind).toBe("invalid-response");
+  });
+
+  it("classifies fetch failures as network errors", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("fetch failed");
+      }),
+    );
+
+    const result = await requestApi("/health");
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.kind).toBe("network");
+  });
 });

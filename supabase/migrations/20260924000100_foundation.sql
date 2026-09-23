@@ -6,12 +6,21 @@ begin
   if not exists (select 1 from pg_roles where rolname = 'hibi_runtime') then
     create role hibi_runtime nologin noinherit;
   end if;
+  alter role hibi_runtime nologin noinherit
+    nosuperuser nocreatedb nocreaterole noreplication;
+
+  if not exists (select 1 from pg_roles where rolname = 'hibi_runtime_user') then
+    create role hibi_runtime_user login inherit;
+  end if;
+  alter role hibi_runtime_user login inherit
+    nosuperuser nocreatedb nocreaterole noreplication;
 end
 $$;
 
+grant hibi_runtime to hibi_runtime_user;
 grant usage on schema app to hibi_runtime;
 
-create table app.profiles (
+create table if not exists app.profiles (
   user_id uuid primary key references auth.users(id) on delete cascade,
   display_name text check (char_length(display_name) <= 100),
   timezone text not null default 'UTC',
@@ -36,6 +45,7 @@ end;
 $$;
 
 revoke all on function app.create_auth_profile() from public;
+drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function app.create_auth_profile();

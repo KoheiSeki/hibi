@@ -53,13 +53,21 @@ export type EchoResponse = {
 };
 
 /**
- * HTTPValidationError
+ * FieldProblem
  */
-export type HttpValidationError = {
+export type FieldProblem = {
+  /**
+   * Code
+   */
+  code: string;
   /**
    * Detail
    */
-  detail?: Array<ValidationError>;
+  detail: string;
+  /**
+   * Pointer
+   */
+  pointer: string;
 };
 
 /**
@@ -70,6 +78,40 @@ export type HealthResponse = {
    * Status
    */
   status: string;
+};
+
+/**
+ * ProblemDetails
+ */
+export type ProblemDetails = {
+  /**
+   * Detail
+   */
+  detail: string;
+  /**
+   * Errors
+   */
+  errors?: Array<FieldProblem> | null;
+  /**
+   * Instance
+   */
+  instance?: string | null;
+  /**
+   * Requestid
+   */
+  requestId: string;
+  /**
+   * Status
+   */
+  status: number;
+  /**
+   * Title
+   */
+  title: string;
+  /**
+   * Type
+   */
+  type: string;
 };
 
 /**
@@ -92,34 +134,6 @@ export type UserResponse = {
   userId: string;
 };
 
-/**
- * ValidationError
- */
-export type ValidationError = {
-  /**
-   * Context
-   */
-  ctx?: {
-    [key: string]: unknown;
-  };
-  /**
-   * Input
-   */
-  input?: unknown;
-  /**
-   * Location
-   */
-  loc: Array<string | number>;
-  /**
-   * Message
-   */
-  msg: string;
-  /**
-   * Error Type
-   */
-  type: string;
-};
-
 export type EchoMessageData = {
   body: EchoRequest;
   path?: never;
@@ -129,9 +143,13 @@ export type EchoMessageData = {
 
 export type EchoMessageErrors = {
   /**
-   * Validation Error
+   * Request validation failed.
    */
-  422: HttpValidationError;
+  422: ProblemDetails;
+  /**
+   * An unexpected server error occurred.
+   */
+  500: ProblemDetails;
 };
 
 export type EchoMessageError = EchoMessageErrors[keyof EchoMessageErrors];
@@ -153,6 +171,15 @@ export type GetHealthData = {
   url: "/api/v1/health";
 };
 
+export type GetHealthErrors = {
+  /**
+   * An unexpected server error occurred.
+   */
+  500: ProblemDetails;
+};
+
+export type GetHealthError = GetHealthErrors[keyof GetHealthErrors];
+
 export type GetHealthResponses = {
   /**
    * Successful Response
@@ -168,6 +195,20 @@ export type GetCurrentUserData = {
   query?: never;
   url: "/api/v1/me";
 };
+
+export type GetCurrentUserErrors = {
+  /**
+   * Authentication failed.
+   */
+  401: ProblemDetails;
+  /**
+   * An unexpected server error occurred.
+   */
+  500: ProblemDetails;
+};
+
+export type GetCurrentUserError =
+  GetCurrentUserErrors[keyof GetCurrentUserErrors];
 
 export type GetCurrentUserResponses = {
   /**
@@ -185,6 +226,24 @@ export type GetProtectedResourceData = {
   query?: never;
   url: "/api/v1/protected-resource";
 };
+
+export type GetProtectedResourceErrors = {
+  /**
+   * Authentication failed.
+   */
+  401: ProblemDetails;
+  /**
+   * The requested resource was not found.
+   */
+  404: ProblemDetails;
+  /**
+   * An unexpected server error occurred.
+   */
+  500: ProblemDetails;
+};
+
+export type GetProtectedResourceError =
+  GetProtectedResourceErrors[keyof GetProtectedResourceErrors];
 
 export type GetProtectedResourceResponses = {
   /**
