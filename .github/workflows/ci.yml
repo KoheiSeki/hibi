@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.17.1 }
+      - uses: actions/setup-node@v5
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder
+  api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.17.1 }
+      - uses: actions/setup-node@v5
+        with: { node-version: 22, cache: pnpm }
+      - uses: astral-sh/setup-uv@v7
+        with: { version: "0.11.26", enable-cache: true }
+      - run: pnpm install --frozen-lockfile
+      - run: uv sync --project apps/api --frozen --python 3.14
+      - run: uv run --project apps/api ruff format --check apps/api/src apps/api/tests scripts
+      - run: uv run --project apps/api ruff check apps/api/src apps/api/tests scripts
+      - run: uv run --project apps/api ty check apps/api/src
+      - run: uv run --project apps/api pytest apps/api/tests
+      - run: uv run --project apps/api python scripts/export_openapi.py
+      - run: pnpm --filter @hibi/api-client generate
+      - run: git diff --exit-code -- contracts packages/api-client/src/generated

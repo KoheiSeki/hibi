@@ -1,0 +1,21 @@
+{
+  "name": "hibi",
+  "private": true,
+  "packageManager": "pnpm@10.17.1",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev:web": "pnpm --filter @hibi/web dev",
+    "build": "corepack pnpm -r build",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "corepack pnpm -r lint",
+    "typecheck": "corepack pnpm -r typecheck",
+    "test": "corepack pnpm -r test",
+    "openapi:client": "pnpm --filter @hibi/api-client generate"
+  },
+  "devDependencies": {
+    "prettier": "3.9.0"
+  }
+}

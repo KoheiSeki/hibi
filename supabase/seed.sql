@@ -1,0 +1,1 @@
+-- Local-only seed data belongs here. Auth users are created through Supabase Auth.

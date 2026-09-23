@@ -1,0 +1,23 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      HIBI_SUPABASE_URL: ${HIBI_SUPABASE_URL:-https://example.supabase.co}
+      HIBI_SUPABASE_JWT_AUDIENCE: ${HIBI_SUPABASE_JWT_AUDIENCE:-authenticated}
+      HIBI_CORS_ORIGINS: http://localhost:3000
+    ports: ["8000:8000"]
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-https://example.supabase.co}
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-local-placeholder}
+    environment:
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-https://example.supabase.co}
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-local-placeholder}
+      NEXT_PUBLIC_API_BASE_URL: http://api:8000
+    ports: ["3000:3000"]
+    depends_on: [api]

@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: hibi-api
+    runtime: docker
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: HIBI_SUPABASE_URL
+        sync: false
+      - key: HIBI_SUPABASE_JWT_AUDIENCE
+        value: authenticated
+      - key: HIBI_CORS_ORIGINS
+        sync: false
