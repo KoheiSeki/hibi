@@ -66,3 +66,17 @@ jobs:
           done
           docker logs "${container_id}"
           exit 1
+      - name: Smoke test Web root
+        run: |
+          set -euo pipefail
+          container_id=$(docker run --detach --publish 13000:3000 hibi-web)
+          trap 'docker rm --force "${container_id}" >/dev/null 2>&1' EXIT
+          for attempt in {1..30}; do
+            if body=$(curl --fail --silent http://127.0.0.1:13000/); then
+              grep --quiet '<h1>Hibi</h1>' <<<"${body}"
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs "${container_id}"
+          exit 1
