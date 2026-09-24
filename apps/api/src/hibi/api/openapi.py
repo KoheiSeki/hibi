@@ -34,6 +34,8 @@ class ProblemDetailsFastAPI(FastAPI):
                         continue
                     content = response.get("content", {})
                     json_schema = content.get("application/json")
-                    if json_schema == {"schema": {"$ref": "#/components/schemas/ProblemDetails"}}:
+                    if json_schema == {
+                        "schema": {"$ref": "#/components/schemas/ProblemDetails"}
+                    }:
                         response["content"] = {"application/problem+json": json_schema}
         return schema
