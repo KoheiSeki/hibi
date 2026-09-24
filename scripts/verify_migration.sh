@@ -28,17 +28,34 @@ create schema auth;
 create table auth.users (id uuid primary key);
 SQL
 
+docker cp supabase/roles.sql \
+  "${container}:/roles.sql" >/dev/null
 docker cp supabase/migrations/20260924000100_foundation.sql \
   "${container}:/migration.sql" >/dev/null
 docker cp supabase/tests/foundation.verify.sql \
   "${container}:/verify.sql" >/dev/null
 
-# Applying twice catches non-idempotent role, table, function, and trigger setup.
-docker exec "${container}" psql --set ON_ERROR_STOP=1 --username postgres \
+# Apply roles twice to verify idempotency.
+docker exec "${container}" psql \
+  --set ON_ERROR_STOP=1 \
+  --username postgres \
+  --file /roles.sql
+docker exec "${container}" psql \
+  --set ON_ERROR_STOP=1 \
+  --username postgres \
+  --file /roles.sql
+# Apply migration twice to verify idempotency.
+docker exec "${container}" psql \
+  --set ON_ERROR_STOP=1 \
+  --username postgres \
   --file /migration.sql
-docker exec "${container}" psql --set ON_ERROR_STOP=1 --username postgres \
+docker exec "${container}" psql \
+  --set ON_ERROR_STOP=1 \
+  --username postgres \
   --file /migration.sql
-docker exec "${container}" psql --set ON_ERROR_STOP=1 --username postgres \
+docker exec "${container}" psql \
+  --set ON_ERROR_STOP=1 \
+  --username postgres \
   --file /verify.sql
 
 # The password is intentionally provisioned outside the migration.
