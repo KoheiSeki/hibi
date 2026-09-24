@@ -24,6 +24,7 @@ def get_jwt_verifier() -> JwtVerifier:
     return JwtVerifier(
         issuer=settings.jwt_issuer,
         audience=settings.supabase_jwt_audience,
+        allowed_algorithms=settings.allowed_jwt_algorithms,
         jwks_provider=fetch_jwks,
     )
 

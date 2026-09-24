@@ -22,14 +22,19 @@ class JwtVerifier:
         *,
         issuer: str,
         audience: str,
+        allowed_algorithms: frozenset[str],
         jwks_provider: JwksProvider,
         cache_ttl_seconds: float = 300,
         clock: Clock = monotonic,
     ) -> None:
         if cache_ttl_seconds <= 0:
             raise ValueError("cache_ttl_seconds must be positive")
+        if not allowed_algorithms:
+            raise ValueError("allowed_algorithms must not be empty")
+
         self._issuer = issuer
         self._audience = audience
+        self._allowed_algorithms = allowed_algorithms
         self._jwks_provider = jwks_provider
         self._cache_ttl_seconds = cache_ttl_seconds
         self._clock = clock
@@ -46,11 +51,23 @@ class JwtVerifier:
                 jwk = self._find_key(kid, self._get_keys(force_refresh=True))
             if jwk is None:
                 raise TokenVerificationError("token signing key not found")
+
+            header_algorithms = header.get("alg")
+            jwk_algorithms = jwk.get("alg")
+
+            if (
+                not isinstance(header_algorithms, str)
+                or not isinstance(jwk_algorithms, str)
+                or header_algorithms != jwk_algorithms
+                or header_algorithms not in self._allowed_algorithms
+            ):
+                raise TokenVerificationError("token algorithm is not allowed")
+
             public_key = jwt.PyJWK.from_dict(jwk).key
             claims = jwt.decode(
                 token,
                 public_key,
-                algorithms=["RS256"],
+                algorithms=[header_algorithms],
                 audience=self._audience,
                 issuer=self._issuer,
                 options={"require": ["sub", "iss", "aud", "exp"]},

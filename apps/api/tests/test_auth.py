@@ -3,7 +3,7 @@ from uuid import UUID
 
 import jwt
 import pytest
-from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.asymmetric import ec, rsa
 
 from hibi.auth.jwt_verifier import JwtVerifier, TokenVerificationError
 
@@ -26,6 +26,7 @@ def test_verifier_builds_principal_from_valid_jwks() -> None:
     verifier = JwtVerifier(
         issuer="https://project.supabase.co/auth/v1",
         audience="authenticated",
+        allowed_algorithms=frozenset({"RS256"}),
         jwks_provider=lambda: {"keys": [public_jwk]},
     )
     principal = verifier.verify(token)
@@ -50,6 +51,7 @@ def test_verifier_rejects_wrong_issuer() -> None:
     verifier = JwtVerifier(
         issuer="https://project.supabase.co/auth/v1",
         audience="authenticated",
+        allowed_algorithms=frozenset({"RS256"}),
         jwks_provider=lambda: {"keys": [public_jwk]},
     )
     with pytest.raises(TokenVerificationError):
@@ -81,6 +83,7 @@ def test_verifier_reuses_jwks_within_cache_ttl() -> None:
     verifier = JwtVerifier(
         issuer="https://project.supabase.co/auth/v1",
         audience="authenticated",
+        allowed_algorithms=frozenset({"RS256"}),
         jwks_provider=provide_jwks,
         cache_ttl_seconds=300,
     )
@@ -120,6 +123,7 @@ def test_verifier_refreshes_jwks_once_for_unknown_kid() -> None:
     verifier = JwtVerifier(
         issuer="https://project.supabase.co/auth/v1",
         audience="authenticated",
+        allowed_algorithms=frozenset({"RS256"}),
         jwks_provider=provide_jwks,
         cache_ttl_seconds=300,
     )
@@ -128,3 +132,66 @@ def test_verifier_refreshes_jwks_once_for_unknown_kid() -> None:
 
     assert principal.user_id == UUID("11111111-1111-4111-8111-111111111111")
     assert fetch_count == 2
+
+
+def test_verifier_accepts_allowed_es256_token() -> None:
+    private_key = ec.generate_private_key(ec.SECP256R1())
+    public_jwk = jwt.algorithms.ECAlgorithm.to_jwk(
+        private_key.public_key(),
+        as_dict=True,
+    )
+    public_jwk.update({"kid": "es256-key", "use": "sig", "alg": "ES256"})
+
+    token = jwt.encode(
+        {
+            "sub": "11111111-1111-4111-8111-111111111111",
+            "iss": "http://127.0.0.1:54321/auth/v1",
+            "aud": "authenticated",
+            "exp": datetime.now(UTC) + timedelta(minutes=5),
+        },
+        private_key,
+        algorithm="ES256",
+        headers={"kid": "es256-key"},
+    )
+
+    verifier = JwtVerifier(
+        issuer="http://127.0.0.1:54321/auth/v1",
+        audience="authenticated",
+        allowed_algorithms=frozenset({"ES256"}),
+        jwks_provider=lambda: {"keys": [public_jwk]},
+    )
+
+    principal = verifier.verify(token)
+
+    assert principal.user_id == UUID("11111111-1111-4111-8111-111111111111")
+
+
+def test_verifier_rejects_algorithm_outside_allowlist() -> None:
+    private_key = ec.generate_private_key(ec.SECP256R1())
+    public_jwk = jwt.algorithms.ECAlgorithm.to_jwk(
+        private_key.public_key(),
+        as_dict=True,
+    )
+    public_jwk.update({"kid": "es256-key", "use": "sig", "alg": "ES256"})
+
+    token = jwt.encode(
+        {
+            "sub": "11111111-1111-4111-8111-111111111111",
+            "iss": "http://127.0.0.1:54321/auth/v1",
+            "aud": "authenticated",
+            "exp": datetime.now(UTC) + timedelta(minutes=5),
+        },
+        private_key,
+        algorithm="ES256",
+        headers={"kid": "es256-key"},
+    )
+
+    verifier = JwtVerifier(
+        issuer="http://127.0.0.1:54321/auth/v1",
+        audience="authenticated",
+        allowed_algorithms=frozenset({"RS256"}),
+        jwks_provider=lambda: {"keys": [public_jwk]},
+    )
+
+    with pytest.raises(TokenVerificationError):
+        verifier.verify(token)
