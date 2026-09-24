@@ -3,7 +3,6 @@ node_modules/
 coverage/
 .env
 .env.local
-.env.example
 .venv/
 __pycache__/
 .pytest_cache/
@@ -12,3 +11,5 @@ __pycache__/
 *.pyc
 *.tsbuildinfo
 .DS_Store
+supabase/.branches/
+supabase/.temp/
