@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { requestApi } from "@/lib/api/request-api";
+import { normalizeGeneratedResult, requestApi } from "@/lib/api/request-api";
 
 describe("requestApi", () => {
   it("unwraps a successful data response", async () => {
@@ -89,5 +89,82 @@ describe("requestApi", () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.kind).toBe("network");
+  });
+
+  it("classifies fetch timeouts", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new DOMException("The operation timed out.", "TimeoutError");
+      }),
+    );
+
+    const result = await requestApi("/health");
+
+    expect(result).toEqual({
+      ok: false,
+      error: { kind: "timeout", message: "The request timed out." },
+    });
+  });
+
+  it("classifies aborted fetch requests", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new DOMException("The operation was aborted.", "AbortError");
+      }),
+    );
+
+    const result = await requestApi("/health");
+
+    expect(result).toEqual({ ok: false, error: { kind: "aborted" } });
+  });
+
+  it("classifies aborted response body reads", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          ({
+            ok: true,
+            json: async () => {
+              throw new DOMException("The operation was aborted.", "AbortError");
+            },
+          }) as unknown as Response,
+      ),
+    );
+
+    const result = await requestApi("/health");
+
+    expect(result).toEqual({ ok: false, error: { kind: "aborted" } });
+  });
+});
+
+describe("normalizeGeneratedResult", () => {
+  it("unwraps successful generated payloads", () => {
+    expect(
+      normalizeGeneratedResult({ data: { data: { userId: "u-1" } } }),
+    ).toEqual({ ok: true, data: { userId: "u-1" } });
+  });
+
+  it("classifies generated client timeouts without a response", () => {
+    expect(
+      normalizeGeneratedResult({
+        data: undefined,
+        error: new DOMException("The operation timed out.", "TimeoutError"),
+      }),
+    ).toEqual({
+      ok: false,
+      error: { kind: "timeout", message: "The request timed out." },
+    });
+  });
+
+  it("classifies generated client aborts without a response", () => {
+    expect(
+      normalizeGeneratedResult({
+        data: undefined,
+        error: new DOMException("The operation was aborted.", "AbortError"),
+      }),
+    ).toEqual({ ok: false, error: { kind: "aborted" } });
   });
 });
