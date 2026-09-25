@@ -1,4 +1,13 @@
 "use client";
+
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+
 export default function ErrorPage({
   reset,
 }: {
@@ -6,9 +15,15 @@ export default function ErrorPage({
   reset: () => void;
 }) {
   return (
-    <section className="card">
-      <h1>問題が発生しました</h1>
-      <button onClick={reset}>再試行</button>
-    </section>
+    <Card>
+      <CardHeader>
+        <CardTitle>問題が発生しました</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Button type="button" onClick={reset}>
+          再試行
+        </Button>
+      </CardContent>
+    </Card>
   );
 }

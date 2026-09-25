@@ -4,10 +4,10 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/auth/server";
 
 export async function signInAction(formData: FormData) {
-  const email = String(formData.get("email") ?? "");
-  const password = String(formData.get("password") ?? "");
-  const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) redirect("/login?error=invalid-credentials");
-  redirect("/account");
+	const email = String(formData.get("email") ?? "");
+	const password = String(formData.get("password") ?? "");
+	const supabase = await createClient();
+	const { error } = await supabase.auth.signInWithPassword({ email, password });
+	if (error) redirect("/login?error=invalid-credentials");
+	redirect("/account");
 }
