@@ -19,7 +19,7 @@ export default async function AccountPage() {
 	const result = await getCurrentUserFromApi();
 
 	if (!result.ok) {
-		if (result.error.kind == "unauthenticated") {
+		if (result.error.kind === "unauthenticated") {
 			redirect("/login");
 		}
 
