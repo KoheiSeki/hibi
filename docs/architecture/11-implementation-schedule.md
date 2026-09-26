@@ -51,6 +51,7 @@
 - 保護APIが未認証リクエストを拒否する
 - 別ユーザーのresourceへアクセスできない
 - エラーがProblem Details形式で返る
+- 認証失敗が401 Problem Detailsとしてテスト固定されている（[12-week2-auth-failure-contract.md](./12-week2-auth-failure-contract.md)）
 - OpenAPI clientを再生成できる
 
 ## Week 3: Captureドメインの同期縦切り
