@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
 	Card,
 	CardContent,
@@ -6,11 +6,16 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { signInAction } from "./actions";
+import { LoginForm } from "./login-form";
 
-export default function LoginPage() {
+type LoginPageProps = {
+	searchParams: Promise<{ error?: string }>;
+};
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+	const { error } = await searchParams;
+	const showInvalidCredentials = error === "invalid-credentials";
+
 	return (
 		<Card>
 			<CardHeader>
@@ -19,30 +24,18 @@ export default function LoginPage() {
 					メールアドレスとパスワードでサインインします。
 				</CardDescription>
 			</CardHeader>
-			<CardContent>
-				<form action={signInAction} className="flex flex-col gap-4">
-					<div className="grid gap-2">
-						<Label htmlFor="email">メール</Label>
-						<Input
-							id="email"
-							name="email"
-							type="email"
-							autoComplete="email"
-							required
-						/>
-					</div>
-					<div className="grid gap-2">
-						<Label htmlFor="password">パスワード</Label>
-						<Input
-							id="password"
-							name="password"
-							type="password"
-							autoComplete="current-password"
-							required
-						/>
-					</div>
-					<Button type="submit">ログイン</Button>
-				</form>
+			<CardContent className="flex flex-col gap-4">
+				{showInvalidCredentials ? (
+					<Alert variant="destructive">
+						<AlertTitle>ログインできませんでした</AlertTitle>
+						<AlertDescription>
+							<p>
+								メールアドレスまたはパスワードが正しくありません。入力内容を確認して、もう一度お試しください。
+							</p>
+						</AlertDescription>
+					</Alert>
+				) : null}
+				<LoginForm />
 			</CardContent>
 		</Card>
 	);
