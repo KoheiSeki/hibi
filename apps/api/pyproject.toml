@@ -11,6 +11,7 @@ dependencies = [
   "pydantic-settings>=2.10,<3",
   "uvicorn[standard]>=0.37,<1",
   "asyncpg>=0.30,<1",
+  "sqlalchemy[asyncio]>=2.0,<3",
   "arq>=0.26,<1",
   "typesafe-sdk>=0.7,<1",
 ]
@@ -36,6 +37,7 @@ markers = [
   "integration: requires Supabase local at HIBI_SUPABASE_URL",
 ]
 addopts = "-q -m 'not integration'"
+asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["src", "tests"]
 

@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from contextlib import asynccontextmanager
 from uuid import UUID, uuid4
 
 from fastapi import Depends, FastAPI, Request
@@ -17,9 +18,16 @@ from hibi.api.schemas import (
 )
 from hibi.auth.principal import Principal
 from hibi.core.config import get_settings
+from hibi.db.engine import dispose_engine
 from hibi.modules.profiles.service import get_owned_resource
 
 ResourceLookup = Callable[[UUID], str]
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    yield
+    await dispose_engine()
 
 
 def _default_resource_lookup(user_id: UUID) -> str:
@@ -27,7 +35,7 @@ def _default_resource_lookup(user_id: UUID) -> str:
 
 
 def create_app(resource_lookup: ResourceLookup = _default_resource_lookup) -> FastAPI:
-    app = ProblemDetailsFastAPI(title="Hibi API", version="0.1.0")
+    app = ProblemDetailsFastAPI(title="Hibi API", version="0.1.0", lifespan=lifespan)
     settings = get_settings()
     app.add_middleware(
         CORSMiddleware,
@@ -82,7 +90,9 @@ def create_app(resource_lookup: ResourceLookup = _default_resource_lookup) -> Fa
     async def get_protected_resource(
         principal: Principal = Depends(get_principal),
     ) -> ApiResponse[ProtectedResourceResponse]:
-        value = get_owned_resource(principal=principal, repository_lookup=resource_lookup)
+        value = get_owned_resource(
+            principal=principal, repository_lookup=resource_lookup
+        )
         return ApiResponse(data=ProtectedResourceResponse(value=value))
 
     register_exception_handlers(app)
