@@ -98,6 +98,7 @@ JWKS provider が未処理例外（例: `ConnectionError`）を投げた場合:
 | `apps/api/tests/test_api_auth_contract.py` | 上表の HTTP 契約テスト                                              |
 | `apps/api/tests/test_api.py`               | トークンなし 401（既存）、OpenAPI 401 メディアタイプ                          |
 | `apps/api/tests/test_auth.py`              | `JwtVerifier` 単体（issuer / algorithm / ES256 等）              |
+| `apps/api/tests/integration/test_auth_supabase_local.py` | Step 5: Supabase Local 実 token（`-m integration`） |
 
 
 実行:
@@ -105,6 +106,12 @@ JWKS provider が未処理例外（例: `ConnectionError`）を投げた場合:
 ```sh
 cd apps/api
 uv run pytest tests/test_api_auth_contract.py -v
+```
+
+Step 5（Local のみ）:
+
+```sh
+uv run --project apps/api pytest apps/api/tests/integration -m integration -v
 ```
 
 ### Web
@@ -224,6 +231,26 @@ pnpm test tests/auth-failure-contract.test.ts
 
 **触る候補:** `apps/api/tests/`（新規 `test_auth_supabase_local.py` 等）、`scripts/`、CI workflow
 
+**実装済み資産（Step 5）:**
+
+
+| パス | 役割 |
+|------|------|
+| `apps/api/tests/integration/test_auth_supabase_local.py` | 実 token / 改ざん / ヘッダなし（`@pytest.mark.integration`） |
+| `apps/api/tests/integration/supabase_local_helpers.py` | password login、JWKS 到達性、`.env.local` 優先 / `.env` 補完 |
+| `apps/api/tests/integration/conftest.py` | session で `apps/api/.env.local`（なければ `.env`）を反映 |
+| `docs/operations/week2-auth-step5.md` | 実行手順 + 手動 Web チェック |
+
+**実行（API）:**
+
+```sh
+uv run --project apps/api pytest apps/api/tests/integration -m integration -v
+```
+
+通常の CI / `pytest apps/api/tests` は `pyproject.toml` の `addopts = "-m 'not integration'"` により integration を除外する。
+
+**手動 Web:** [week2-auth-step5.md](../operations/week2-auth-step5.md) の「手動 Web チェック」を参照。
+
 ---
 
 ### 7. OpenAPI / クライアント — 担当: API + Web / 随時
@@ -263,6 +290,7 @@ Week 2 完了条件「token なし、期限切れ、不正 token が 401 Problem
 
 ## 関連ドキュメント
 
+- [Step 5 実行・手動 Web チェック](../operations/week2-auth-step5.md)
 - [認証・セキュリティ方針](./07-security-auth.md)
 - [エラーハンドリング方針](./04-error-handling.md)
 - [テスト・品質管理方針](./08-testing-quality.md)
