@@ -98,7 +98,7 @@ get_session
 
 ## 次ステップ（Capture Repository）
 
-接続が通ったあとで、`modules/captures/models.py` と `repository.py` を足す。`hibi/db` や `db/crud/` には置かない。公開 method は `get_by_id` / `get_by_idempotency_key` / `list_for_user` / `create_capture` / `update_capture` / `delete_capture`。すべての query に `user_id` を含め、他者は `None` にする。HTTP の CRUD はさらにその次の Service / Router である。
+方針は [17-week3-capture-repository.md](./17-week3-capture-repository.md)。
 
 ## 関連
 

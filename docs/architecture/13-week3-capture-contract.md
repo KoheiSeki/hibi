@@ -417,7 +417,7 @@ Week 3 の UI に処理中 polling、retry、カテゴリ表示は出さない�
 3. **DB 接続基盤**  
    方針は [16-week3-db-repository.md](./16-week3-db-repository.md)。engine / session だけ。
 4. **Capture Repository**  
-   `modules/captures/models.py` と `repository.py`。`db/crud/` は作らない。
+   方針は [17-week3-capture-repository.md](./17-week3-capture-repository.md)。`modules/captures/models.py` と `repository.py`。`db/crud/` は作らない。
 5. **service / router / OpenAPI**  
    `create_app` から captures router を mount。`problem_responses` を更新。`pnpm openapi:client`。
 6. **Web**  
