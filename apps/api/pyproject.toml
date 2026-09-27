@@ -32,9 +32,12 @@ build-backend = "hatchling.build"
 packages = ["src/hibi"]
 
 [tool.pytest.ini_options]
-addopts = "-q"
+markers = [
+  "integration: requires Supabase local at HIBI_SUPABASE_URL",
+]
+addopts = "-q -m 'not integration'"
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "tests"]
 
 [tool.ruff]
 target-version = "py314"
