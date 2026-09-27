@@ -4,6 +4,8 @@ coverage/
 .env
 .env.local
 .venv/
+.vscode/
+pyrightconfig.json
 __pycache__/
 .pytest_cache/
 .ruff_cache/
