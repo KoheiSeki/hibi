@@ -68,6 +68,14 @@ API・データ契約
 
 Week 2 認証失敗契約（Step 4）
 
+Week 3 Capture 業務ルールと API 契約
+
+ER図
+
+テーブル定義
+
+Week 3 DB接続基盤
+
 ADRテンプレート
 
 規約の強さ

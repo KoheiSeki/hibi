@@ -190,6 +190,7 @@ RFC 9457の共通型は`api/problem_details.py`へ置きます。
 - migrationはロールフォワードを基本とする
 - seedはテスト・ローカル開発用データだけを持つ
 - RLS/権限テストを`supabase/tests`へ置く
+- table または主要な FK を追加・変更したら、同じ PR で [ER図](./14-er.md) と [テーブル定義](./15-table-catalog.md) を更新する
 
 ## ファイルサイズの目安
 

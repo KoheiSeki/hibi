@@ -45,6 +45,7 @@ SQLiteでPostgreSQL固有機能を代替しません。TestcontainersまたはSu
 - provider adapterの入出力schema
 - webhook payload/署名
 - 認証失敗の401 Problem Details（`tests/test_api_auth_contract.py`、Web `auth-failure-contract.test.ts`）。詳細は [Week 2 認証失敗契約](./12-week2-auth-failure-contract.md)
+- Capture CRUD・冪等・所有者分離。詳細は [Week 3 Capture 契約](./13-week3-capture-contract.md)
 
 `operationId`、必須field、enum、status codeの意図しない変更を検知します。
 

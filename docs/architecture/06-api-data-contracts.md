@@ -292,7 +292,7 @@ export type ApiResult<T, TMeta = never> =
 ## PostgreSQL schema
 
 - Supabase `auth` schemaは認証providerが管理する
-- Hibi業務tableはData APIへ露出しないprivate schemaに置く
+- Hibi業務tableはData APIへ露出しないprivate schema `app` に置く（本番も同名。関係は [ER図](./14-er.md)、列定義は [テーブル定義](./15-table-catalog.md)）
 - runtime role、migration role、管理roleを分離する
 - すべての外部キー列へ用途に応じたindexを付ける
 - 一覧・outbox・cron等の主要queryに複合/部分indexを設計する

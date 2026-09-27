@@ -56,7 +56,7 @@
 
 ## Week 3: Captureドメインの同期縦切り
 
-- ER図とOpenAPIを確定する
+- ER図とOpenAPIを確定する（[13-week3-capture-contract.md](./13-week3-capture-contract.md)、[14-er.md](./14-er.md)）
 - Capture schemaとmigrationを作成する
 - Repository、Service、Routerを実装する
 - Captureの作成・単一取得・一覧・更新・削除を実装する
