@@ -1,6 +1,6 @@
 import { signOutAction } from "@/app/account/actions";
-import { Button } from "./button";
 import { Card, CardFooter } from "./card";
+import { FormSubmitButton } from "./form-submit-button";
 
 export function AccountCard({ children }: { children: React.ReactNode }) {
 	return (
@@ -8,9 +8,12 @@ export function AccountCard({ children }: { children: React.ReactNode }) {
 			{children}
 			<CardFooter>
 				<form action={signOutAction}>
-					<Button type="submit" variant="outline">
+					<FormSubmitButton
+						variant="outline"
+						pendingLabel="ログアウト中…"
+					>
 						ログアウト
-					</Button>
+					</FormSubmitButton>
 				</form>
 			</CardFooter>
 		</Card>

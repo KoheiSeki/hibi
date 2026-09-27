@@ -5,6 +5,9 @@ import { createClient } from "@/lib/auth/server";
 
 export async function signOutAction() {
   const supabase = await createClient();
-  await supabase.auth.signOut();
-  redirect("/");
+  const { error } = await supabase.auth.signOut({ scope: "local" });
+  if (error) {
+    throw error;
+  }
+  redirect("/login");
 }
