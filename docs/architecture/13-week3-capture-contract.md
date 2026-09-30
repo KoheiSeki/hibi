@@ -22,17 +22,18 @@ Week 3 は、ユーザーが打ち込んだ**未整理の生入力 1 件（Captu
 新規判断の前に、定義済みドキュメントを優先する。
 
 
-| ドキュメント | この週に効く拘束 |
-| --- | --- |
-| [01-architecture.md](./01-architecture.md) | 業務 API は FastAPI のみ。Web は業務 table を直接操作しない。Capture 作成は `Idempotency-Key` 付き |
-| [02-project-structure.md](./02-project-structure.md) | `modules/captures/`、`features/capture/`、migration は `supabase/migrations` のみ |
-| [03-naming-conventions.md](./03-naming-conventions.md) | `MAX_CAPTURE_LENGTH = 2_000`、`operationId`、`Request`/`Response`、table `captures` |
-| [04-error-handling.md](./04-error-handling.md) | RFC 9457。別ユーザー所有は 404。業務層で `HTTPException` を上げない |
-| [06-api-data-contracts.md](./06-api-data-contracts.md) | `/api/v1`、`data` エンベロープ、cursor 一覧、201/202/204、冪等キー |
-| [07-security-auth.md](./07-security-auth.md) | Principal + 所有者条件。認可は FastAPI。private schema |
-| [08-testing-quality.md](./08-testing-quality.md) | 認可・冪等性を重点。SQLite で PostgreSQL を代替しない |
-| [12-week2-auth-failure-contract.md](./12-week2-auth-failure-contract.md) | 未認証は 401 Problem Details。JWKS 障害は 401 にしない |
-| foundation migration | 業務 table は `app` schema。`anon`/`authenticated` から revoke。`hibi_runtime` にだけ GRANT |
+| ドキュメント                                                                   | この週に効く拘束                                                                          |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| [01-architecture.md](./01-architecture.md)                               | 業務 API は FastAPI のみ。Web は業務 table を直接操作しない。Capture 作成は `Idempotency-Key` 付き       |
+| [02-project-structure.md](./02-project-structure.md)                     | `modules/captures/`、`features/capture/`、migration は `supabase/migrations` のみ      |
+| [03-naming-conventions.md](./03-naming-conventions.md)                   | `MAX_CAPTURE_LENGTH = 2_000`、`operationId`、`Request`/`Response`、table `captures`  |
+| [04-error-handling.md](./04-error-handling.md)                           | RFC 9457。別ユーザー所有は 404。業務層で `HTTPException` を上げない                                  |
+| [06-api-data-contracts.md](./06-api-data-contracts.md)                   | `/api/v1`、`data` エンベロープ、cursor 一覧、201/202/204、冪等キー                                |
+| [07-security-auth.md](./07-security-auth.md)                             | Principal + 所有者条件。認可は FastAPI。private schema                                      |
+| [08-testing-quality.md](./08-testing-quality.md)                         | 認可・冪等性を重点。SQLite で PostgreSQL を代替しない                                              |
+| [12-week2-auth-failure-contract.md](./12-week2-auth-failure-contract.md) | 未認証は 401 Problem Details。JWKS 障害は 401 にしない                                        |
+| foundation migration                                                     | 業務 table は `app` schema。`anon`/`authenticated` から revoke。`hibi_runtime` にだけ GRANT |
+
 
 Week 3 では Jev / LLM / outbox / Worker / retry / polling を実装しない。それらは Week 4 以降の契約変更として予約する。
 
@@ -53,14 +54,17 @@ Browser
 
 ## 検討した方針と推奨
 
+
+
 ### 作成 API の status code
 
 
-| 案 | 内容 | 採用 |
-| --- | --- | --- |
-| A | Week 3 は同期作成なので `201 Created`。Week 4 で `202 Accepted` へ意図的に変更する | **採用** |
-| B | Week 3 から `202` を返す（job は無い） | 不採用。同期保存なのに非同期受理を偽る |
-| C | 作成は常に `201`、処理開始は別 endpoint | 不採用。[01](./01-architecture.md) と Week 4 完了条件が「作成 API が 202」と明記している |
+| 案   | 内容                                                              | 採用                                                                 |
+| --- | --------------------------------------------------------------- | ------------------------------------------------------------------ |
+| A   | Week 3 は同期作成なので `201 Created`。Week 4 で `202 Accepted` へ意図的に変更する | **採用**                                                             |
+| B   | Week 3 から `202` を返す（job は無い）                                    | 不採用。同期保存なのに非同期受理を偽る                                                |
+| C   | 作成は常に `201`、処理開始は別 endpoint                                     | 不採用。[01](./01-architecture.md) と Week 4 完了条件が「作成 API が 202」と明記している |
+
 
 [06-api-data-contracts.md](./06-api-data-contracts.md) は「作成は 201、job 受理は 202」と分けている。Week 3 は作成、Week 4 は作成と同時に処理開始、と読む。
 
@@ -69,22 +73,28 @@ Browser
 ### 永続化
 
 
-| 案 | 内容 | 採用 |
-| --- | --- | --- |
-| A | SQLAlchemy 2.0 async + 既存 `asyncpg` | **採用**。[02](./02-project-structure.md) の `models.py`、[08](./08-testing-quality.md) の repository 前提と一致。Week 4 の同一 transaction + outbox にそのまま使える |
-| B | `asyncpg` 生 SQL のみ | 不採用。小さく始められるが、UoW / session 境界を後から取り直すコストが大きい |
+| 案   | 内容                                  | 採用                                                                                                                                             |
+| --- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| A   | SQLAlchemy 2.0 async + 既存 `asyncpg` | **採用**。[02](./02-project-structure.md) の `models.py`、[08](./08-testing-quality.md) の repository 前提と一致。Week 4 の同一 transaction + outbox にそのまま使える |
+| B   | `asyncpg` 生 SQL のみ                  | 不採用。小さく始められるが、UoW / session 境界を後から取り直すコストが大きい                                                                                                  |
+
 
 SQLite は使わない。
 
 ### 削除
 
 
-| 案 | 内容 | 採用 |
-| --- | --- | --- |
-| A | 物理削除 + `204` | **採用**。Week 3 の inbox CRUD に十分。冪等キーも行と一緒に消える |
-| B | `is_archived` 論理削除 | 不採用。命名例にはあるが、検索・レビュー要件が出るまで YAGNI |
+| 案   | 内容                 | 採用                                           |
+| --- | ------------------ | -------------------------------------------- |
+| A   | 物理削除 + `204`       | **採用**。Week 3 の inbox CRUD に十分。冪等キーも行と一緒に消える |
+| B   | `is_archived` 論理削除 | 不採用。命名例にはあるが、検索・レビュー要件が出るまで YAGNI            |
+
+
+
 
 ## 業務ルール
+
+
 
 ### 所有と可視性
 
@@ -93,6 +103,8 @@ SQLite は使わない。
 - Repository のすべての query に `user_id` を含める
 - 存在しない ID と、別ユーザー所有はどちらも `404 capture-not-found`（存在を秘匿）
 - `403` は使わない（認証済みだが他者 resource、という情報を返さない）
+
+
 
 ### 入力
 
@@ -103,6 +115,8 @@ SQLite は使わない。
 - 改行は本文として許可する
 - 添付、HTML、位置情報、カテゴリ指定は Week 3 対象外
 - user 入力を HTML として描画しない
+
+
 
 ### 状態（Week 3）
 
@@ -115,6 +129,8 @@ DB と API の enum は Week 4 以降の値を先に許可する。Week 3 の AP
 - 作成直後: `pending`
 - 更新・削除: `pending` の間は常に許可
 - `processing` 以降の遷移・更新禁止・retry は Week 4 で追加する
+
+
 
 ### 冪等（作成のみ）
 
@@ -130,6 +146,8 @@ DB と API の enum は Week 4 以降の値を先に許可する。Week 3 の AP
 - retention: Capture 行の寿命に一致する。削除後は同じ key で新規作成してよい
 - クライアントは「1 回の投稿意図」ごとに UUID を発行する。再送時だけ同じ key を再利用する
 
+
+
 ### 一覧
 
 - 自分の Capture だけ
@@ -137,17 +155,23 @@ DB と API の enum は Week 4 以降の値を先に許可する。Week 3 の AP
 - pagination は cursor
 - Week 3 に status / 全文検索 filter は置かない
 
+
+
 ### 更新
 
 - `rawText` のみ変更できる
 - `id` / `userId` / `status` / 時刻はクライアントから変更できない
 - 対象が無ければ 404
 
+
+
 ### 削除
 
 - 所有者のみ物理削除
 - 成功は `204`
 - 再削除は 404
+
+
 
 ## データモデル
 
@@ -220,6 +244,8 @@ JSON field: `camelCase`
 - 単一も一覧要素も `CaptureResponse` を使う。`CaptureListItem` は作らない
 - 一覧の HTTP 型は `ApiResponseWithMeta[list[CaptureResponse], CursorMeta]`。`CaptureListResponse` を別 item 型としては作らない
 
+
+
 ### `POST /api/v1/captures`
 
 - `operationId`: `createCapture`
@@ -236,11 +262,13 @@ Request:
 
 初回成功:
 
-| 項目 | 値 |
-| --- | --- |
-| Status | `201` |
+
+| 項目         | 値                              |
+| ---------- | ------------------------------ |
+| Status     | `201`                          |
 | `Location` | `/api/v1/captures/{captureId}` |
-| Body | `{ "data": CaptureResponse }` |
+| Body       | `{ "data": CaptureResponse }`  |
+
 
 同一 key・同一 payload の再送: `200` + 最初の `CaptureResponse`（新規作成しない）。`Location` は付けてよい。
 
@@ -248,6 +276,8 @@ Request:
 
 - `operationId`: `getCapture`
 - 成功: `200` + `{ "data": CaptureResponse }`
+
+
 
 ### `GET /api/v1/captures`
 
@@ -288,33 +318,40 @@ Request:
 }
 ```
 
+
+
 ### `DELETE /api/v1/captures/{captureId}`
 
 - `operationId`: `deleteCapture`
 - 成功: `204`（body なし）
+
+
 
 ### Week 3 で作らない endpoint
 
 - `POST /api/v1/captures/{captureId}/retry`
 - 処理状態専用の polling 専用 API（GET 単体で足りる）
 
+
+
 ## エラー契約
 
 `type` で分岐する。`detail` 文字列では分岐しない。`requestId` は `X-Request-ID` と一致。`instance` は request path。
 
 
-| ケース | Status | `type` 末尾 | `title` | 備考 |
-| --- | --- | --- | --- | --- |
-| 未認証 / token 不正 | 401 | `unauthorized` | `Unauthorized` | Week 2 と同じ。例外メッセージ直出し禁止 |
-| `Idempotency-Key` なし | 400 | `idempotency-key-required` | `Idempotency-Key required` | 固定 `detail` |
-| key 形式不正 | 400 | `idempotency-key-invalid` | `Idempotency-Key invalid` | 長さ・文字種 |
-| 不正 cursor | 400 | `malformed-cursor` | `Malformed cursor` | |
-| 同一 key・異なる payload | 409 | `idempotency-key-conflict` | `Idempotency-Key conflict` | |
-| 存在しない / 他者の Capture | 404 | `capture-not-found` | `Capture not found` | 両者を区別しない |
-| `rawText` 検証失敗 | 422 | `validation-error` | `Request validation failed` | `errors[].pointer` は `/rawText` |
-| path の UUID 不正 | 422 | `validation-error` | `Request validation failed` | |
-| JWKS 等インフラ例外 | 500 | `internal-error` | `Internal server error` | 401 にしない |
-| その他の未処理例外 | 500 | `internal-error` | `Internal server error` | |
+| ケース                  | Status | `type` 末尾                  | `title`                     | 備考                              |
+| -------------------- | ------ | -------------------------- | --------------------------- | ------------------------------- |
+| 未認証 / token 不正       | 401    | `unauthorized`             | `Unauthorized`              | Week 2 と同じ。例外メッセージ直出し禁止         |
+| `Idempotency-Key` なし | 400    | `idempotency-key-required` | `Idempotency-Key required`  | 固定 `detail`                     |
+| key 形式不正             | 400    | `idempotency-key-invalid`  | `Idempotency-Key invalid`   | 長さ・文字種                          |
+| 不正 cursor            | 400    | `malformed-cursor`         | `Malformed cursor`          |                                 |
+| 同一 key・異なる payload   | 409    | `idempotency-key-conflict` | `Idempotency-Key conflict`  |                                 |
+| 存在しない / 他者の Capture  | 404    | `capture-not-found`        | `Capture not found`         | 両者を区別しない                        |
+| `rawText` 検証失敗       | 422    | `validation-error`         | `Request validation failed` | `errors[].pointer` は `/rawText` |
+| path の UUID 不正       | 422    | `validation-error`         | `Request validation failed` |                                 |
+| JWKS 等インフラ例外         | 500    | `internal-error`           | `Internal server error`     | 401 にしない                        |
+| その他の未処理例外            | 500    | `internal-error`           | `Internal server error`     |                                 |
+
 
 404 例:
 
@@ -373,14 +410,18 @@ DB は `hibi/db` に async session / Unit of Work を新設する。例外時 ro
 
 ## Web 契約
 
+
+
 ### 画面
 
 モバイル前提の 2 面。
 
-| 経路 | 役割 |
-| --- | --- |
-| `/captures` | 入力欄 + 自分の一覧。empty / loading / error を必ず持つ |
-| `/captures/[captureId]` | 本文表示、編集、削除。他者・不存在は `notFound()` |
+
+| 経路                      | 役割                                        |
+| ----------------------- | ----------------------------------------- |
+| `/captures`             | 入力欄 + 自分の一覧。empty / loading / error を必ず持つ |
+| `/captures/[captureId]` | 本文表示、編集、削除。他者・不存在は `notFound()`           |
+
 
 未ログインは Week 2 アカウント画面と同じく `getUser()` → `/login`。
 
@@ -393,6 +434,8 @@ DB は `hibi/db` に async session / Unit of Work を新設する。例外時 ro
 - 生成 client の `createCapture` / `getCapture` / `listCaptures` / `updateCapture` / `deleteCapture` を使う
 - 手書きの Capture 型を作らない。`pnpm openapi:client` を同一 PR で回す
 - 表示文言は FE が決める。API の `detail` をそのまま見出しにしない
+
+
 
 ### 冪等キーの発行
 
@@ -410,40 +453,49 @@ Week 3 の UI に処理中 polling、retry、カテゴリ表示は出さない�
 
 週 10 時間前提で、テストを先に固定する。
 
-1. **契約テスト（API）**  
-   TestClient + `get_principal` override で 201/200 replay/409/404 秘匿/422/401 を先に落とす。DB は repository fake でよい。
-2. **migration**  
-   `supabase migration new` で `app.captures` を追加。`supabase/tests` に revoke と owner query 用の検証を足す。
-3. **DB 接続基盤**  
-   方針は [16-week3-db-repository.md](./16-week3-db-repository.md)。engine / session だけ。
-4. **Capture Repository**  
-   方針は [17-week3-capture-repository.md](./17-week3-capture-repository.md)。`modules/captures/models.py` と `repository.py`。`db/crud/` は作らない。
-5. **service / router / OpenAPI**  
-   `create_app` から captures router を mount。`problem_responses` を更新。`pnpm openapi:client`。
-6. **Web**  
-   `/captures` と detail。Server Action は token を Bearer で渡す（`getCurrentUserFromApi` と同じ取得方法）。
-7. **縦切り確認**  
-   ログイン済みユーザーが作成 → 一覧 → 編集 → 削除。別ユーザーの URL を開いても 404。
+1. **契約テスト（API）**
+  TestClient + `get_principal` override で 201/200 replay/409/404 秘匿/422/401 を先に落とす。DB は repository fake でよい。
+2. **migration**
+  `supabase migration new` で `app.captures` を追加。`supabase/tests` に revoke と owner query 用の検証を足す。
+3. **DB 接続基盤**
+  方針は [16-week3-db-repository.md](./16-week3-db-repository.md)。engine / session だけ。
+4. **Capture Repository**
+  方針は [17-week3-capture-repository.md](./17-week3-capture-repository.md)。`modules/captures/models.py` と `repository.py`。`db/crud/` は作らない。
+5. **Capture Service**
+  方針は [18-week3-capture-service.md](./18-week3-capture-service.md)。冪等・trim・cursor・domain error。HTTP はまだしない。
+6. **router / OpenAPI**
+  `create_app` から captures router を mount。`problem_responses` を更新。`pnpm openapi:client`。
+7. **Web**
+  `/captures` と detail。Server Action は token を Bearer で渡す（`getCurrentUserFromApi` と同じ取得方法）。
+8. **縦切り確認**
+  ログイン済みユーザーが作成 → 一覧 → 編集 → 削除。別ユーザーの URL を開いても 404。
+
+
 
 ## テスト契約
+
+
 
 ### API（決定的・CI）
 
 
-| ケース | 期待 |
-| --- | --- |
-| 未認証で POST/GET/PATCH/DELETE | 401 `unauthorized` |
-| 正常作成 | 201、`Location`、`data.status === "pending"`、`rawText` が trim 済み |
-| 同一 key・同一 body 再 POST | 200、同じ `id`、行は 1 件 |
-| 同一 key・異なる `rawText` | 409 `idempotency-key-conflict` |
-| `Idempotency-Key` なし | 400 |
-| `rawText` 空 / 2001 文字 | 422、`/rawText` |
-| 自分の GET | 200 |
-| 他人の ID で GET/PATCH/DELETE | 404 `capture-not-found`（401/403 ではない） |
-| 存在しない ID | 404 |
-| 一覧に他人の行が混ざらない | `data` が所有者のみ、新しい順 |
-| DELETE 後 GET | 404 |
-| JWKS 障害中の GET | 500（401 ではない）。既存 verifier 契約を流用 |
+| ケース                        | 期待                                                             |
+| -------------------------- | -------------------------------------------------------------- |
+| 未認証で POST/GET/PATCH/DELETE | 401 `unauthorized`                                             |
+| 正常作成                       | 201、`Location`、`data.status === "pending"`、`rawText` が trim 済み |
+| 同一 key・同一 body 再 POST      | 200、同じ `id`、行は 1 件                                             |
+| 同一 key・異なる `rawText`       | 409 `idempotency-key-conflict`                                 |
+| `Idempotency-Key` なし       | 400                                                            |
+| `rawText` 空 / 2001 文字      | 422、`/rawText`                                                 |
+| 自分の GET                    | 200                                                            |
+| 他人の ID で GET/PATCH/DELETE  | 404 `capture-not-found`（401/403 ではない）                          |
+| 存在しない ID                   | 404                                                            |
+| 一覧に他人の行が混ざらない              | `data` が所有者のみ、新しい順                                             |
+| DELETE 後 GET               | 404                                                            |
+| JWKS 障害中の GET              | 500（401 ではない）。既存 verifier 契約を流用                                |
+
+
+
 
 ### API（integration・Local）
 
@@ -452,14 +504,17 @@ Week 3 の UI に処理中 polling、retry、カテゴリ表示は出さない�
 ### Web
 
 
-| ケース | 期待 |
-| --- | --- |
-| 未ログインで `/captures` | `/login` |
-| 作成成功 | 一覧に本文が出る |
-| 空送信 | 入力欄エラー（422） |
-| 一覧 empty | empty state |
-| API 500 | `ApiErrorMessage`（login へ飛ばない） |
-| 二重 submit | 1 件だけ作られる（同じ Idempotency-Key） |
+| ケース                | 期待                             |
+| ------------------ | ------------------------------ |
+| 未ログインで `/captures` | `/login`                       |
+| 作成成功               | 一覧に本文が出る                       |
+| 空送信                | 入力欄エラー（422）                    |
+| 一覧 empty           | empty state                    |
+| API 500            | `ApiErrorMessage`（login へ飛ばない） |
+| 二重 submit          | 1 件だけ作られる（同じ Idempotency-Key）  |
+
+
+
 
 ## 脅威（Week 3 分）
 
@@ -478,13 +533,17 @@ file upload、webhook、vector 漏洩、prompt injection は対象外。
 
 実装しないが、壊さないために列と enum を先に空ける。
 
-| 時期 | 変更 | 備考 |
-| --- | --- | --- |
-| Week 4 | 作成が `202`、outbox 同一 transaction、`processing` 遷移、polling UI | 本契約の 201 テストを意図的に更新 |
-| Week 4 | `POST .../retry` | `failed` のみ |
-| Week 4 | `pending` / `processing` 中の更新ルール | 処理開始後は本文更新を 409 にする想定 |
-| Week 5 | route / category / urgency / confidence | response への追加は optional field なら非破壊 |
-| Week 8 | 検索 | 一覧 query を拡張 |
+
+| 時期     | 変更                                                         | 備考                                  |
+| ------ | ---------------------------------------------------------- | ----------------------------------- |
+| Week 4 | 作成が `202`、outbox 同一 transaction、`processing` 遷移、polling UI | 本契約の 201 テストを意図的に更新                 |
+| Week 4 | `POST .../retry`                                           | `failed` のみ                         |
+| Week 4 | `pending` / `processing` 中の更新ルール                           | 処理開始後は本文更新を 409 にする想定               |
+| Week 5 | route / category / urgency / confidence                    | response への追加は optional field なら非破壊 |
+| Week 8 | 検索                                                         | 一覧 query を拡張                        |
+
+
+
 
 ## プログラム本体の推奨（担当分担）
 
@@ -517,3 +576,4 @@ file upload、webhook、vector 漏洩、prompt injection は対象外。
 - [テスト・品質管理](./08-testing-quality.md)
 - [実装スケジュール](./11-implementation-schedule.md)
 - [Week 2 認証失敗契約](./12-week2-auth-failure-contract.md)
+

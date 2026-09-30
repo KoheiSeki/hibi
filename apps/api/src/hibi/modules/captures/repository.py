@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -6,18 +5,7 @@ from sqlalchemy import select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hibi.modules.captures.models import CaptureModel
-
-
-@dataclass(frozen=True, slots=True)
-class Capture:
-    id: UUID
-    user_id: UUID
-    raw_text: str
-    status: str
-    idempotency_key: str
-    request_hash: str
-    created_at: datetime
-    updated_at: datetime
+from hibi.modules.captures.types import Capture
 
 
 class CaptureRepository:
@@ -51,13 +39,14 @@ class CaptureRepository:
         user_id: UUID,
         *,
         limit: int,
-        created_at: datetime | None = None,
-        id: UUID | None = None,
+        start_created_at: datetime | None = None,
+        start_capture_id: UUID | None = None,
     ) -> list[Capture]:
         stmt = select(CaptureModel).where(CaptureModel.user_id == user_id)
-        if created_at is not None and id is not None:
+        if start_created_at is not None and start_capture_id is not None:
             stmt = stmt.where(
-                tuple_(CaptureModel.created_at, CaptureModel.id) < (created_at, id)
+                tuple_(CaptureModel.created_at, CaptureModel.id)
+                < (start_created_at, start_capture_id)
             )
         stmt = stmt.order_by(
             CaptureModel.created_at.desc(), CaptureModel.id.desc()
@@ -69,13 +58,13 @@ class CaptureRepository:
         self,
         user_id: UUID,
         *,
-        id: UUID,
+        capture_id: UUID,
         raw_text: str,
         idempotency_key: str,
         request_hash: str,
     ) -> Capture:
         db_obj = CaptureModel(
-            id=id,
+            id=capture_id,
             user_id=user_id,
             raw_text=raw_text,
             status="pending",

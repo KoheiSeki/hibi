@@ -8,7 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from hibi.core.config import get_settings
 from hibi.db.engine import dispose_engine, get_engine
-from hibi.modules.captures.repository import Capture, CaptureRepository
+from hibi.modules.captures.repository import CaptureRepository
+from hibi.modules.captures.types import Capture
 
 _HASH_A = "a" * 64
 _HASH_B = "b" * 64

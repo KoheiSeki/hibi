@@ -1,0 +1,167 @@
+from base64 import urlsafe_b64decode, urlsafe_b64encode
+from datetime import UTC, datetime
+import hashlib
+import json
+import re
+from uuid import UUID, uuid7
+
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from hibi.modules.captures.errors import (
+    CaptureNotFoundError,
+    CaptureTextInvalidError,
+    IdempotencyKeyConflictError,
+    IdempotencyKeyInvalidError,
+    IdempotencyKeyRequiredError,
+    MalformedCursorError,
+)
+from hibi.modules.captures.repository import CaptureRepository
+from hibi.modules.captures.types import (
+    Capture,
+    CapturePage,
+    CreateCaptureCommand,
+    CreateCaptureResult,
+    ListCapturesQuery,
+    UpdateCaptureCommand,
+)
+
+_IDEMPOTENCY_KEY_PATTERN = re.compile(r"^[\x20-\x7E]{8,128}$")
+_MAX_CAPTURE_LENGTH = 2_000
+
+
+class CaptureService:
+    def __init__(self, session: AsyncSession, repository: CaptureRepository) -> None:
+        self._session = session
+        self._repository = repository
+
+    async def create_capture(
+        self, command: CreateCaptureCommand
+    ) -> CreateCaptureResult:
+        idempotency_key = command.idempotency_key
+        if idempotency_key is None or idempotency_key == "":
+            raise IdempotencyKeyRequiredError()
+        if _IDEMPOTENCY_KEY_PATTERN.fullmatch(idempotency_key) is None:
+            raise IdempotencyKeyInvalidError()
+
+        stripped_raw_text = self._normalize_raw_text(command.raw_text)
+
+        request_hash = hashlib.sha256(stripped_raw_text.encode("utf-8")).hexdigest()
+
+        existing = await self._repository.get_by_idempotency_key(
+            command.user_id, key=idempotency_key
+        )
+        result = self._replay_or_conflict(existing, request_hash)
+        if result is not None:
+            return result
+
+        capture_id = uuid7()
+
+        try:
+            new = await self._repository.create_capture(
+                command.user_id,
+                capture_id=capture_id,
+                raw_text=stripped_raw_text,
+                idempotency_key=idempotency_key,
+                request_hash=request_hash,
+            )
+            return CreateCaptureResult(capture=new, created=True)
+        except IntegrityError:
+            await self._session.rollback()
+
+            existing = await self._repository.get_by_idempotency_key(
+                command.user_id, key=idempotency_key
+            )
+            result = self._replay_or_conflict(existing, request_hash)
+            if result is not None:
+                return result
+            raise
+
+    async def get_capture(self, user_id: UUID, capture_id: UUID) -> Capture:
+        result = await self._repository.get_by_id(user_id, capture_id=capture_id)
+        if result is None:
+            raise CaptureNotFoundError(capture_id)
+        return result
+
+    async def list_captures(self, query: ListCapturesQuery) -> CapturePage:
+        limit = 20 if query.limit is None else query.limit
+        limit = min(max(limit, 1), 50)
+
+        start_created_at = None
+        start_capture_id = None
+        if query.cursor is not None and query.cursor != "":
+            start_created_at, start_capture_id = self._decode_cursor(query.cursor)
+
+        rows = await self._repository.list_for_user(
+            query.user_id,
+            limit=limit + 1,
+            start_created_at=start_created_at,
+            start_capture_id=start_capture_id,
+        )
+        items = rows[:limit]
+        has_next_page = len(rows) > limit
+        next_cursor = None
+        if has_next_page:
+            last = items[-1]
+            next_cursor = self._encode_cursor(last.created_at, last.id)
+
+        return CapturePage(
+            items=items, next_cursor=next_cursor, has_next_page=has_next_page
+        )
+
+    async def update_capture(self, command: UpdateCaptureCommand) -> Capture:
+
+        stripped_raw_text = self._normalize_raw_text(command.raw_text)
+
+        updated = await self._repository.update_capture(
+            command.user_id, capture_id=command.capture_id, raw_text=stripped_raw_text
+        )
+        if updated is None:
+            raise CaptureNotFoundError(capture_id=command.capture_id)
+        return updated
+
+    async def delete_capture(self, user_id: UUID, capture_id: UUID) -> None:
+        is_deleted = await self._repository.delete_capture(
+            user_id, capture_id=capture_id
+        )
+        if not is_deleted:
+            raise CaptureNotFoundError(capture_id=capture_id)
+
+    def _replay_or_conflict(
+        self, existing: Capture | None, request_hash: str
+    ) -> CreateCaptureResult | None:
+        if existing is None:
+            return None
+        if existing.request_hash == request_hash:
+            return CreateCaptureResult(capture=existing, created=False)
+        raise IdempotencyKeyConflictError()
+
+    def _normalize_raw_text(self, raw_text: str) -> str:
+        stripped_raw_text = raw_text.strip()
+        if len(stripped_raw_text) == 0 or len(stripped_raw_text) > _MAX_CAPTURE_LENGTH:
+            raise CaptureTextInvalidError()
+        return stripped_raw_text
+
+    def _decode_cursor(self, cursor: str) -> tuple[datetime, UUID]:
+        try:
+            padded = cursor + "=" * (-len(cursor) % 4)
+            raw = urlsafe_b64decode(padded)
+            payload = json.loads(raw)
+            created_at = datetime.fromisoformat(
+                str(payload["c"]).replace("Z", "+00:00")
+            )
+            capture_id = UUID(str(payload["i"]))
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+            raise MalformedCursorError() from None
+
+        if created_at.tzinfo is None:
+            raise MalformedCursorError() from None
+        return created_at, capture_id
+
+    def _encode_cursor(self, created_at: datetime, capture_id: UUID) -> str:
+        payload = {
+            "c": created_at.astimezone(UTC).isoformat().replace("+00:00", "Z"),
+            "i": str(capture_id),
+        }
+        raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+        return urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")

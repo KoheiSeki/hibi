@@ -53,7 +53,7 @@ Repository は SQL と行の有無だけを知る
 | --- | --- |
 | `apps/api/src/hibi/modules/captures/__init__.py` | 空、または `CaptureRepository` を公開 |
 | `apps/api/src/hibi/modules/captures/models.py` | `CaptureModel`。`Base` を継承。`__table_args__ = {"schema": "app"}` |
-| `apps/api/src/hibi/modules/captures/repository.py` | domain `Capture` と `CaptureRepository` |
+| `apps/api/src/hibi/modules/captures/repository.py` | `CaptureRepository`。domain `Capture` は Service 以降 `types.py` |
 | `apps/api/tests/integration/test_capture_repository.py` | 実 Postgres。通常 CI からは除外 |
 
 
@@ -102,7 +102,7 @@ Capture
 
 `idempotency_key` / `request_hash` は API に出さないが、次の Service が 200 / 409 を決めるので domain には載せる。
 
-置き場所は `repository.py` でよい。`models.py` に dataclass を混ぜない。
+`models.py` に dataclass を混ぜない。Service 導入後の置き場は `types.py`（[18](./18-week3-capture-service.md)）。
 
 ### `CaptureRepository`
 
@@ -185,7 +185,7 @@ LIMIT :limit
 
 ## 次ステップ（Service）
 
-Repository の `None` / `IntegrityError` / 既存行の hash を、`201` / `200` / `409` / `404` 相当の domain error に変える。cursor の encode / decode と `rawText` の trim / hash も Service。
+方針は [18-week3-capture-service.md](./18-week3-capture-service.md)。
 
 ## 関連
 
