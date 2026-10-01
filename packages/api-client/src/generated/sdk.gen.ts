@@ -9,9 +9,18 @@ import type {
 } from "./client";
 import { client } from "./client.gen";
 import type {
+  CreateCaptureData,
+  CreateCaptureErrors,
+  CreateCaptureResponses,
+  DeleteCaptureData,
+  DeleteCaptureErrors,
+  DeleteCaptureResponses,
   EchoMessageData,
   EchoMessageErrors,
   EchoMessageResponses,
+  GetCaptureData,
+  GetCaptureErrors,
+  GetCaptureResponses,
   GetCurrentUserData,
   GetCurrentUserErrors,
   GetCurrentUserResponses,
@@ -21,6 +30,12 @@ import type {
   GetProtectedResourceData,
   GetProtectedResourceErrors,
   GetProtectedResourceResponses,
+  ListCapturesData,
+  ListCapturesErrors,
+  ListCapturesResponses,
+  UpdateCaptureData,
+  UpdateCaptureErrors,
+  UpdateCaptureResponses,
 } from "./types.gen";
 
 export type Options<
@@ -40,6 +55,94 @@ export type Options<
    */
   meta?: keyof ClientMeta extends never ? Record<string, unknown> : ClientMeta;
 };
+
+/**
+ * List Captures
+ */
+export const listCaptures = <ThrowOnError extends boolean = false>(
+  options?: Options<ListCapturesData, ThrowOnError>,
+): RequestResult<ListCapturesResponses, ListCapturesErrors, ThrowOnError> =>
+  (options?.client ?? client).get<
+    ListCapturesResponses,
+    ListCapturesErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/api/v1/captures",
+    ...options,
+  });
+
+/**
+ * Create Capture
+ */
+export const createCapture = <ThrowOnError extends boolean = false>(
+  options: Options<CreateCaptureData, ThrowOnError>,
+): RequestResult<CreateCaptureResponses, CreateCaptureErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    CreateCaptureResponses,
+    CreateCaptureErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/api/v1/captures",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Delete Capture
+ */
+export const deleteCapture = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteCaptureData, ThrowOnError>,
+): RequestResult<DeleteCaptureResponses, DeleteCaptureErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    DeleteCaptureResponses,
+    DeleteCaptureErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/api/v1/captures/{capture_id}",
+    ...options,
+  });
+
+/**
+ * Get Capture
+ */
+export const getCapture = <ThrowOnError extends boolean = false>(
+  options: Options<GetCaptureData, ThrowOnError>,
+): RequestResult<GetCaptureResponses, GetCaptureErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetCaptureResponses,
+    GetCaptureErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/api/v1/captures/{capture_id}",
+    ...options,
+  });
+
+/**
+ * Update Capture
+ */
+export const updateCapture = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateCaptureData, ThrowOnError>,
+): RequestResult<UpdateCaptureResponses, UpdateCaptureErrors, ThrowOnError> =>
+  (options.client ?? client).patch<
+    UpdateCaptureResponses,
+    UpdateCaptureErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/api/v1/captures/{capture_id}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
 
 /**
  * Echo Message

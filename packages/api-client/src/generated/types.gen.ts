@@ -5,6 +5,24 @@ export type ClientOptions = {
 };
 
 /**
+ * ApiResponseWithMeta[list[CaptureResponse], CursorMeta]
+ */
+export type ApiResponseWithMetaListCaptureResponseCursorMeta = {
+  /**
+   * Data
+   */
+  data: Array<CaptureResponse>;
+  meta: CursorMeta;
+};
+
+/**
+ * ApiResponse[CaptureResponse]
+ */
+export type ApiResponseCaptureResponse = {
+  data: CaptureResponse;
+};
+
+/**
  * ApiResponse[EchoResponse]
  */
 export type ApiResponseEchoResponse = {
@@ -30,6 +48,56 @@ export type ApiResponseProtectedResourceResponse = {
  */
 export type ApiResponseUserResponse = {
   data: UserResponse;
+};
+
+/**
+ * CaptureResponse
+ */
+export type CaptureResponse = {
+  /**
+   * Createdat
+   */
+  createdAt: string;
+  /**
+   * Id
+   */
+  id: string;
+  /**
+   * Rawtext
+   */
+  rawText: string;
+  /**
+   * Status
+   */
+  status: string;
+  /**
+   * Updatedat
+   */
+  updatedAt: string;
+};
+
+/**
+ * CreateCaptureRequest
+ */
+export type CreateCaptureRequest = {
+  /**
+   * Rawtext
+   */
+  rawText: string;
+};
+
+/**
+ * CursorMeta
+ */
+export type CursorMeta = {
+  /**
+   * Hasnextpage
+   */
+  hasNextPage: boolean;
+  /**
+   * Nextcursor
+   */
+  nextCursor: string | null;
 };
 
 /**
@@ -125,6 +193,16 @@ export type ProtectedResourceResponse = {
 };
 
 /**
+ * UpdateCaptureRequest
+ */
+export type UpdateCaptureRequest = {
+  /**
+   * Rawtext
+   */
+  rawText: string;
+};
+
+/**
  * UserResponse
  */
 export type UserResponse = {
@@ -133,6 +211,233 @@ export type UserResponse = {
    */
   userId: string;
 };
+
+export type ListCapturesData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Limit
+     */
+    limit?: number;
+    /**
+     * Cursor
+     */
+    cursor?: string | null;
+  };
+  url: "/api/v1/captures";
+};
+
+export type ListCapturesErrors = {
+  /**
+   * Bad request.
+   */
+  400: ProblemDetails;
+  /**
+   * Authentication failed.
+   */
+  401: ProblemDetails;
+  /**
+   * Request validation failed.
+   */
+  422: ProblemDetails;
+  /**
+   * An unexpected server error occurred.
+   */
+  500: ProblemDetails;
+};
+
+export type ListCapturesError = ListCapturesErrors[keyof ListCapturesErrors];
+
+export type ListCapturesResponses = {
+  /**
+   * Successful Response
+   */
+  200: ApiResponseWithMetaListCaptureResponseCursorMeta;
+};
+
+export type ListCapturesResponse =
+  ListCapturesResponses[keyof ListCapturesResponses];
+
+export type CreateCaptureData = {
+  body: CreateCaptureRequest;
+  headers?: {
+    /**
+     * Idempotency-Key
+     */
+    "Idempotency-Key"?: string | null;
+  };
+  path?: never;
+  query?: never;
+  url: "/api/v1/captures";
+};
+
+export type CreateCaptureErrors = {
+  /**
+   * Bad request.
+   */
+  400: ProblemDetails;
+  /**
+   * Authentication failed.
+   */
+  401: ProblemDetails;
+  /**
+   * Conflict.
+   */
+  409: ProblemDetails;
+  /**
+   * Request validation failed.
+   */
+  422: ProblemDetails;
+  /**
+   * An unexpected server error occurred.
+   */
+  500: ProblemDetails;
+};
+
+export type CreateCaptureError = CreateCaptureErrors[keyof CreateCaptureErrors];
+
+export type CreateCaptureResponses = {
+  /**
+   * OK
+   */
+  200: ApiResponseCaptureResponse;
+  /**
+   * Successful Response
+   */
+  201: ApiResponseCaptureResponse;
+};
+
+export type CreateCaptureResponse =
+  CreateCaptureResponses[keyof CreateCaptureResponses];
+
+export type DeleteCaptureData = {
+  body?: never;
+  path: {
+    /**
+     * Capture Id
+     */
+    capture_id: string;
+  };
+  query?: never;
+  url: "/api/v1/captures/{capture_id}";
+};
+
+export type DeleteCaptureErrors = {
+  /**
+   * Authentication failed.
+   */
+  401: ProblemDetails;
+  /**
+   * The requested resource was not found.
+   */
+  404: ProblemDetails;
+  /**
+   * Request validation failed.
+   */
+  422: ProblemDetails;
+  /**
+   * An unexpected server error occurred.
+   */
+  500: ProblemDetails;
+};
+
+export type DeleteCaptureError = DeleteCaptureErrors[keyof DeleteCaptureErrors];
+
+export type DeleteCaptureResponses = {
+  /**
+   * Successful Response
+   */
+  204: void;
+};
+
+export type DeleteCaptureResponse =
+  DeleteCaptureResponses[keyof DeleteCaptureResponses];
+
+export type GetCaptureData = {
+  body?: never;
+  path: {
+    /**
+     * Capture Id
+     */
+    capture_id: string;
+  };
+  query?: never;
+  url: "/api/v1/captures/{capture_id}";
+};
+
+export type GetCaptureErrors = {
+  /**
+   * Authentication failed.
+   */
+  401: ProblemDetails;
+  /**
+   * The requested resource was not found.
+   */
+  404: ProblemDetails;
+  /**
+   * Request validation failed.
+   */
+  422: ProblemDetails;
+  /**
+   * An unexpected server error occurred.
+   */
+  500: ProblemDetails;
+};
+
+export type GetCaptureError = GetCaptureErrors[keyof GetCaptureErrors];
+
+export type GetCaptureResponses = {
+  /**
+   * Successful Response
+   */
+  200: ApiResponseCaptureResponse;
+};
+
+export type GetCaptureResponse = GetCaptureResponses[keyof GetCaptureResponses];
+
+export type UpdateCaptureData = {
+  body: UpdateCaptureRequest;
+  path: {
+    /**
+     * Capture Id
+     */
+    capture_id: string;
+  };
+  query?: never;
+  url: "/api/v1/captures/{capture_id}";
+};
+
+export type UpdateCaptureErrors = {
+  /**
+   * Authentication failed.
+   */
+  401: ProblemDetails;
+  /**
+   * The requested resource was not found.
+   */
+  404: ProblemDetails;
+  /**
+   * Request validation failed.
+   */
+  422: ProblemDetails;
+  /**
+   * An unexpected server error occurred.
+   */
+  500: ProblemDetails;
+};
+
+export type UpdateCaptureError = UpdateCaptureErrors[keyof UpdateCaptureErrors];
+
+export type UpdateCaptureResponses = {
+  /**
+   * Successful Response
+   */
+  200: ApiResponseCaptureResponse;
+};
+
+export type UpdateCaptureResponse =
+  UpdateCaptureResponses[keyof UpdateCaptureResponses];
 
 export type EchoMessageData = {
   body: EchoRequest;

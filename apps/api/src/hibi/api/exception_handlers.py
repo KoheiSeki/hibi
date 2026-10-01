@@ -28,6 +28,16 @@ def _response(problem: ProblemDetails) -> JSONResponse:
 
 
 async def handle_application_error(request: Request, error: ApplicationError) -> JSONResponse:
+    pointer = getattr(error, "pointer", None)
+    fields = None
+    if pointer is not None:
+        fields = [
+            FieldProblem(
+                pointer=str(pointer),
+                code=str(getattr(error, "error_code", "invalid")),
+                detail=error.detail,
+            )
+        ]
     return _response(
         ProblemDetails(
             type=f"{PROBLEM_BASE}/{error.problem_type}",
@@ -36,6 +46,7 @@ async def handle_application_error(request: Request, error: ApplicationError) ->
             detail=error.detail,
             instance=request.url.path,
             request_id=_request_id(request),
+            errors=fields,
         )
     )
 

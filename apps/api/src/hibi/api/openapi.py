@@ -5,8 +5,10 @@ from fastapi import FastAPI
 from hibi.api.problem_details import ProblemDetails
 
 _DESCRIPTIONS = {
+    400: "Bad request.",
     401: "Authentication failed.",
     404: "The requested resource was not found.",
+    409: "Conflict.",
     422: "Request validation failed.",
     500: "An unexpected server error occurred.",
 }
@@ -34,6 +36,8 @@ class ProblemDetailsFastAPI(FastAPI):
                         continue
                     content = response.get("content", {})
                     json_schema = content.get("application/json")
-                    if json_schema == {"schema": {"$ref": "#/components/schemas/ProblemDetails"}}:
+                    if json_schema == {
+                        "schema": {"$ref": "#/components/schemas/ProblemDetails"}
+                    }:
                         response["content"] = {"application/problem+json": json_schema}
         return schema

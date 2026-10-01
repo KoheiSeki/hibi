@@ -464,7 +464,7 @@ Week 3 の UI に処理中 polling、retry、カテゴリ表示は出さない�
 5. **Capture Service**
   方針は [18-week3-capture-service.md](./18-week3-capture-service.md)。冪等・trim・cursor・domain error。HTTP はまだしない。
 6. **router / OpenAPI**
-  `create_app` から captures router を mount。`problem_responses` を更新。`pnpm openapi:client`。
+  方針は [19-week3-capture-router.md](./19-week3-capture-router.md)。`create_app` から captures router を mount。`problem_responses` を更新。`pnpm openapi:client`。
 7. **Web**
   `/captures` と detail。Server Action は token を Bearer で渡す（`getCurrentUserFromApi` と同じ取得方法）。
 8. **縦切り確認**

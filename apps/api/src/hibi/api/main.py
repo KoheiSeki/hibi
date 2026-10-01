@@ -19,6 +19,7 @@ from hibi.api.schemas import (
 from hibi.auth.principal import Principal
 from hibi.core.config import get_settings
 from hibi.db.engine import dispose_engine
+from hibi.modules.captures.router import router as captures_router
 from hibi.modules.profiles.service import get_owned_resource
 
 ResourceLookup = Callable[[UUID], str]
@@ -42,7 +43,12 @@ def create_app(resource_lookup: ResourceLookup = _default_resource_lookup) -> Fa
         allow_origins=[origin.strip() for origin in settings.cors_origins.split(",")],
         allow_credentials=True,
         allow_methods=["*"],
-        allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+        allow_headers=[
+            "Authorization",
+            "Content-Type",
+            "X-Request-ID",
+            "Idempotency-Key",
+        ],
     )
 
     @app.middleware("http")
@@ -96,6 +102,7 @@ def create_app(resource_lookup: ResourceLookup = _default_resource_lookup) -> Fa
         return ApiResponse(data=ProtectedResourceResponse(value=value))
 
     register_exception_handlers(app)
+    app.include_router(captures_router, prefix="/api/v1")
     return app
 
 

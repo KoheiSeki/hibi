@@ -25,3 +25,13 @@ class UserResponse(ApiModel):
 
 class ProtectedResourceResponse(ApiModel):
     value: str
+
+
+class ApiResponseWithMeta[DataT, MetaT](ApiModel):
+    data: DataT
+    meta: MetaT
+
+
+class CursorMeta(ApiModel):
+    next_cursor: str | None
+    has_next_page: bool

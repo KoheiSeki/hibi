@@ -225,7 +225,7 @@ encode は SQL を露出さない。契約例と同じ形でよい。
 
 ## 次ステップ（Router / OpenAPI）
 
-`CreateCaptureRequest` / `CaptureResponse`、`get_principal`、`Location`、`data` エンベロープ、`problem_responses`、CORS の `Idempotency-Key`、`pnpm openapi:client`。Service の例外はそのまま Global Exception Handler に載せる。決定的な HTTP 契約テスト（TestClient）はそちら。
+方針は [19-week3-capture-router.md](./19-week3-capture-router.md)。
 
 ## 関連
 

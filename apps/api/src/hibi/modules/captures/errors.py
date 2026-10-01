@@ -1,4 +1,5 @@
 from uuid import UUID
+
 from hibi.core.errors import ApplicationError
 
 
@@ -46,3 +47,5 @@ class CaptureTextInvalidError(ApplicationError):
     title = "Request validation failed"
     status = 422
     detail = "One or more fields are invalid."
+    pointer = "/rawText"
+    error_code = "invalid"
