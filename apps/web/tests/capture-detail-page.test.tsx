@@ -11,6 +11,9 @@ const { getCaptureFromApiMock, notFoundMock, requireUserMock } =
 vi.mock("@/lib/api/capture", () => ({
 	getCaptureFromApi: getCaptureFromApiMock,
 }));
+vi.mock("@/features/capture/actions", () => ({
+	updateCaptureAction: vi.fn(),
+}));
 vi.mock("@/lib/auth/require-user", () => ({
 	requireUser: requireUserMock,
 }));

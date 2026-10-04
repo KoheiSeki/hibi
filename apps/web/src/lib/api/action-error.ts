@@ -11,7 +11,7 @@ type ActionError<TFieldErrors> = {
 	fieldErrors?: TFieldErrors;
 };
 
-export function createActionError<TFieldErrors = never>(
+export function toActionErrorState<TFieldErrors = never>(
 	error: ApiClientError,
 	mapFieldErrors?: (
 		presentation: ApiClientErrorPresentation,

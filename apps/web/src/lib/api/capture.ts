@@ -6,6 +6,7 @@ import {
 	createCapture,
 	getCapture,
 	listCaptures,
+	updateCapture,
 } from "@hibi/api-client";
 import {
 	ApiResult,
@@ -76,6 +77,28 @@ export async function createCaptureFromApi(
 		},
 		headers: {
 			idempotencyKey,
+		},
+	});
+	return normalizeGeneratedResult(result);
+}
+
+export async function updateCaptureFromApi(
+	captureId: string,
+	rawText: string,
+): Promise<ApiResult<CaptureResponse>> {
+	const context = await getServerApiContext();
+	if (!context.ok) {
+		return context;
+	}
+
+	const result = await updateCapture({
+		baseUrl: context.baseUrl,
+		auth: context.accessToken,
+		body: {
+			rawText,
+		},
+		path: {
+			capture_id: captureId,
 		},
 	});
 	return normalizeGeneratedResult(result);

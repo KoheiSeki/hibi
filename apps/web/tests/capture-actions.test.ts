@@ -3,27 +3,39 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const {
 	createCaptureFromApiMock,
 	listCapturesFromApiMock,
+	notFoundMock,
 	redirectMock,
 	revalidatePathMock,
+	updateCaptureFromApiMock,
 } = vi.hoisted(() => ({
-		createCaptureFromApiMock: vi.fn(),
-		listCapturesFromApiMock: vi.fn(),
-		redirectMock: vi.fn(),
-		revalidatePathMock: vi.fn(),
-	}));
+	createCaptureFromApiMock: vi.fn(),
+	listCapturesFromApiMock: vi.fn(),
+	notFoundMock: vi.fn(),
+	redirectMock: vi.fn(),
+	revalidatePathMock: vi.fn(),
+	updateCaptureFromApiMock: vi.fn(),
+}));
 
 vi.mock("@/lib/api/capture", () => ({
 	createCaptureFromApi: createCaptureFromApiMock,
 	listCapturesFromApi: listCapturesFromApiMock,
+	updateCaptureFromApi: updateCaptureFromApiMock,
 }));
-vi.mock("next/navigation", () => ({ redirect: redirectMock }));
+vi.mock("next/navigation", () => ({
+	notFound: notFoundMock,
+	redirect: redirectMock,
+}));
 vi.mock("next/cache", () => ({ revalidatePath: revalidatePathMock }));
 
 import {
 	createCaptureAction,
 	listCapturesAction,
+	updateCaptureAction,
 } from "@/features/capture/actions";
-import { initialCreateCaptureActionState } from "@/features/capture/capture-action-state";
+import {
+	initialCreateCaptureActionState,
+	initialUpdateCaptureActionState,
+} from "@/features/capture/capture-action-state";
 
 function createFormData() {
 	const formData = new FormData();
@@ -228,6 +240,135 @@ describe("listCapturesAction", () => {
 
 		await expect(
 			listCapturesAction("current-cursor"),
+		).rejects.toThrow("NEXT_REDIRECT");
+		expect(redirectMock).toHaveBeenCalledWith("/login");
+	});
+});
+
+describe("updateCaptureAction", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it("returns the updated capture and revalidates both pages", async () => {
+		const capture = {
+			id: "capture-1",
+			rawText: "牛乳を買った",
+			status: "active",
+			createdAt: "2026-10-04T09:00:00Z",
+			updatedAt: "2026-10-04T10:00:00Z",
+		};
+		updateCaptureFromApiMock.mockResolvedValue({
+			ok: true,
+			data: capture,
+		});
+		const formData = new FormData();
+		formData.set("rawText", "牛乳を買った");
+
+		const state = await updateCaptureAction(
+			"capture-1",
+			initialUpdateCaptureActionState,
+			formData,
+		);
+
+		expect(updateCaptureFromApiMock).toHaveBeenCalledWith(
+			"capture-1",
+			"牛乳を買った",
+		);
+		expect(revalidatePathMock).toHaveBeenCalledWith("/captures");
+		expect(revalidatePathMock).toHaveBeenCalledWith("/captures/capture-1");
+		expect(state).toEqual({
+			status: "success",
+			data: capture,
+			message: "更新しました。",
+		});
+	});
+
+	it("maps the API rawText field error to the editor state", async () => {
+		updateCaptureFromApiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "problem",
+				problem: {
+					type: "https://api.hibi.example/problems/validation-error",
+					title: "Validation error",
+					status: 422,
+					detail: "Request validation failed.",
+					requestId: "request-422",
+					errors: [
+						{
+							pointer: "/rawText",
+							code: "string_too_long",
+							detail: "2000文字以内で入力してください。",
+						},
+					],
+				},
+			},
+		});
+
+		const state = await updateCaptureAction(
+			"capture-1",
+			initialUpdateCaptureActionState,
+			createFormData(),
+		);
+
+		expect(state).toEqual({
+			status: "error",
+			fieldErrors: {
+				rawText: "2000文字以内で入力してください。",
+			},
+			message: "Request validation failed.（参照 ID: request-422）",
+		});
+		expect(revalidatePathMock).not.toHaveBeenCalled();
+	});
+
+	it("renders the not-found boundary when the capture no longer exists", async () => {
+		updateCaptureFromApiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "problem",
+				problem: {
+					type: "https://api.hibi.example/problems/not-found",
+					title: "Not found",
+					status: 404,
+					detail: "Capture was not found.",
+					requestId: "request-404",
+				},
+			},
+		});
+		notFoundMock.mockImplementation(() => {
+			throw new Error("NEXT_NOT_FOUND");
+		});
+
+		await expect(
+			updateCaptureAction(
+				"missing",
+				initialUpdateCaptureActionState,
+				createFormData(),
+			),
+		).rejects.toThrow("NEXT_NOT_FOUND");
+		expect(notFoundMock).toHaveBeenCalledOnce();
+		expect(revalidatePathMock).not.toHaveBeenCalled();
+	});
+
+	it("redirects unauthenticated failures to login", async () => {
+		updateCaptureFromApiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "unauthenticated",
+				message: "Authentication is required.",
+			},
+		});
+		redirectMock.mockImplementation(() => {
+			throw new Error("NEXT_REDIRECT");
+		});
+
+		await expect(
+			updateCaptureAction(
+				"capture-1",
+				initialUpdateCaptureActionState,
+				createFormData(),
+			),
 		).rejects.toThrow("NEXT_REDIRECT");
 		expect(redirectMock).toHaveBeenCalledWith("/login");
 	});

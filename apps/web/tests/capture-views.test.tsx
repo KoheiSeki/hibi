@@ -9,7 +9,7 @@ import { CaptureEmptyState } from "@/features/capture/capture-empty-state";
 import { CaptureListSkeleton } from "@/features/capture/capture-list-skeleton";
 import { CapturePageFrame } from "@/features/capture/capture-page-frame";
 import { CaptureComposerView } from "@/features/capture/capture-composer-view";
-import { CaptureDetailEditorView } from "@/features/capture/capture-detail-editor";
+import { CaptureDetailEditorView } from "@/features/capture/capture-detail-editor-view";
 import { CaptureList } from "@/features/capture/capture-list";
 import { CaptureListPager } from "@/features/capture/capture-list-pager";
 
@@ -96,12 +96,18 @@ describe("Capture presentation", () => {
 			<CaptureDetailEditorView
 				defaultValue="牛乳を買う"
 				timeLabel="10月2日 14:02"
+				fieldError="入力内容を確認してください"
+				message="更新しました。"
+				updatePending
 			/>,
 		);
 
-		expect(html).toContain("保存する");
+		expect(html).toContain("保存しています");
 		expect(html).toContain("削除する");
 		expect(html).toContain('name="rawText"');
+		expect(html).toContain("入力内容を確認してください");
+		expect(html).toContain("更新しました。");
+		expect(html).toContain("disabled");
 	});
 
 	it("keeps the composer in a distinct bottom region", () => {

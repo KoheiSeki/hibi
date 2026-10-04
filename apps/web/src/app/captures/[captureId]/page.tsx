@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { notFound, redirect } from "next/navigation";
 
 import { ApiErrorMessage } from "@/components/ui/api-error-message";
-import { CaptureDetailEditorView } from "@/features/capture/capture-detail-editor";
+import { CaptureDetailEditor } from "@/features/capture/capture-detail-editor";
 import { getCaptureFromApi } from "@/lib/api/capture";
 import { requireUser } from "@/lib/auth/require-user";
 import { formatJstDateTime } from "@/lib/date-time";
@@ -35,7 +35,8 @@ export default async function CaptureDetailPage({
 
 	return (
 		<main className="mx-auto w-full max-w-2xl">
-			<CaptureDetailEditorView
+			<CaptureDetailEditor
+				captureId={result.data.id}
 				defaultValue={result.data.rawText}
 				timeLabel={formatJstDateTime(result.data.createdAt)}
 			/>

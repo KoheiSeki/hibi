@@ -3,7 +3,7 @@ import type {
 	CaptureResponse,
 } from "@hibi/api-client";
 import type { ActionState } from "@/lib/action-state";
-type CaptureFieldErrors = {
+export type CaptureFieldErrors = {
 	rawText?: string;
 };
 export type CreateCaptureActionState = ActionState<
@@ -15,5 +15,13 @@ export type ListCapturesActionState =
 	ActionState<ApiResponseWithMetaListCaptureResponseCursorMeta>;
 
 export const initialCreateCaptureActionState: CreateCaptureActionState = {
+	status: "idle",
+};
+
+export type UpdateCaptureActionState = ActionState<
+	CaptureResponse,
+	CaptureFieldErrors
+>;
+export const initialUpdateCaptureActionState: UpdateCaptureActionState = {
 	status: "idle",
 };
