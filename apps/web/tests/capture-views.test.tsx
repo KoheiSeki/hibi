@@ -1,5 +1,9 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@/features/capture/actions", () => ({
+	listCapturesAction: vi.fn(),
+}));
 
 import { CaptureEmptyState } from "@/features/capture/capture-empty-state";
 import { CaptureListSkeleton } from "@/features/capture/capture-list-skeleton";

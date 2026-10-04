@@ -1,19 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createCaptureFromApiMock, redirectMock, revalidatePathMock } =
-	vi.hoisted(() => ({
+const {
+	createCaptureFromApiMock,
+	listCapturesFromApiMock,
+	redirectMock,
+	revalidatePathMock,
+} = vi.hoisted(() => ({
 		createCaptureFromApiMock: vi.fn(),
+		listCapturesFromApiMock: vi.fn(),
 		redirectMock: vi.fn(),
 		revalidatePathMock: vi.fn(),
 	}));
 
 vi.mock("@/lib/api/capture", () => ({
 	createCaptureFromApi: createCaptureFromApiMock,
+	listCapturesFromApi: listCapturesFromApiMock,
 }));
 vi.mock("next/navigation", () => ({ redirect: redirectMock }));
 vi.mock("next/cache", () => ({ revalidatePath: revalidatePathMock }));
 
-import { createCaptureAction } from "@/features/capture/actions";
+import {
+	createCaptureAction,
+	listCapturesAction,
+} from "@/features/capture/actions";
 import { initialCreateCaptureActionState } from "@/features/capture/capture-action-state";
 
 function createFormData() {
@@ -115,5 +124,111 @@ describe("createCaptureAction", () => {
 		).rejects.toThrow("NEXT_REDIRECT");
 		expect(redirectMock).toHaveBeenCalledWith("/login");
 		expect(revalidatePathMock).not.toHaveBeenCalled();
+	});
+});
+
+describe("listCapturesAction", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it("passes the cursor and preserves the response metadata", async () => {
+		const response = {
+			data: [
+				{
+					id: "capture-2",
+					rawText: "資料を送る",
+					status: "active",
+					createdAt: "2026-10-04T08:00:00Z",
+					updatedAt: "2026-10-04T08:00:00Z",
+				},
+			],
+			meta: {
+				nextCursor: "next-cursor",
+				hasNextPage: true,
+			},
+		};
+		listCapturesFromApiMock.mockResolvedValue({
+			ok: true,
+			data: response,
+		});
+
+		const state = await listCapturesAction("current-cursor");
+
+		expect(listCapturesFromApiMock).toHaveBeenCalledWith({
+			cursor: "current-cursor",
+		});
+		expect(state).toEqual({
+			status: "success",
+			data: response,
+		});
+	});
+
+	it("rejects an empty cursor without calling the API", async () => {
+		const state = await listCapturesAction("");
+
+		expect(listCapturesFromApiMock).not.toHaveBeenCalled();
+		expect(state).toEqual({
+			status: "error",
+			message: "カーソルが不正です。",
+		});
+	});
+
+	it("converts API failures to an action error", async () => {
+		listCapturesFromApiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "network",
+				message: "fetch failed",
+			},
+		});
+
+		const state = await listCapturesAction("current-cursor");
+
+		expect(state).toEqual({
+			status: "error",
+			message: "ネットワーク接続を確認して、もう一度お試しください。",
+		});
+	});
+
+	it("returns an invalid cursor problem with its request ID", async () => {
+		listCapturesFromApiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "problem",
+				problem: {
+					type: "https://api.hibi.example/problems/invalid-cursor",
+					title: "Invalid cursor",
+					status: 400,
+					detail: "カーソルが不正です。",
+					requestId: "request-400",
+				},
+			},
+		});
+
+		const state = await listCapturesAction("invalid-cursor");
+
+		expect(state).toEqual({
+			status: "error",
+			message: "カーソルが不正です。（参照 ID: request-400）",
+		});
+	});
+
+	it("redirects unauthenticated failures to login", async () => {
+		listCapturesFromApiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "unauthenticated",
+				message: "Authentication is required.",
+			},
+		});
+		redirectMock.mockImplementation(() => {
+			throw new Error("NEXT_REDIRECT");
+		});
+
+		await expect(
+			listCapturesAction("current-cursor"),
+		).rejects.toThrow("NEXT_REDIRECT");
+		expect(redirectMock).toHaveBeenCalledWith("/login");
 	});
 });

@@ -31,6 +31,7 @@ export async function CaptureListSection(): Promise<ReactNode> {
 
 	return (
 		<CaptureListPager
+			key={`${items[0]?.id ?? "empty"}:${meta.nextCursor ?? "end"}`}
 			initialItems={items}
 			initialNextCursor={meta.nextCursor}
 			initialHasNextPage={meta.hasNextPage}
