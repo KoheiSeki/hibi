@@ -27,6 +27,18 @@ type GeneratedResult<T> = {
 	response?: Response;
 };
 
+type GeneratedEnvelopeResult<T> = {
+	data?: T;
+	error?: unknown;
+	request?: Request;
+	response?: Response;
+};
+
+type GeneratedFailure = {
+	error?: unknown;
+	response?: Response;
+};
+
 export function normalizeGeneratedResult<T>(
 	result: GeneratedResult<T>,
 ): ApiResult<T> {
@@ -34,23 +46,31 @@ export function normalizeGeneratedResult<T>(
 		return { ok: true, data: result.data.data };
 	}
 
+	return { ok: false, error: classifyGeneratedError(result) };
+}
+
+export function normalizeGeneratedEnvelopeResult<T>(
+	result: GeneratedEnvelopeResult<T>,
+): ApiResult<T> {
+	if (result.data !== undefined && result.error == undefined) {
+		return { ok: true, data: result.data };
+	}
+
+	return { ok: false, error: classifyGeneratedError(result) };
+}
+
+function classifyGeneratedError(result: GeneratedFailure): ApiClientError {
 	if (isProblem(result.error)) {
-		return { ok: false, error: { kind: "problem", problem: result.error } };
+		return { kind: "problem", problem: result.error };
 	}
 
 	if (!result.response) {
-		return {
-			ok: false,
-			error: classifyFetchError(result.error),
-		};
+		return classifyFetchError(result.error);
 	}
 
 	return {
-		ok: false,
-		error: {
-			kind: "invalid-response",
-			message: "API error was not RFC 9457 Problem Details.",
-		},
+		kind: "invalid-response",
+		message: "API error was not RFC 9457 Problem Details.",
 	};
 }
 

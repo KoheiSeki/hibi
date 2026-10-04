@@ -274,7 +274,7 @@ JWKS 障害の 500 は既存 verifier 契約を流用。このファイルで増
 
 ## 次ステップ（Web）
 
-`/captures` と detail。生成 client の `createCapture` 等を使う。Idempotency-Key は Client Component が投稿意図ごとに発行する。
+方針は [20-week3-capture-web.md](./20-week3-capture-web.md)。`/captures` と detail。生成 client の `createCapture` 等を使う。Idempotency-Key は Client Component が投稿意図ごとに発行する。
 
 ## 関連
 

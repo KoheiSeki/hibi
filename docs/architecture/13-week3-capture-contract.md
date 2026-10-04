@@ -430,10 +430,12 @@ DB は `hibi/db` に async session / Unit of Work を新設する。例外時 ro
 ### 呼び出し
 
 - 業務 API の代替 Route Handler は作らない
-- Server Action 名: `createCaptureAction` / `updateCaptureAction` / `deleteCaptureAction`
+- Server Action 名: `listCapturesAction`（「さらに表示」用）/ `createCaptureAction` / `updateCaptureAction` / `deleteCaptureAction`
 - 生成 client の `createCapture` / `getCapture` / `listCaptures` / `updateCapture` / `deleteCapture` を使う
 - 手書きの Capture 型を作らない。`pnpm openapi:client` を同一 PR で回す
 - 表示文言は FE が決める。API の `detail` をそのまま見出しにしない
+
+初回一覧は Server Component の `CaptureListSection` が取得する。「さらに表示」は Client Component の `CaptureListPager` が `items` / `nextCursor` / `hasNextPage` を保持し、`listCapturesAction` の結果を既存行へ追記する。cursor を Server Component や module 変数に保持しない。
 
 
 
@@ -466,7 +468,7 @@ Week 3 の UI に処理中 polling、retry、カテゴリ表示は出さない�
 6. **router / OpenAPI**
   方針は [19-week3-capture-router.md](./19-week3-capture-router.md)。`create_app` から captures router を mount。`problem_responses` を更新。`pnpm openapi:client`。
 7. **Web**
-  `/captures` と detail。Server Action は token を Bearer で渡す（`getCurrentUserFromApi` と同じ取得方法）。
+  方針は [20-week3-capture-web.md](./20-week3-capture-web.md)。`/captures` と detail。Server Action は token を Bearer で渡す（`getCurrentUserFromApi` と同じ取得方法）。
 8. **縦切り確認**
   ログイン済みユーザーが作成 → 一覧 → 編集 → 削除。別ユーザーの URL を開いても 404。
 
@@ -563,7 +565,7 @@ file upload、webhook、vector 漏洩、prompt injection は対象外。
 
 ### 4. Web の入力 UX — 担当: Web / 必須
 
-送信中は button を disable する。失敗はフォーム近くに残す（toast だけにしない）。削除は確認のあと `deleteCaptureAction`。
+方針は [20-week3-capture-web.md](./20-week3-capture-web.md)。送信中は button を disable する。失敗はフォーム近くに残す（toast だけにしない）。削除は確認のあと `deleteCaptureAction`。
 
 ## 関連ドキュメント
 
@@ -576,4 +578,6 @@ file upload、webhook、vector 漏洩、prompt injection は対象外。
 - [テスト・品質管理](./08-testing-quality.md)
 - [実装スケジュール](./11-implementation-schedule.md)
 - [Week 2 認証失敗契約](./12-week2-auth-failure-contract.md)
+- [Week 3 Capture Router / OpenAPI](./19-week3-capture-router.md)
+- [Week 3 Capture Web](./20-week3-capture-web.md)
 
