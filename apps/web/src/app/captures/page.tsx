@@ -4,7 +4,7 @@ import { createClient } from "@/lib/auth/server";
 import { redirect } from "next/navigation";
 import { ReactNode, Suspense } from "react";
 import { CapturePageFrame } from "@/features/capture/capture-page-frame";
-import { CaptureComposerView } from "@/features/capture/capture-composer";
+import { CaptureComposer } from "@/features/capture/capture-composer";
 import { CaptureListSkeleton } from "@/features/capture/capture-list-skeleton";
 import { formatJstDateLabel } from "@/lib/date-time";
 import { CaptureListSection } from "@/features/capture/capture-list-section";
@@ -21,7 +21,7 @@ export default async function CapturePage(): Promise<ReactNode> {
 	return (
 		<CapturePageFrame
 			dateLabel={formatJstDateLabel()}
-			composer={<CaptureComposerView />}
+			composer={<CaptureComposer />}
 		>
 			<Suspense fallback={<CaptureListSkeleton />}>
 				<CaptureListSection />

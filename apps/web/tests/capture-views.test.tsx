@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { CaptureEmptyState } from "@/features/capture/capture-empty-state";
 import { CaptureListSkeleton } from "@/features/capture/capture-list-skeleton";
 import { CapturePageFrame } from "@/features/capture/capture-page-frame";
-import { CaptureComposerView } from "@/features/capture/capture-composer";
+import { CaptureComposerView } from "@/features/capture/capture-composer-view";
 import { CaptureDetailEditorView } from "@/features/capture/capture-detail-editor";
 import { CaptureList } from "@/features/capture/capture-list";
 import { CaptureListPager } from "@/features/capture/capture-list-pager";
