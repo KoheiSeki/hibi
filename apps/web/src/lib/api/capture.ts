@@ -4,6 +4,7 @@ import {
 	type ApiResponseWithMetaListCaptureResponseCursorMeta,
 	type CaptureResponse,
 	createCapture,
+	getCapture,
 	listCaptures,
 } from "@hibi/api-client";
 import {
@@ -17,6 +18,24 @@ type ListCapturesParams = {
 	limit?: number;
 	cursor?: string;
 };
+
+export async function getCaptureFromApi(
+	captureId: string,
+): Promise<ApiResult<CaptureResponse>> {
+	const context = await getServerApiContext();
+	if (!context.ok) {
+		return context;
+	}
+
+	const result = await getCapture({
+		baseUrl: context.baseUrl,
+		auth: context.accessToken,
+		path: {
+			capture_id: captureId,
+		},
+	});
+	return normalizeGeneratedResult(result);
+}
 
 export async function listCapturesFromApi({
 	limit = 20,
