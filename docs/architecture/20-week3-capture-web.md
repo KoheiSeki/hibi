@@ -284,6 +284,7 @@ Playwright のログイン〜作成は [縦切り](./13-week3-capture-contract.m
 ## 関連
 
 - [Capture 画面の見た目](./21-capture-visual.md)
+- [Week 4 Capture の非同期処理](./22-week4-async-capture.md)
 - [Capture 契約](./13-week3-capture-contract.md)
 - [Capture Router / OpenAPI](./19-week3-capture-router.md)
 - [Week 2 認証失敗契約](./12-week2-auth-failure-contract.md)

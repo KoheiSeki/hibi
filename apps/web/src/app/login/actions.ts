@@ -9,5 +9,5 @@ export async function signInAction(formData: FormData) {
 	const supabase = await createClient();
 	const { error } = await supabase.auth.signInWithPassword({ email, password });
 	if (error) redirect("/login?error=invalid-credentials");
-	redirect("/account");
+	redirect("/captures");
 }

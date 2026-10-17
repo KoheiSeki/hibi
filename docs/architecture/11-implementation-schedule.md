@@ -71,6 +71,8 @@
 
 ## Week 4: 非同期処理基盤
 
+方針は [22-week4-async-capture.md](./22-week4-async-capture.md)。
+
 - Transactional Outboxを実装する
 - arq queueとWorkerを実装する
 - retry回数とfailed状態を実装する
