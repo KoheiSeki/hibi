@@ -1,11 +1,4 @@
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
+import { AuthFrame } from "@/components/auth/auth-frame";
 import { LoginForm } from "./login-form";
 
 type LoginPageProps = {
@@ -17,26 +10,16 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 	const showInvalidCredentials = error === "invalid-credentials";
 
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle>ログイン</CardTitle>
-				<CardDescription>
-					メールアドレスとパスワードでサインインします。
-				</CardDescription>
-			</CardHeader>
-			<CardContent className="flex flex-col gap-4">
-				{showInvalidCredentials ? (
-					<Alert variant="destructive">
-						<AlertTitle>ログインできませんでした</AlertTitle>
-						<AlertDescription>
-							<p>
-								メールアドレスまたはパスワードが正しくありません。入力内容を確認して、もう一度お試しください。
-							</p>
-						</AlertDescription>
-					</Alert>
-				) : null}
-				<LoginForm />
-			</CardContent>
-		</Card>
+		<AuthFrame
+			title="ログイン"
+			description="メールアドレスとパスワードでサインインします。"
+		>
+			{showInvalidCredentials ? (
+				<p className="mb-4 text-sm leading-6 text-destructive" role="alert">
+					メールアドレスまたはパスワードが正しくありません。入力内容を確認して、もう一度お試しください。
+				</p>
+			) : null}
+			<LoginForm />
+		</AuthFrame>
 	);
 }

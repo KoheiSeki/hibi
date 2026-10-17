@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { ApiErrorMessage } from "@/components/ui/api-error-message";
-import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCurrentUserFromApi } from "@/lib/api/server";
 import { AccountCard } from "@/components/ui/account-card";
 import { createClient } from "@/lib/auth/server";
@@ -25,29 +24,22 @@ export default async function AccountPage() {
 
 		return (
 			<AccountCard>
-				<CardContent>
-					<ApiErrorMessage error={result.error} />
-				</CardContent>
+				<ApiErrorMessage error={result.error} />
 			</AccountCard>
 		);
 	}
 
 	return (
 		<AccountCard>
-			<CardHeader>
-				<CardTitle>アカウント</CardTitle>
-				<p>{user.email}</p>
-			</CardHeader>
-			<CardContent>
-				<p>
-					<span className="text-muted-foreground">Supabase user ID:</span>
-					<span className="font-mono">{user.id}</span>
-				</p>
-				<p>
-					<span className="text-muted-foreground">API user ID:</span>
-					<span className="font-mono">{result.data.userId}</span>
-				</p>
-			</CardContent>
+			<p className="text-base text-[#15201A]">{user.email}</p>
+			<p>
+				<span className="text-[#5A6A62]">ログイン ID:</span>{" "}
+				<span className="font-mono text-[#15201A]">{user.id}</span>
+			</p>
+			<p>
+				<span className="text-[#5A6A62]">API ID:</span>{" "}
+				<span className="font-mono text-[#15201A]">{result.data.userId}</span>
+			</p>
 		</AccountCard>
 	);
 }

@@ -9,6 +9,10 @@ const { createClientMock, getCurrentUserMock, redirectMock } = vi.hoisted(
 	}),
 );
 
+vi.mock("next/font/google", () => ({
+	Noto_Sans_JP: () => ({ variable: "--font-capture-body" }),
+	Shippori_Mincho: () => ({ variable: "--font-capture-display" }),
+}));
 vi.mock("next/navigation", () => ({ redirect: redirectMock }));
 vi.mock("@/lib/auth/server", () => ({ createClient: createClientMock }));
 vi.mock("@/lib/api/server", () => ({

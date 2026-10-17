@@ -16,6 +16,7 @@ export function LoginForm() {
 					type="email"
 					autoComplete="email"
 					required
+					className="h-11 rounded-xl border-[#D5E3D9] bg-white text-[#15201A] focus-visible:border-[#1E6B43] focus-visible:ring-[#1E6B43]/20"
 				/>
 			</div>
 			<div className="grid gap-2">
@@ -26,9 +27,15 @@ export function LoginForm() {
 					type="password"
 					autoComplete="current-password"
 					required
+					className="h-11 rounded-xl border-[#D5E3D9] bg-white text-[#15201A] focus-visible:border-[#1E6B43] focus-visible:ring-[#1E6B43]/20"
 				/>
 			</div>
-			<FormSubmitButton pendingLabel="ログイン中…">ログイン</FormSubmitButton>
+			<FormSubmitButton
+				pendingLabel="ログイン中…"
+				className="h-11 rounded-2xl bg-[#1E6B43] text-base font-semibold text-white shadow-[0_8px_18px_rgb(30_107_67/0.22)] hover:bg-[#185838]"
+			>
+				ログイン
+			</FormSubmitButton>
 		</form>
 	);
 }
