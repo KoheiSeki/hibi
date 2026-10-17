@@ -13,17 +13,17 @@ export function CapturePageFrame({
 }: CapturePageFrameProps) {
   return (
     <section className="mx-auto flex min-h-[calc(100svh-3.5rem)] w-full max-w-2xl flex-col">
-      <header className="px-5 pb-3 pt-6 sm:px-8">
-        <p className="text-[0.8125rem] font-medium tracking-[0.04em] text-[#4A5870]">
+      <header className="px-5 pb-2 pt-7 sm:px-8">
+        <p className="text-[1.65rem] font-medium leading-none tracking-[0.04em] text-[#15201A] [font-family:var(--font-capture-display),serif]">
           {dateLabel}
         </p>
       </header>
 
-      <div className="flex-1 px-5 pb-36 sm:px-8">{children}</div>
+      <div className="flex-1 px-5 pb-40 sm:px-8">{children}</div>
 
       <div
         data-slot="capture-composer-region"
-        className="sticky bottom-0 z-20 border-t border-[#D5DCE5] bg-[#F4F6F8]/95 px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md sm:px-8"
+        className="sticky bottom-0 z-20 bg-[#EEF3EF]/80 px-4 pb-[max(0.85rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl sm:px-6"
       >
         <div className="mx-auto w-full max-w-2xl">{composer}</div>
       </div>

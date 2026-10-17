@@ -5,9 +5,9 @@ export default function CaptureDetailLoading() {
       aria-busy="true"
       aria-label="記録を読み込んでいます"
     >
-      <div className="h-4 w-32 animate-pulse rounded-full bg-[#D5DCE5] motion-reduce:animate-none" />
-      <div className="mt-5 h-56 animate-pulse rounded-xl border border-[#D5DCE5] bg-white/70 motion-reduce:animate-none" />
-      <div className="mt-3 h-11 animate-pulse rounded-xl bg-[#B9C9BF] motion-reduce:animate-none" />
+      <div className="h-7 w-40 animate-pulse rounded-full bg-[#D5E3D9] motion-reduce:animate-none" />
+      <div className="mt-6 h-56 animate-pulse rounded-[1.25rem] border border-[#D5E3D9] bg-white/80 motion-reduce:animate-none" />
+      <div className="mt-3 h-11 animate-pulse rounded-2xl bg-[#C9DDD1] motion-reduce:animate-none" />
       <span className="sr-only">読み込み中…</span>
     </section>
   );

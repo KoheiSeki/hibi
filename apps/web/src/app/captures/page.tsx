@@ -1,5 +1,3 @@
-"use server";
-
 import { ReactNode, Suspense } from "react";
 import { CapturePageFrame } from "@/features/capture/capture-page-frame";
 import { CaptureComposer } from "@/features/capture/capture-composer";

@@ -63,7 +63,7 @@ describe("createCaptureFromApi", () => {
 				rawText: "牛乳を買う",
 			},
 			headers: {
-				idempotencyKey: "capture-key",
+				"Idempotency-Key": "capture-key",
 			},
 		});
 		expect(result).toEqual({

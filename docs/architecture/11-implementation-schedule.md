@@ -74,9 +74,9 @@
 - Transactional Outboxを実装する
 - arq queueとWorkerを実装する
 - retry回数とfailed状態を実装する
-- Capture処理状態のpolling UIを実装する
+- Capture処理状態のpolling UIを実装する。見た目は [21-capture-visual.md](./21-capture-visual.md) の苔の糸の上に足し、一覧を別デザインにしない。処理中は status バッジを新設せず、節の動きと短い文言で表す
 - Capture保存とoutbox作成を同一transactionにする
-- jobをat-least-once前提で冪等化する
+- jobをat-least-once前提で冪等化する。Week 3 の `Idempotency-Key` は作成APIの入口に残し、Worker の重複実行防止とは別に扱う
 
 完了条件:
 

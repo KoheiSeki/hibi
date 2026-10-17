@@ -27,7 +27,10 @@ export function CaptureComposerView({
 
 	return (
 		<form
-			className={cn("grid gap-2.5", className)}
+			className={cn(
+				"grid gap-2.5 rounded-[1.4rem] border border-[#D5E3D9] bg-[#F7FBF8] p-3 shadow-[0_16px_40px_rgb(21_32_26/0.08)]",
+				className,
+			)}
 			aria-label="新しい記録"
 			{...formProps}
 		>
@@ -43,7 +46,7 @@ export function CaptureComposerView({
 				rows={2}
 				aria-describedby={errorId}
 				aria-invalid={fieldError ? true : undefined}
-				className="min-h-20 resize-none rounded-xl border-[#BFC8D3] bg-white px-4 py-3 text-[1.0625rem] leading-7 text-[#1A1D23] shadow-[0_1px_0_rgb(26_29_35/0.03)] placeholder:text-[#697588] focus-visible:border-[#2F6A4A] focus-visible:ring-[#2F6A4A]/20"
+				className="min-h-20 resize-none rounded-2xl border-[#D5E3D9] bg-white px-4 py-3 text-[1.0625rem] leading-7 text-[#15201A] placeholder:text-[#5A6A62] focus-visible:border-[#1E6B43] focus-visible:ring-[#1E6B43]/20"
 			/>
 
 			{fieldError ? (
@@ -56,12 +59,12 @@ export function CaptureComposerView({
 				</p>
 			) : null}
 
-			{message ? <div className="text-sm text-[#4A5870]">{message}</div> : null}
+			{message ? <div className="text-sm text-[#5A6A62]">{message}</div> : null}
 
 			<Button
 				type="submit"
 				disabled={pending || submitDisabled}
-				className="h-11 w-full rounded-xl bg-[#2F6A4A] font-sans text-base font-semibold text-white hover:bg-[#285C40] focus-visible:border-[#244F38] focus-visible:ring-[#2F6A4A]/30"
+				className="h-11 w-full rounded-2xl bg-[#1E6B43] font-sans text-base font-semibold text-white shadow-[0_8px_18px_rgb(30_107_67/0.22)] hover:bg-[#185838] focus-visible:border-[#144C30] focus-visible:ring-[#1E6B43]/30"
 			>
 				{pending ? "記録しています" : "記録する"}
 			</Button>

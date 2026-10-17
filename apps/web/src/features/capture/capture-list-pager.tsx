@@ -84,7 +84,7 @@ export function CaptureListPager({
 						aria-describedby={
 							error ? "capture-list-load-more-error" : undefined
 						}
-						className="h-11 rounded-full border-[#BFC8D3] bg-transparent px-6 text-[#1A1D23]"
+						className="h-11 rounded-full border-[#D5E3D9] bg-[#F7FBF8] px-6 text-[#15201A] hover:border-[#1E6B43] hover:text-[#1E6B43]"
 					>
 						{pending ? "読み込んでいます" : "さらに表示"}
 					</Button>

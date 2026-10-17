@@ -1,6 +1,6 @@
 # Week 3 Step 7: Capture Web（入力・一覧）
 
-[Capture 契約](./13-week3-capture-contract.md) の実装順 7。[Capture Router / OpenAPI](./19-week3-capture-router.md) の上に、モバイル前提の `/captures` と detail を載せる。見た目は実装後に調整してよい。トークンと画面構造はこの文書を正にする。
+[Capture 契約](./13-week3-capture-contract.md) の実装順 7。[Capture Router / OpenAPI](./19-week3-capture-router.md) の上に、モバイル前提の `/captures` と detail を載せる。色、書体、配置は [Capture 画面の見た目](./21-capture-visual.md) を正にする。
 
 ## このステップのゴール
 
@@ -69,25 +69,9 @@ detail:
 - 空一覧: 「最初の一文を書いてください」
 - 422 の入力エラー: 入力欄の直下。API の `detail` を見出しにしない
 
-## 見た目（このステップの正。実装後に調整可）
+## 見た目
 
-| 役割 | 値 | 使い所 |
-| --- | --- | --- |
-| Paper | `#F4F6F8` | Capture layout の背景。クリーム `#f6f4ef` は使わない |
-| Ink | `#1A1D23` | 本文。muted グレーを本文にしない |
-| Moss | `#2F6A4A` | 「記録する」だけ |
-| Dusk | `#4A5870` | 日付・時刻 |
-| Hairline | `#D5DCE5` | 行の区切り。影・太い枠なし |
-
-活字:
-
-- 本文: Noto Sans JP、16–17px、行間 1.7。Capture layout に載せる
-- UI（バー・ボタン）: 既存 Geist
-- 時刻: `font-variant-numeric: tabular-nums`
-
-シグネチャは下段コンポーザと時刻列だけ。グラデ、大きな数字、01/02 番号、`status` バッジは付けない。
-
-ログイン / アカウントは今の Card のまま。トークンの全面置換はしない。
+色、書体、苔の糸、下段の入力面は [Capture 画面の見た目](./21-capture-visual.md)。この文書では繰り返さない。ログインとアカウントは、そのトークンへ置換しない。
 
 ## 依存の流れ
 
@@ -299,6 +283,7 @@ Playwright のログイン〜作成は [縦切り](./13-week3-capture-contract.m
 
 ## 関連
 
+- [Capture 画面の見た目](./21-capture-visual.md)
 - [Capture 契約](./13-week3-capture-contract.md)
 - [Capture Router / OpenAPI](./19-week3-capture-router.md)
 - [Week 2 認証失敗契約](./12-week2-auth-failure-contract.md)

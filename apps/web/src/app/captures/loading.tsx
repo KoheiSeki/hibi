@@ -5,7 +5,7 @@ export default function CapturesLoading() {
     <section
       className="mx-auto w-full max-w-2xl px-5 pb-32 pt-6 sm:px-8"
     >
-      <div className="h-4 w-24 animate-pulse rounded-full bg-[#D5DCE5] motion-reduce:animate-none" />
+      <div className="h-7 w-36 animate-pulse rounded-full bg-[#D5E3D9] motion-reduce:animate-none" />
       <div className="mt-5">
         <CaptureListSkeleton />
       </div>

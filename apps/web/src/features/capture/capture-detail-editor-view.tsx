@@ -33,8 +33,8 @@ export function CaptureDetailEditorView({
 		: undefined;
 
 	return (
-		<article className="px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-7 sm:px-8">
-			<p className="mb-5 text-sm font-medium tabular-nums text-[#4A5870]">
+		<article className="px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-8 sm:px-8">
+			<p className="mb-6 text-[1.35rem] font-medium leading-none tracking-[0.03em] text-[#15201A] tabular-nums [font-family:var(--font-capture-display),serif]">
 				{timeLabel}
 			</p>
 
@@ -50,7 +50,7 @@ export function CaptureDetailEditorView({
 					rows={8}
 					aria-describedby={errorId}
 					aria-invalid={fieldError ? true : undefined}
-					className="min-h-56 resize-y rounded-xl border-[#BFC8D3] bg-white px-4 py-4 text-[1.0625rem] leading-[1.7] text-[#1A1D23] focus-visible:border-[#2F6A4A] focus-visible:ring-[#2F6A4A]/20"
+					className="min-h-56 resize-y rounded-[1.25rem] border-[#D5E3D9] bg-white px-4 py-4 text-[1.0625rem] leading-[1.7] text-[#15201A] shadow-[0_12px_32px_rgb(21_32_26/0.05)] focus-visible:border-[#1E6B43] focus-visible:ring-[#1E6B43]/20"
 				/>
 
 				{fieldError ? (
@@ -64,19 +64,19 @@ export function CaptureDetailEditorView({
 				) : null}
 
 				{message ? (
-					<div className="text-sm text-[#4A5870]">{message}</div>
+					<div className="text-sm text-[#5A6A62]">{message}</div>
 				) : null}
 
 				<Button
 					type="submit"
 					disabled={updatePending}
-					className="h-11 rounded-xl bg-[#2F6A4A] font-sans text-base font-semibold text-white hover:bg-[#285C40]"
+					className="h-11 rounded-2xl bg-[#1E6B43] font-sans text-base font-semibold text-white shadow-[0_8px_18px_rgb(30_107_67/0.22)] hover:bg-[#185838]"
 				>
 					{updatePending ? "保存しています" : "保存する"}
 				</Button>
 			</form>
 
-			<div className="mt-10 border-t border-[#D5DCE5] pt-5">
+			<div className="mt-10 border-t border-[#D5E3D9] pt-5">
 				{errorMessage ? (
 					<p
 						id={deleteErrorId}
@@ -92,7 +92,7 @@ export function CaptureDetailEditorView({
 					variant="destructive"
 					disabled={deletePending}
 					aria-describedby={deleteErrorId}
-					className="h-11 w-full rounded-xl font-sans text-base font-semibold"
+					className="h-11 w-full rounded-2xl border border-[#E7C8C4] bg-transparent font-sans text-base font-semibold text-[#8A3E36] hover:bg-[#F8EDEC]"
 				>
 					{deletePending ? "削除しています" : "削除する"}
 				</Button>

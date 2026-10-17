@@ -78,7 +78,7 @@ export async function createCaptureFromApi(
 			rawText,
 		},
 		headers: {
-			idempotencyKey,
+			"Idempotency-Key": idempotencyKey,
 		},
 	});
 	return normalizeGeneratedResult(result);
