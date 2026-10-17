@@ -9,6 +9,7 @@ type CaptureDetailEditorViewProps = {
 	timeLabel: string;
 	fieldError?: string;
 	message?: ReactNode;
+	errorMessage?: string;
 	updateFormProps?: Omit<ComponentProps<"form">, "children">;
 	deleteButtonProps?: Omit<ComponentProps<typeof Button>, "children">;
 	updatePending?: boolean;
@@ -20,12 +21,16 @@ export function CaptureDetailEditorView({
 	timeLabel,
 	fieldError,
 	message,
+	errorMessage,
 	updateFormProps,
 	deleteButtonProps,
 	updatePending = false,
 	deletePending = false,
 }: CaptureDetailEditorViewProps) {
 	const errorId = fieldError ? "capture-detail-raw-text-error" : undefined;
+	const deleteErrorId = errorMessage
+		? "capture-detail-delete-error"
+		: undefined;
 
 	return (
 		<article className="px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-7 sm:px-8">
@@ -72,11 +77,21 @@ export function CaptureDetailEditorView({
 			</form>
 
 			<div className="mt-10 border-t border-[#D5DCE5] pt-5">
+				{errorMessage ? (
+					<p
+						id={deleteErrorId}
+						className="mb-3 text-sm leading-5 text-destructive"
+						role="alert"
+					>
+						{errorMessage}
+					</p>
+				) : null}
 				<Button
 					{...deleteButtonProps}
 					type="button"
 					variant="destructive"
 					disabled={deletePending}
+					aria-describedby={deleteErrorId}
 					className="h-11 w-full rounded-xl font-sans text-base font-semibold"
 				>
 					{deletePending ? "削除しています" : "削除する"}

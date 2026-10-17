@@ -20,24 +20,25 @@ export type ApiResult<T> =
 	{ ok: true; data: T } | { ok: false; error: ApiClientError };
 
 /** Matches @hey-api/client-fetch `RequestResult` when `throwOnError` is false. */
-type GeneratedResult<T> = {
+type GeneratedResultBase = {
+	error?: unknown;
+	request?: Request;
+	response?: Response;
+};
+
+type GeneratedResult<T> = GeneratedResultBase & {
 	data?: { data: T };
-	error?: unknown;
-	request?: Request;
-	response?: Response;
 };
 
-type GeneratedEnvelopeResult<T> = {
+type GeneratedEnvelopeResult<T> = GeneratedResultBase & {
 	data?: T;
-	error?: unknown;
-	request?: Request;
-	response?: Response;
 };
 
-type GeneratedFailure = {
-	error?: unknown;
-	response?: Response;
+type GeneratedEmptyResult = GeneratedResultBase & {
+	data?: void;
 };
+
+type GeneratedFailure = Pick<GeneratedResultBase, "error" | "response">;
 
 export function normalizeGeneratedResult<T>(
 	result: GeneratedResult<T>,
@@ -54,6 +55,16 @@ export function normalizeGeneratedEnvelopeResult<T>(
 ): ApiResult<T> {
 	if (result.data !== undefined && result.error == undefined) {
 		return { ok: true, data: result.data };
+	}
+
+	return { ok: false, error: classifyGeneratedError(result) };
+}
+
+export function normalizeGeneratedEmptyResult(
+	result: GeneratedEmptyResult,
+): ApiResult<void> {
+	if (result.error === undefined && result.response !== undefined) {
+		return { ok: true, data: undefined };
 	}
 
 	return { ok: false, error: classifyGeneratedError(result) };

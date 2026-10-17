@@ -4,12 +4,14 @@ import {
 	type ApiResponseWithMetaListCaptureResponseCursorMeta,
 	type CaptureResponse,
 	createCapture,
+	deleteCapture,
 	getCapture,
 	listCaptures,
 	updateCapture,
 } from "@hibi/api-client";
 import {
 	ApiResult,
+	normalizeGeneratedEmptyResult,
 	normalizeGeneratedEnvelopeResult,
 	normalizeGeneratedResult,
 } from "./request-api";
@@ -102,4 +104,22 @@ export async function updateCaptureFromApi(
 		},
 	});
 	return normalizeGeneratedResult(result);
+}
+
+export async function deleteCaptureFromApi(
+	captureId: string,
+): Promise<ApiResult<void>> {
+	const context = await getServerApiContext();
+	if (!context.ok) {
+		return context;
+	}
+
+	const result = await deleteCapture({
+		baseUrl: context.baseUrl,
+		auth: context.accessToken,
+		path: {
+			capture_id: captureId,
+		},
+	});
+	return normalizeGeneratedEmptyResult(result);
 }

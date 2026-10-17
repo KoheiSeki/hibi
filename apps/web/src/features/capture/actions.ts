@@ -2,17 +2,19 @@
 
 import {
 	createCaptureFromApi,
+	deleteCaptureFromApi,
 	listCapturesFromApi,
 	updateCaptureFromApi,
 } from "@/lib/api/capture";
 import type {
 	CaptureFieldErrors,
 	CreateCaptureActionState,
+	DeleteCaptureActionState,
 	ListCapturesActionState,
 	UpdateCaptureActionState,
 } from "./capture-action-state";
 import { revalidatePath } from "next/cache";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { toActionErrorState } from "@/lib/api/action-error";
 import { ApiClientErrorPresentation } from "@/lib/api/client-error-message";
 
@@ -116,6 +118,31 @@ export async function updateCaptureAction(
 		data: result.data,
 		message: "更新しました。",
 	};
+}
+
+export async function deleteCaptureAction(
+	captureId: string,
+): Promise<DeleteCaptureActionState> {
+	if (typeof captureId !== "string" || captureId.length === 0) {
+		return {
+			status: "error",
+			message: "削除に失敗しました。",
+		};
+	}
+
+	const result = await deleteCaptureFromApi(captureId);
+	if (!result.ok) {
+		if (
+			result.error.kind === "problem" &&
+			result.error.problem.status === 404
+		) {
+			notFound();
+		}
+
+		return toActionErrorState(result.error);
+	}
+	revalidatePath("/captures");
+	redirect("/captures");
 }
 
 function mapCaptureFieldErrors(

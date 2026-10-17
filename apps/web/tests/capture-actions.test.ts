@@ -7,6 +7,7 @@ const {
 	redirectMock,
 	revalidatePathMock,
 	updateCaptureFromApiMock,
+	deleteCaptureFromApiMock,
 } = vi.hoisted(() => ({
 	createCaptureFromApiMock: vi.fn(),
 	listCapturesFromApiMock: vi.fn(),
@@ -14,10 +15,12 @@ const {
 	redirectMock: vi.fn(),
 	revalidatePathMock: vi.fn(),
 	updateCaptureFromApiMock: vi.fn(),
+	deleteCaptureFromApiMock: vi.fn(),
 }));
 
 vi.mock("@/lib/api/capture", () => ({
 	createCaptureFromApi: createCaptureFromApiMock,
+	deleteCaptureFromApi: deleteCaptureFromApiMock,
 	listCapturesFromApi: listCapturesFromApiMock,
 	updateCaptureFromApi: updateCaptureFromApiMock,
 }));
@@ -29,6 +32,7 @@ vi.mock("next/cache", () => ({ revalidatePath: revalidatePathMock }));
 
 import {
 	createCaptureAction,
+	deleteCaptureAction,
 	listCapturesAction,
 	updateCaptureAction,
 } from "@/features/capture/actions";
@@ -370,6 +374,110 @@ describe("updateCaptureAction", () => {
 				createFormData(),
 			),
 		).rejects.toThrow("NEXT_REDIRECT");
+		expect(redirectMock).toHaveBeenCalledWith("/login");
+	});
+});
+
+describe("deleteCaptureAction", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		redirectMock.mockReset();
+	});
+
+	it("revalidates the list and redirects after deletion", async () => {
+		deleteCaptureFromApiMock.mockResolvedValue({
+			ok: true,
+			data: undefined,
+		});
+		redirectMock.mockImplementation(() => {
+			throw new Error("NEXT_REDIRECT");
+		});
+
+		await expect(deleteCaptureAction("capture-1")).rejects.toThrow(
+			"NEXT_REDIRECT",
+		);
+		expect(deleteCaptureFromApiMock).toHaveBeenCalledWith("capture-1");
+		expect(revalidatePathMock).toHaveBeenCalledWith("/captures");
+		expect(revalidatePathMock).not.toHaveBeenCalledWith(
+			"/captures/capture-1",
+		);
+		expect(redirectMock).toHaveBeenCalledWith("/captures");
+	});
+
+	it("rejects an empty capture ID without calling the API", async () => {
+		const state = await deleteCaptureAction("");
+
+		expect(deleteCaptureFromApiMock).not.toHaveBeenCalled();
+		expect(state).toEqual({
+			status: "error",
+			message: "削除に失敗しました。",
+		});
+	});
+
+	it("returns a server failure without leaving the detail page", async () => {
+		deleteCaptureFromApiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "problem",
+				problem: {
+					type: "https://api.hibi.example/problems/internal-error",
+					title: "Internal server error",
+					status: 500,
+					detail: "An unexpected error occurred.",
+					requestId: "request-500",
+				},
+			},
+		});
+
+		const state = await deleteCaptureAction("capture-1");
+
+		expect(state).toEqual({
+			status: "error",
+			message:
+				"処理を完了できませんでした。時間をおいて再度お試しください。改善しない場合は、参照 ID を添えてお問い合わせください。（参照 ID: request-500）",
+		});
+		expect(redirectMock).not.toHaveBeenCalled();
+	});
+
+	it("renders the not-found boundary when the capture no longer exists", async () => {
+		deleteCaptureFromApiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "problem",
+				problem: {
+					type: "https://api.hibi.example/problems/not-found",
+					title: "Not found",
+					status: 404,
+					detail: "Capture was not found.",
+					requestId: "request-404",
+				},
+			},
+		});
+		notFoundMock.mockImplementation(() => {
+			throw new Error("NEXT_NOT_FOUND");
+		});
+
+		await expect(deleteCaptureAction("missing")).rejects.toThrow(
+			"NEXT_NOT_FOUND",
+		);
+		expect(redirectMock).not.toHaveBeenCalled();
+	});
+
+	it("redirects unauthenticated failures to login", async () => {
+		deleteCaptureFromApiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "unauthenticated",
+				message: "Authentication is required.",
+			},
+		});
+		redirectMock.mockImplementation(() => {
+			throw new Error("NEXT_REDIRECT");
+		});
+
+		await expect(deleteCaptureAction("capture-1")).rejects.toThrow(
+			"NEXT_REDIRECT",
+		);
 		expect(redirectMock).toHaveBeenCalledWith("/login");
 	});
 });

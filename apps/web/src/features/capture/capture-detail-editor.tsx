@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState, useTransition } from "react";
 
-import { updateCaptureAction } from "./actions";
+import { deleteCaptureAction, updateCaptureAction } from "./actions";
 import { initialUpdateCaptureActionState } from "./capture-action-state";
 import { CaptureDetailEditorView } from "./capture-detail-editor-view";
 
@@ -21,6 +21,22 @@ export function CaptureDetailEditor({
 		updateCaptureAction.bind(null, captureId),
 		initialUpdateCaptureActionState,
 	);
+	const [deletePending, startDeleteTransition] = useTransition();
+	const [deleteError, setDeleteError] = useState<string>();
+
+	function handleDelete() {
+		if (!window.confirm("この記録を削除しますか？")) {
+			return;
+		}
+
+		setDeleteError(undefined);
+		startDeleteTransition(async () => {
+			const result = await deleteCaptureAction(captureId);
+			if (result.status === "error") {
+				setDeleteError(result.message);
+			}
+		});
+	}
 
 	return (
 		<CaptureDetailEditorView
@@ -30,8 +46,11 @@ export function CaptureDetailEditor({
 				state.status === "error" ? state.fieldErrors?.rawText : undefined
 			}
 			message={state.status === "idle" ? undefined : state.message}
+			errorMessage={deleteError}
 			updatePending={pending}
 			updateFormProps={{ action: formAction }}
+			deletePending={deletePending}
+			deleteButtonProps={{ onClick: handleDelete }}
 		/>
 	);
 }

@@ -22,6 +22,8 @@ export type UpdateCaptureActionState = ActionState<
 	CaptureResponse,
 	CaptureFieldErrors
 >;
+export type DeleteCaptureActionState = ActionState<void>;
+
 export const initialUpdateCaptureActionState: UpdateCaptureActionState = {
 	status: "idle",
 };

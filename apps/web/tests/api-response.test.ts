@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { normalizeGeneratedResult, requestApi } from "@/lib/api/request-api";
+import {
+  normalizeGeneratedEmptyResult,
+  normalizeGeneratedResult,
+  requestApi,
+} from "@/lib/api/request-api";
 
 describe("requestApi", () => {
   it("unwraps a successful data response", async () => {
@@ -166,5 +170,47 @@ describe("normalizeGeneratedResult", () => {
         error: new DOMException("The operation was aborted.", "AbortError"),
       }),
     ).toEqual({ ok: false, error: { kind: "aborted" } });
+  });
+});
+
+describe("normalizeGeneratedEmptyResult", () => {
+  it("treats an empty successful response as success", () => {
+    expect(
+      normalizeGeneratedEmptyResult({
+        data: undefined,
+        error: undefined,
+        response: new Response(null, { status: 204 }),
+      }),
+    ).toEqual({ ok: true, data: undefined });
+  });
+
+  it("preserves a problem response", () => {
+    const problem = {
+      type: "https://api.hibi.example/problems/not-found",
+      title: "Not found",
+      status: 404,
+      detail: "Capture was not found.",
+      requestId: "request-404",
+    };
+
+    expect(
+      normalizeGeneratedEmptyResult({
+        data: undefined,
+        error: problem,
+        response: new Response(null, { status: 404 }),
+      }),
+    ).toEqual({ ok: false, error: { kind: "problem", problem } });
+  });
+
+  it("classifies a missing response as a network error", () => {
+    expect(
+      normalizeGeneratedEmptyResult({
+        data: undefined,
+        error: new TypeError("fetch failed"),
+      }),
+    ).toEqual({
+      ok: false,
+      error: { kind: "network", message: "fetch failed" },
+    });
   });
 });

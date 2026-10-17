@@ -110,6 +110,20 @@ describe("Capture presentation", () => {
 		expect(html).toContain("disabled");
 	});
 
+	it("shows a delete failure beside the delete button", () => {
+		const html = renderToStaticMarkup(
+			<CaptureDetailEditorView
+				defaultValue="牛乳を買う"
+				timeLabel="10月2日 14:02"
+				errorMessage="削除に失敗しました。"
+			/>,
+		);
+
+		expect(html).toContain("削除に失敗しました。");
+		expect(html).toContain('id="capture-detail-delete-error"');
+		expect(html).toContain('aria-describedby="capture-detail-delete-error"');
+	});
+
 	it("keeps the composer in a distinct bottom region", () => {
 		const html = renderToStaticMarkup(
 			<CapturePageFrame dateLabel="10月2日 木" composer={<div>composer</div>}>
