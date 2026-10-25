@@ -40,11 +40,11 @@ describe("createCaptureFromApi", () => {
 		});
 	});
 
-	it("sends the raw text and idempotency key through the generated client", async () => {
+	it("treats a 202 accepted response as a created capture", async () => {
 		const capture = {
 			id: "capture-1",
 			rawText: "牛乳を買う",
-			status: "active",
+			status: "pending",
 			createdAt: "2026-10-04T09:00:00Z",
 			updatedAt: "2026-10-04T09:00:00Z",
 		};
@@ -52,6 +52,8 @@ describe("createCaptureFromApi", () => {
 			data: {
 				data: capture,
 			},
+			error: undefined,
+			response: new Response(null, { status: 202 }),
 		});
 
 		const result = await createCaptureFromApi("牛乳を買う", "capture-key");

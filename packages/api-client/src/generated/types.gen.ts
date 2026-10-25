@@ -305,7 +305,7 @@ export type CreateCaptureResponses = {
   /**
    * Successful Response
    */
-  201: ApiResponseCaptureResponse;
+  202: ApiResponseCaptureResponse;
 };
 
 export type CreateCaptureResponse =

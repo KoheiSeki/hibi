@@ -47,7 +47,7 @@ def _get_capture_service(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
         ),
     },
-    status_code=status.HTTP_201_CREATED,
+    status_code=status.HTTP_202_ACCEPTED,
 )
 async def create_capture(
     body: CreateCaptureRequest,

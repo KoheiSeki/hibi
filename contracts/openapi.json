@@ -466,7 +466,7 @@
             },
             "description": "OK"
           },
-          "201": {
+          "202": {
             "content": {
               "application/json": {
                 "schema": {
