@@ -2,6 +2,17 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
+CAPTURE_AGGREGATE_TYPE = "capture"
+CAPTURE_PROCESSING_REQUESTED = "capture.processing_requested"
+
+CAPTURE_STATUS_PENDING = "pending"
+CAPTURE_STATUS_PROCESSING = "processing"
+CAPTURE_STATUS_COMPLETED = "completed"
+CAPTURE_STATUS_FAILED = "failed"
+
+OUTBOX_STATUS_PENDING = "pending"
+OUTBOX_STATUS_PUBLISHED = "published"
+
 
 @dataclass(frozen=True, slots=True)
 class Capture:

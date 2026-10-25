@@ -2,14 +2,20 @@ from collections.abc import AsyncGenerator
 from uuid import UUID, uuid4, uuid7
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from hibi.core.config import get_settings
 from hibi.db.engine import dispose_engine, get_engine
+from hibi.modules.captures.models import OutboxModel
 from hibi.modules.captures.repository import CaptureRepository
-from hibi.modules.captures.types import Capture
+from hibi.modules.captures.types import (
+    CAPTURE_PROCESSING_REQUESTED,
+    CAPTURE_STATUS_PENDING,
+    OUTBOX_STATUS_PENDING,
+    Capture,
+)
 
 _HASH_A = "a" * 64
 _HASH_B = "b" * 64
@@ -50,7 +56,7 @@ async def _create_capture(
 ) -> Capture:
     return await repo.create_capture(
         user_id,
-        id=uuid7(),
+        capture_id=uuid7(),
         raw_text=raw_text,
         idempotency_key=idempotency_key or str(uuid4()),
         request_hash=request_hash,
@@ -171,7 +177,7 @@ async def test_duplicate_idempotency_key_raises_integrity_error(
 
     await repo.create_capture(
         user_id,
-        id=uuid7(),
+        capture_id=uuid7(),
         raw_text="1件目",
         idempotency_key=key,
         request_hash=_HASH_A,
@@ -180,8 +186,60 @@ async def test_duplicate_idempotency_key_raises_integrity_error(
     with pytest.raises(IntegrityError):
         await repo.create_capture(
             user_id,
-            id=uuid7(),
+            capture_id=uuid7(),
             raw_text="2件目",
             idempotency_key=key,
             request_hash=_HASH_B,
         )
+
+
+@pytest.mark.integration
+async def test_create_capture_writes_capture_and_outbox(session: AsyncSession) -> None:
+    user_id = uuid4()
+    await _insert_auth_user(session, user_id)
+    repo = CaptureRepository(session)
+
+    created = await _create_capture(repo, user_id)
+    outbox = await session.scalar(
+        select(OutboxModel).where(OutboxModel.aggregate_id == created.id)
+    )
+
+    assert outbox is not None
+    assert outbox.user_id == user_id
+    assert outbox.aggregate_type == "capture"
+    assert outbox.event_type == CAPTURE_PROCESSING_REQUESTED
+    assert outbox.processing_generation == 1
+    assert outbox.status == OUTBOX_STATUS_PENDING
+    assert created.status == CAPTURE_STATUS_PENDING
+
+
+@pytest.mark.integration
+async def test_failed_create_leaves_neither_capture_nor_outbox(
+    session: AsyncSession,
+) -> None:
+    user_id = uuid4()
+    await _insert_auth_user(session, user_id)
+    repo = CaptureRepository(session)
+    key = "idem-key-rollback"
+    created = await _create_capture(repo, user_id, idempotency_key=key)
+
+    with pytest.raises(IntegrityError):
+        await repo.create_capture(
+            user_id,
+            capture_id=uuid7(),
+            raw_text="2件目",
+            idempotency_key=key,
+            request_hash=_HASH_B,
+        )
+    await session.rollback()
+
+    capture_count = await session.scalar(
+        text("SELECT count(*) FROM app.captures WHERE id = :id"),
+        {"id": created.id},
+    )
+    outbox_count = await session.scalar(
+        text("SELECT count(*) FROM app.outbox_events WHERE aggregate_id = :id"),
+        {"id": created.id},
+    )
+    assert capture_count == 0
+    assert outbox_count == 0

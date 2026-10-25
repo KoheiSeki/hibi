@@ -55,15 +55,14 @@ class CaptureService:
         if result is not None:
             return result
 
-        capture_id = uuid7()
-
         try:
             new = await self._repository.create_capture(
                 command.user_id,
-                capture_id=capture_id,
+                capture_id=uuid7(),
                 raw_text=stripped_raw_text,
                 idempotency_key=idempotency_key,
                 request_hash=request_hash,
+                outbox_id=uuid7(),
             )
             return CreateCaptureResult(capture=new, created=True)
         except IntegrityError:

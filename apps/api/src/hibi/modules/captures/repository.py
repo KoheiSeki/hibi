@@ -4,8 +4,8 @@ from uuid import UUID
 from sqlalchemy import select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from hibi.modules.captures.models import CaptureModel
-from hibi.modules.captures.types import Capture
+from hibi.modules.captures.models import CaptureModel, OutboxModel
+from hibi.modules.captures.types import CAPTURE_STATUS_PENDING, Capture
 
 
 class CaptureRepository:
@@ -62,19 +62,22 @@ class CaptureRepository:
         raw_text: str,
         idempotency_key: str,
         request_hash: str,
+        outbox_id: UUID,
     ) -> Capture:
-        db_obj = CaptureModel(
+        capture = CaptureModel(
             id=capture_id,
             user_id=user_id,
             raw_text=raw_text,
-            status="pending",
+            status=CAPTURE_STATUS_PENDING,
             idempotency_key=idempotency_key,
             request_hash=request_hash,
         )
-        self._session.add(db_obj)
+        outbox = OutboxModel(id=outbox_id, user_id=user_id, aggregate_id=capture_id)
+        self._session.add(capture)
+        self._session.add(outbox)
         await self._session.flush()
-        await self._session.refresh(db_obj)
-        return _to_capture(db_obj)
+        await self._session.refresh(capture)
+        return _to_capture(capture)
 
     async def update_capture(
         self, user_id: UUID, *, capture_id: UUID, raw_text: str
