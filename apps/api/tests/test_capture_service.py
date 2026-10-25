@@ -96,6 +96,7 @@ class FakeCaptureRepository:
         raw_text: str,
         idempotency_key: str,
         request_hash: str,
+        outbox_id: UUID,
     ) -> Capture:
         self._create_attempts += 1
         if self._raise_on_create is not None:
