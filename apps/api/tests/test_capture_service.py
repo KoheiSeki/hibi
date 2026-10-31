@@ -111,6 +111,7 @@ class FakeCaptureRepository:
             status="pending",
             idempotency_key=idempotency_key,
             request_hash=request_hash,
+            processing_generation=1,
             created_at=now,
             updated_at=now,
         )
@@ -130,6 +131,7 @@ class FakeCaptureRepository:
                 status=capture.status,
                 idempotency_key=capture.idempotency_key,
                 request_hash=capture.request_hash,
+                processing_generation=capture.processing_generation,
                 created_at=capture.created_at,
                 updated_at=datetime.now(UTC),
             )
@@ -309,6 +311,7 @@ async def test_create_capture_replays_after_integrity_error_when_hash_matches() 
         status="pending",
         idempotency_key=_KEY,
         request_hash=_hash("牛乳を買う"),
+        processing_generation=1,
         created_at=datetime.now(UTC),
         updated_at=datetime.now(UTC),
     )
@@ -334,6 +337,7 @@ async def test_create_capture_conflicts_after_integrity_error_when_hash_differs(
         status="pending",
         idempotency_key=_KEY,
         request_hash=_hash("卵を買う"),
+        processing_generation=1,
         created_at=datetime.now(UTC),
         updated_at=datetime.now(UTC),
     )

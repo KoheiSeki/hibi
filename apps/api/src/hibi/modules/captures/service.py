@@ -1,8 +1,8 @@
-from base64 import urlsafe_b64decode, urlsafe_b64encode
-from datetime import UTC, datetime
 import hashlib
 import json
 import re
+from base64 import urlsafe_b64decode, urlsafe_b64encode
+from datetime import UTC, datetime
 from uuid import UUID, uuid7
 
 from sqlalchemy.exc import IntegrityError
@@ -18,6 +18,10 @@ from hibi.modules.captures.errors import (
 )
 from hibi.modules.captures.repository import CaptureRepository
 from hibi.modules.captures.types import (
+    CAPTURE_STATUS_COMPLETED,
+    CAPTURE_STATUS_FAILED,
+    CAPTURE_STATUS_PENDING,
+    CAPTURE_STATUS_PROCESSING,
     Capture,
     CapturePage,
     CreateCaptureCommand,
@@ -125,6 +129,46 @@ class CaptureService:
         )
         if not is_deleted:
             raise CaptureNotFoundError(capture_id=capture_id)
+
+    async def process_capture(
+        self, capture_id: UUID, processing_generation: int
+    ) -> None:
+        capture = await self._repository.get_by_capture_id(capture_id)
+        if (
+            capture is None
+            or capture.processing_generation != processing_generation
+            or capture.status in {CAPTURE_STATUS_COMPLETED, CAPTURE_STATUS_FAILED}
+        ):
+            return
+
+        # statusをprocessingに更新
+        is_started = await self._repository.update_processing_status(
+            capture_id=capture_id,
+            processing_generation=capture.processing_generation,
+            expected_status=CAPTURE_STATUS_PENDING,
+            status=CAPTURE_STATUS_PROCESSING,
+        )
+        if not is_started:
+            return
+
+        # todo: captureの分類、文章生成処理
+
+        await self._repository.update_processing_status(
+            capture_id=capture_id,
+            processing_generation=capture.processing_generation,
+            expected_status=CAPTURE_STATUS_PROCESSING,
+            status=CAPTURE_STATUS_COMPLETED,
+        )
+
+    async def mark_processing_failed(
+        self, capture_id: UUID, processing_generation: int
+    ) -> None:
+        await self._repository.update_processing_status(
+            capture_id=capture_id,
+            processing_generation=processing_generation,
+            expected_status=CAPTURE_STATUS_PENDING,
+            status=CAPTURE_STATUS_FAILED,
+        )
 
     def _replay_or_conflict(
         self, existing: Capture | None, request_hash: str

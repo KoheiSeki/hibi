@@ -60,6 +60,7 @@ async def _create_capture(
         raw_text=raw_text,
         idempotency_key=idempotency_key or str(uuid4()),
         request_hash=request_hash,
+        outbox_id=uuid7(),
     )
 
 
@@ -181,6 +182,7 @@ async def test_duplicate_idempotency_key_raises_integrity_error(
         raw_text="1件目",
         idempotency_key=key,
         request_hash=_HASH_A,
+        outbox_id=uuid7(),
     )
 
     with pytest.raises(IntegrityError):
@@ -190,6 +192,7 @@ async def test_duplicate_idempotency_key_raises_integrity_error(
             raw_text="2件目",
             idempotency_key=key,
             request_hash=_HASH_B,
+            outbox_id=uuid7(),
         )
 
 
@@ -230,6 +233,7 @@ async def test_failed_create_leaves_neither_capture_nor_outbox(
             raw_text="2件目",
             idempotency_key=key,
             request_hash=_HASH_B,
+            outbox_id=uuid7(),
         )
     await session.rollback()
 

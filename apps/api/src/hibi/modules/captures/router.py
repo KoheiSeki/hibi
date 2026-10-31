@@ -64,7 +64,7 @@ async def create_capture(
     result: CreateCaptureResult = await service.create_capture(command)
 
     response.status_code = (
-        status.HTTP_201_CREATED if result.created else status.HTTP_200_OK
+        status.HTTP_202_ACCEPTED if result.created else status.HTTP_200_OK
     )
     response.headers["Location"] = f"/api/v1/captures/{result.capture.id}"
     return ApiResponse(data=_to_capture_response(result.capture))

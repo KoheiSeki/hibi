@@ -40,6 +40,7 @@ def _capture(**overrides: object) -> Capture:
         "status": "pending",
         "idempotency_key": _KEY,
         "request_hash": "hash",
+        "processing_generation": 1,
         "created_at": _NOW,
         "updated_at": _NOW,
     }
@@ -135,14 +136,14 @@ def test_capture_endpoints_reject_missing_token() -> None:
         assert response.json()["type"].endswith("/unauthorized")
 
 
-def test_create_capture_returns_201_and_location() -> None:
+def test_create_capture_returns_202_and_location() -> None:
     fake = FakeCaptureService()
     response = _client(fake).post(
         "/api/v1/captures",
         json={"rawText": "牛乳を買う"},
         headers={"Idempotency-Key": _KEY},
     )
-    assert response.status_code == 201
+    assert response.status_code == 202
     body = response.json()["data"]
     assert body["status"] == "pending"
     assert body["rawText"] == "牛乳を買う"

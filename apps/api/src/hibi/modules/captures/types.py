@@ -13,6 +13,8 @@ CAPTURE_STATUS_FAILED = "failed"
 OUTBOX_STATUS_PENDING = "pending"
 OUTBOX_STATUS_PUBLISHED = "published"
 
+CAPTURE_PROCESSING_MAX_ATTEMPTS = 3
+
 
 @dataclass(frozen=True, slots=True)
 class Capture:
@@ -22,6 +24,7 @@ class Capture:
     status: str
     idempotency_key: str
     request_hash: str
+    processing_generation: int
     created_at: datetime
     updated_at: datetime
 

@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import select, tuple_
+from sqlalchemy import select, tuple_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hibi.modules.captures.models import CaptureModel, OutboxModel
@@ -11,6 +11,14 @@ from hibi.modules.captures.types import CAPTURE_STATUS_PENDING, Capture
 class CaptureRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
+
+    async def get_by_capture_id(self, capture_id: UUID) -> Capture | None:
+        stmt = select(CaptureModel).where(CaptureModel.id == capture_id)
+        result = await self._session.execute(stmt)
+        row = result.scalar_one_or_none()
+        if row is None:
+            return None
+        return _to_capture(row)
 
     async def get_by_id(self, user_id: UUID, *, capture_id: UUID) -> Capture | None:
         stmt = select(CaptureModel).where(
@@ -96,6 +104,27 @@ class CaptureRepository:
         await self._session.refresh(row)
         return _to_capture(row)
 
+    async def update_processing_status(
+        self,
+        *,
+        capture_id: UUID,
+        processing_generation: int,
+        expected_status: str,
+        status: str,
+    ) -> bool:
+        stmt = (
+            update(CaptureModel)
+            .where(
+                CaptureModel.id == capture_id,
+                CaptureModel.status == expected_status,
+                CaptureModel.processing_generation == processing_generation,
+            )
+            .values(status=status)
+            .returning(CaptureModel.id)
+        )
+        updated_id = await self._session.scalar(stmt)
+        return updated_id is not None
+
     async def delete_capture(self, user_id: UUID, *, capture_id: UUID) -> bool:
         stmt = select(CaptureModel).where(
             CaptureModel.id == capture_id, CaptureModel.user_id == user_id
@@ -118,6 +147,7 @@ def _to_capture(row: CaptureModel) -> Capture:
         status=row.status,
         idempotency_key=row.idempotency_key,
         request_hash=row.request_hash,
+        processing_generation=row.processing_generation,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
