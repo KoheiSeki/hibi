@@ -7,6 +7,8 @@ from hibi.modules.captures.repository import CaptureRepository
 from hibi.modules.captures.service import CaptureService
 from hibi.modules.captures.types import CAPTURE_PROCESSING_MAX_ATTEMPTS
 
+PROCESS_CAPTURE_JOB_NAME = "process_capture_job"
+
 
 async def process_capture_job(
     ctx: dict[str, Any], capture_id: UUID, processing_generation: int

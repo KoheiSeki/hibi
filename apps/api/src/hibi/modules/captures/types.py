@@ -61,3 +61,10 @@ class CapturePage:
     items: list[Capture]
     next_cursor: str | None
     has_next_page: bool
+
+
+@dataclass(frozen=True, slots=True)
+class OutboxEvent:
+    id: UUID
+    aggregate_id: UUID
+    processing_generation: int

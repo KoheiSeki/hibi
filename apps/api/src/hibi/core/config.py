@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_prefix="HIBI_", env_file=".env", extra="ignore"
+        env_prefix="HIBI_", env_file=(".env", ".env.local"), extra="ignore"
     )
 
     supabase_url: str = "https://example.supabase.co"
@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000"
 
     database_url: str = ""
+
+    redis_url: str = "redis://localhost:6379/0"
 
     @property
     def allowed_jwt_algorithms(self) -> frozenset[str]:

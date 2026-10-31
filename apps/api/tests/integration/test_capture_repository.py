@@ -1,8 +1,9 @@
 from collections.abc import AsyncGenerator
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4, uuid7
 
 import pytest
-from sqlalchemy import select, text
+from sqlalchemy import select, text, update
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -14,6 +15,7 @@ from hibi.modules.captures.types import (
     CAPTURE_PROCESSING_REQUESTED,
     CAPTURE_STATUS_PENDING,
     OUTBOX_STATUS_PENDING,
+    OUTBOX_STATUS_PUBLISHED,
     Capture,
 )
 
@@ -203,9 +205,7 @@ async def test_create_capture_writes_capture_and_outbox(session: AsyncSession) -
     repo = CaptureRepository(session)
 
     created = await _create_capture(repo, user_id)
-    outbox = await session.scalar(
-        select(OutboxModel).where(OutboxModel.aggregate_id == created.id)
-    )
+    outbox = await session.scalar(select(OutboxModel).where(OutboxModel.aggregate_id == created.id))
 
     assert outbox is not None
     assert outbox.user_id == user_id
@@ -247,3 +247,69 @@ async def test_failed_create_leaves_neither_capture_nor_outbox(
     )
     assert capture_count == 0
     assert outbox_count == 0
+
+
+@pytest.mark.integration
+async def test_list_pending_outbox_events_filters_orders_and_limits(
+    session: AsyncSession,
+) -> None:
+    user_id = uuid4()
+    await _insert_auth_user(session, user_id)
+    repo = CaptureRepository(session)
+    now = datetime.now(UTC)
+
+    oldest = await _create_capture(repo, user_id, raw_text="oldest")
+    newer = await _create_capture(repo, user_id, raw_text="newer")
+    published = await _create_capture(repo, user_id, raw_text="published")
+    future = await _create_capture(repo, user_id, raw_text="future")
+
+    await session.execute(
+        update(OutboxModel)
+        .where(OutboxModel.aggregate_id == oldest.id)
+        .values(available_at=now - timedelta(minutes=2))
+    )
+    await session.execute(
+        update(OutboxModel)
+        .where(OutboxModel.aggregate_id == newer.id)
+        .values(available_at=now - timedelta(minutes=1))
+    )
+    await session.execute(
+        update(OutboxModel)
+        .where(OutboxModel.aggregate_id == published.id)
+        .values(
+            status=OUTBOX_STATUS_PUBLISHED,
+            available_at=now - timedelta(minutes=3),
+        )
+    )
+    await session.execute(
+        update(OutboxModel)
+        .where(OutboxModel.aggregate_id == future.id)
+        .values(available_at=now + timedelta(minutes=1))
+    )
+
+    first_page = await repo.list_pending_outbox_events(limit=1)
+    all_available = await repo.list_pending_outbox_events(limit=20)
+
+    assert [event.aggregate_id for event in first_page] == [oldest.id]
+    assert [event.aggregate_id for event in all_available] == [oldest.id, newer.id]
+
+
+@pytest.mark.integration
+async def test_update_outbox_published_sets_timestamp_once(
+    session: AsyncSession,
+) -> None:
+    user_id = uuid4()
+    await _insert_auth_user(session, user_id)
+    repo = CaptureRepository(session)
+    capture = await _create_capture(repo, user_id)
+    outbox = await session.scalar(select(OutboxModel).where(OutboxModel.aggregate_id == capture.id))
+    assert outbox is not None
+
+    first_update = await repo.update_outbox_published(outbox_id=outbox.id)
+    second_update = await repo.update_outbox_published(outbox_id=outbox.id)
+    await session.refresh(outbox)
+
+    assert first_update is True
+    assert second_update is False
+    assert outbox.status == OUTBOX_STATUS_PUBLISHED
+    assert outbox.published_at is not None

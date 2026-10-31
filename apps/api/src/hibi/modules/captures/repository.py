@@ -1,11 +1,17 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import select, tuple_, update
+from sqlalchemy import func, select, tuple_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hibi.modules.captures.models import CaptureModel, OutboxModel
-from hibi.modules.captures.types import CAPTURE_STATUS_PENDING, Capture
+from hibi.modules.captures.types import (
+    CAPTURE_STATUS_PENDING,
+    OUTBOX_STATUS_PENDING,
+    OUTBOX_STATUS_PUBLISHED,
+    Capture,
+    OutboxEvent,
+)
 
 
 class CaptureRepository:
@@ -30,9 +36,7 @@ class CaptureRepository:
             return None
         return _to_capture(row)
 
-    async def get_by_idempotency_key(
-        self, user_id: UUID, *, key: str
-    ) -> Capture | None:
+    async def get_by_idempotency_key(self, user_id: UUID, *, key: str) -> Capture | None:
         stmt = select(CaptureModel).where(
             CaptureModel.user_id == user_id, CaptureModel.idempotency_key == key
         )
@@ -56,11 +60,23 @@ class CaptureRepository:
                 tuple_(CaptureModel.created_at, CaptureModel.id)
                 < (start_created_at, start_capture_id)
             )
-        stmt = stmt.order_by(
-            CaptureModel.created_at.desc(), CaptureModel.id.desc()
-        ).limit(limit)
+        stmt = stmt.order_by(CaptureModel.created_at.desc(), CaptureModel.id.desc()).limit(limit)
         result = await self._session.execute(stmt)
         return [_to_capture(row) for row in result.scalars().all()]
+
+    async def list_pending_outbox_events(self, *, limit: int) -> list[OutboxEvent]:
+        stmt = (
+            select(OutboxModel)
+            .where(
+                OutboxModel.status == OUTBOX_STATUS_PENDING,
+                OutboxModel.available_at <= func.now(),
+            )
+            .order_by(OutboxModel.available_at, OutboxModel.id)
+            .limit(limit)
+            .with_for_update(skip_locked=True)
+        )
+        result = await self._session.execute(stmt)
+        return [_to_outbox_event(row) for row in result.scalars()]
 
     async def create_capture(
         self,
@@ -122,8 +138,16 @@ class CaptureRepository:
             .values(status=status)
             .returning(CaptureModel.id)
         )
-        updated_id = await self._session.scalar(stmt)
-        return updated_id is not None
+        return await self._session.scalar(stmt) is not None
+
+    async def update_outbox_published(self, *, outbox_id: UUID) -> bool:
+        stmt = (
+            update(OutboxModel)
+            .where(OutboxModel.id == outbox_id, OutboxModel.status == OUTBOX_STATUS_PENDING)
+            .values(status=OUTBOX_STATUS_PUBLISHED, published_at=func.now())
+            .returning(OutboxModel.id)
+        )
+        return await self._session.scalar(stmt) is not None
 
     async def delete_capture(self, user_id: UUID, *, capture_id: UUID) -> bool:
         stmt = select(CaptureModel).where(
@@ -150,4 +174,12 @@ def _to_capture(row: CaptureModel) -> Capture:
         processing_generation=row.processing_generation,
         created_at=row.created_at,
         updated_at=row.updated_at,
+    )
+
+
+def _to_outbox_event(row: OutboxModel) -> OutboxEvent:
+    return OutboxEvent(
+        id=row.id,
+        aggregate_id=row.aggregate_id,
+        processing_generation=row.processing_generation,
     )
