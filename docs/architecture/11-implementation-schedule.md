@@ -89,6 +89,8 @@
 
 ## Week 5: Jev System One
 
+方針は [23-week5-jev-system-one.md](./23-week5-jev-system-one.md)。
+
 - `docs/ai/jev-questions.md`を作成する
 - route、category、urgency、confidenceを設計する
 - policy versionを定義する
