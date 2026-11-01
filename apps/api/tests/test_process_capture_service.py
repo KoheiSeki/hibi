@@ -66,6 +66,13 @@ def _capture(*, status: str = CAPTURE_STATUS_PENDING, generation: int = 1) -> Ca
         idempotency_key=str(uuid4()),
         request_hash="a" * 64,
         processing_generation=generation,
+        category=None,
+        route=None,
+        urgency=None,
+        confidence=None,
+        policy_version=None,
+        question_version=None,
+        processed_at=None,
         created_at=now,
         updated_at=now,
     )

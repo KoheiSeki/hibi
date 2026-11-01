@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import func, select, tuple_, update
@@ -6,8 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from hibi.modules.captures.models import CaptureModel, OutboxModel
 from hibi.modules.captures.types import (
+    CAPTURE_STATUS_COMPLETED,
     CAPTURE_STATUS_FAILED,
     CAPTURE_STATUS_PENDING,
+    CAPTURE_STATUS_PROCESSING,
     OUTBOX_STATUS_PENDING,
     OUTBOX_STATUS_PUBLISHED,
     Capture,
@@ -200,6 +203,45 @@ class CaptureRepository:
 
         return _to_capture(row)
 
+    async def complete_capture_classification(
+        self,
+        *,
+        capture_id: UUID,
+        processing_generation: int,
+        category: str,
+        route: str,
+        urgency: str,
+        confidence: Decimal,
+        policy_version: str,
+        question_version: str,
+    ) -> Capture | None:
+        stmt = (
+            update(CaptureModel)
+            .where(
+                CaptureModel.id == capture_id,
+                CaptureModel.status == CAPTURE_STATUS_PROCESSING,
+                CaptureModel.processing_generation == processing_generation,
+            )
+            .values(
+                status=CAPTURE_STATUS_COMPLETED,
+                category=category,
+                route=route,
+                urgency=urgency,
+                confidence=confidence,
+                policy_version=policy_version,
+                question_version=question_version,
+                processed_at=func.now(),
+                updated_at=func.now(),
+            )
+            .returning(CaptureModel)
+        )
+        result = await self._session.execute(stmt)
+        row = result.scalar_one_or_none()
+        if row is None:
+            return None
+
+        return _to_capture(row)
+
 
 def _to_capture(row: CaptureModel) -> Capture:
     return Capture(
@@ -210,6 +252,13 @@ def _to_capture(row: CaptureModel) -> Capture:
         idempotency_key=row.idempotency_key,
         request_hash=row.request_hash,
         processing_generation=row.processing_generation,
+        category=row.category,
+        route=row.route,
+        urgency=row.urgency,
+        confidence=row.confidence,
+        policy_version=row.policy_version,
+        question_version=row.question_version,
+        processed_at=row.processed_at,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )

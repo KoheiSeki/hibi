@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID
 
 CAPTURE_AGGREGATE_TYPE = "capture"
@@ -25,6 +26,13 @@ class Capture:
     idempotency_key: str
     request_hash: str
     processing_generation: int
+    category: str | None
+    route: str | None
+    urgency: str | None
+    confidence: Decimal | None
+    policy_version: str | None
+    question_version: str | None
+    processed_at: datetime | None
     created_at: datetime
     updated_at: datetime
 

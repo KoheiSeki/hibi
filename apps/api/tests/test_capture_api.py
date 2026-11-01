@@ -43,6 +43,13 @@ def _capture(**overrides: object) -> Capture:
         "idempotency_key": _KEY,
         "request_hash": "hash",
         "processing_generation": 1,
+        "category": None,
+        "route": None,
+        "urgency": None,
+        "confidence": None,
+        "policy_version": None,
+        "question_version": None,
+        "processed_at": None,
         "created_at": _NOW,
         "updated_at": _NOW,
     }
