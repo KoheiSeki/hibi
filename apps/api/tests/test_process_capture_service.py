@@ -150,3 +150,14 @@ async def test_mark_processing_failed_transitions_pending_to_failed() -> None:
         CAPTURE_STATUS_PENDING,
         CAPTURE_STATUS_FAILED,
     )
+
+
+@pytest.mark.asyncio
+async def test_mark_processing_failed_does_not_overwrite_newer_generation() -> None:
+    capture = _capture(generation=2)
+    repository = FakeProcessCaptureRepository(capture)
+
+    await _service(repository).mark_processing_failed(capture.id, 1)
+
+    assert repository.capture is not None
+    assert repository.capture.status == CAPTURE_STATUS_PENDING

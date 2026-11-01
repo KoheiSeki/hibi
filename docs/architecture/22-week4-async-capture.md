@@ -115,7 +115,7 @@ relay は arq cron で `relay_outbox_events` を短い間隔（5 秒）で回す
 
 Worker は HTTP を返さない。一時障害は例外を arq の retry に乗せる。検証エラーと「所有者の行ではない」は例外にせず、その job を終了する。Capture がすでに無い job も終了する。構造化ログと失敗の記録は [04](./04-error-handling.md) の Worker 境界。
 
-一時障害の上限は 3。回数は outbox ではなく、その世代の Worker 試行として Capture service が数える。3 回目の失敗で `failed`。4 回目以降の job は状態を変えない。
+一時障害の上限は 3。回数は outbox ではなく、その世代の Worker 試行として Job境界がjob_tryで判定する。3 回目の失敗で `failed`。4 回目以降の job は状態を変えない。
 
 ## HTTP
 

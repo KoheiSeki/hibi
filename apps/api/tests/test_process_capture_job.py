@@ -5,6 +5,7 @@ from typing import Any
 from uuid import UUID, uuid7
 
 import pytest
+from arq import Retry
 
 job_module = import_module("hibi.jobs.process_capture_job")
 
@@ -53,8 +54,10 @@ async def test_process_capture_job_commits_successful_processing(
 
 
 @pytest.mark.asyncio
-async def test_process_capture_job_rolls_back_and_reraises(
+@pytest.mark.parametrize("attempt", [1, 2])
+async def test_process_capture_job_rolls_back_and_schedules_retry(
     monkeypatch: pytest.MonkeyPatch,
+    attempt: int,
 ) -> None:
     state = TransactionState()
     session = object()
@@ -71,13 +74,16 @@ async def test_process_capture_job_rolls_back_and_reraises(
     monkeypatch.setattr(job_module, "CaptureService", FailingService)
     logged: list[dict[str, Any]] = []
     monkeypatch.setattr(job_module, "log_job_failure", lambda **kwargs: logged.append(kwargs))
+    monkeypatch.setattr(job_module, "_retry_delay", lambda attempt: attempt * 5.0)
 
-    with pytest.raises(RuntimeError, match="processing failed"):
-        await job_module.process_capture_job({"job_try": 1}, uuid7(), processing_generation=1)
+    with pytest.raises(Retry) as retry:
+        await job_module.process_capture_job({"job_try": attempt}, uuid7(), processing_generation=1)
 
     assert state.committed is False
     assert state.rolled_back is True
-    assert logged[0]["attempt"] == 1
+    assert retry.value.defer_score == attempt * 5_000
+    assert isinstance(retry.value.__cause__, RuntimeError)
+    assert logged[0]["attempt"] == attempt
 
 
 @pytest.mark.asyncio
@@ -112,7 +118,8 @@ async def test_process_capture_job_commits_failed_status_in_separate_transaction
     monkeypatch.setattr(job_module, "session_scope", lambda: next(scopes))
     monkeypatch.setattr(job_module, "CaptureRepository", lambda *, session: object())
     monkeypatch.setattr(job_module, "CaptureService", FailingService)
-    monkeypatch.setattr(job_module, "log_job_failure", lambda **kwargs: None)
+    logged: list[dict[str, Any]] = []
+    monkeypatch.setattr(job_module, "log_job_failure", lambda **kwargs: logged.append(kwargs))
     capture_id = uuid7()
 
     with pytest.raises(RuntimeError, match="processing failed"):
@@ -123,3 +130,26 @@ async def test_process_capture_job_commits_failed_status_in_separate_transaction
     assert failure_state.committed is True
     assert failure_state.rolled_back is False
     assert marked_failed == [(capture_id, 2)]
+    assert logged[0]["attempt"] == 3
+
+
+@pytest.mark.asyncio
+async def test_process_capture_job_ignores_attempt_above_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        job_module,
+        "session_scope",
+        lambda: pytest.fail("session must not be opened"),
+    )
+
+    await job_module.process_capture_job({"job_try": 4}, uuid7(), processing_generation=1)
+
+
+def test_retry_delay_uses_exponential_backoff_and_jitter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(job_module.random, "uniform", lambda _start, _end: 0.5)
+
+    assert job_module._retry_delay(1) == 5.5
+    assert job_module._retry_delay(2) == 10.5
