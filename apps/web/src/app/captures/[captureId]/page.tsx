@@ -38,6 +38,7 @@ export default async function CaptureDetailPage({
 			<CaptureDetailEditor
 				captureId={result.data.id}
 				defaultValue={result.data.rawText}
+				initialStatus={result.data.status}
 				timeLabel={formatJstDateTime(result.data.createdAt)}
 			/>
 		</main>

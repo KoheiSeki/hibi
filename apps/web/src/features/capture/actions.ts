@@ -3,14 +3,18 @@
 import {
 	createCaptureFromApi,
 	deleteCaptureFromApi,
+	getCaptureFromApi,
 	listCapturesFromApi,
+	retryCaptureFromApi,
 	updateCaptureFromApi,
 } from "@/lib/api/capture";
 import type {
 	CaptureFieldErrors,
 	CreateCaptureActionState,
 	DeleteCaptureActionState,
+	GetCaptureActionState,
 	ListCapturesActionState,
+	RetryCaptureActionState,
 	UpdateCaptureActionState,
 } from "./capture-action-state";
 import { revalidatePath } from "next/cache";
@@ -73,6 +77,51 @@ export async function listCapturesAction(
 	return {
 		status: "success",
 		data: result.data,
+	};
+}
+
+export async function getCaptureAction(
+	captureId: string,
+): Promise<GetCaptureActionState> {
+	if (typeof captureId !== "string" || captureId.length === 0) {
+		return {
+			status: "error",
+			message: "記録を取得できませんでした。",
+		};
+	}
+
+	const result = await getCaptureFromApi(captureId);
+	if (!result.ok) {
+		return toActionErrorState(result.error);
+	}
+
+	return {
+		status: "success",
+		data: result.data,
+	};
+}
+
+export async function retryCaptureAction(
+	captureId: string,
+): Promise<RetryCaptureActionState> {
+	if (typeof captureId !== "string" || captureId.length === 0) {
+		return {
+			status: "error",
+			message: "やり直しを開始できませんでした。",
+		};
+	}
+
+	const result = await retryCaptureFromApi(captureId);
+	if (!result.ok) {
+		return toActionErrorState(result.error);
+	}
+
+	revalidatePath("/captures");
+	revalidatePath(`/captures/${captureId}`);
+	return {
+		status: "success",
+		data: result.data,
+		message: "もう一度整えています。",
 	};
 }
 

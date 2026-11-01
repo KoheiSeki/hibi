@@ -7,25 +7,39 @@ import { Textarea } from "@/components/ui/textarea";
 type CaptureDetailEditorViewProps = {
 	defaultValue: string;
 	timeLabel: string;
+	statusMessage?: string;
 	fieldError?: string;
 	message?: ReactNode;
 	errorMessage?: string;
+	pollingError?: string;
+	retryError?: string;
 	updateFormProps?: Omit<ComponentProps<"form">, "children">;
 	deleteButtonProps?: Omit<ComponentProps<typeof Button>, "children">;
+	pollingRetryButtonProps?: Omit<ComponentProps<typeof Button>, "children">;
+	retryButtonProps?: Omit<ComponentProps<typeof Button>, "children">;
+	editingDisabled?: boolean;
 	updatePending?: boolean;
 	deletePending?: boolean;
+	retryPending?: boolean;
 };
 
 export function CaptureDetailEditorView({
 	defaultValue,
 	timeLabel,
+	statusMessage,
 	fieldError,
 	message,
 	errorMessage,
+	pollingError,
+	retryError,
 	updateFormProps,
 	deleteButtonProps,
+	pollingRetryButtonProps,
+	retryButtonProps,
+	editingDisabled = false,
 	updatePending = false,
 	deletePending = false,
+	retryPending = false,
 }: CaptureDetailEditorViewProps) {
 	const errorId = fieldError ? "capture-detail-raw-text-error" : undefined;
 	const deleteErrorId = errorMessage
@@ -38,6 +52,55 @@ export function CaptureDetailEditorView({
 				{timeLabel}
 			</p>
 
+			{statusMessage ? (
+				<p
+					className="mb-4 text-sm text-[#5A6A62]"
+					aria-live="polite"
+				>
+					{statusMessage}
+				</p>
+			) : null}
+
+			{pollingError ? (
+				<div className="mb-4">
+					<p
+						id="capture-detail-polling-error"
+						className="text-sm text-destructive"
+						role="alert"
+					>
+						{pollingError}
+					</p>
+					<Button
+						{...pollingRetryButtonProps}
+						type="button"
+						variant="ghost"
+						aria-describedby="capture-detail-polling-error"
+						className="mt-1 px-0 text-[#1E6B43]"
+					>
+						もう一度確認
+					</Button>
+				</div>
+			) : null}
+
+			{retryButtonProps ? (
+				<div className="mb-4">
+					{retryError ? (
+						<p className="mb-2 text-sm text-destructive" role="alert">
+							{retryError}
+						</p>
+					) : null}
+					<Button
+						{...retryButtonProps}
+						type="button"
+						variant="outline"
+						disabled={retryPending}
+						className="h-10 rounded-full border-[#D5E3D9] bg-[#F7FBF8] px-5 text-[#1E6B43]"
+					>
+						{retryPending ? "開始しています" : "もう一度整える"}
+					</Button>
+				</div>
+			) : null}
+
 			<form className="grid gap-3" {...updateFormProps}>
 				<Label htmlFor="capture-detail-raw-text" className="sr-only">
 					記録の本文
@@ -48,6 +111,7 @@ export function CaptureDetailEditorView({
 					defaultValue={defaultValue}
 					maxLength={2000}
 					rows={8}
+					disabled={editingDisabled}
 					aria-describedby={errorId}
 					aria-invalid={fieldError ? true : undefined}
 					className="min-h-56 resize-y rounded-[1.25rem] border-[#D5E3D9] bg-white px-4 py-4 text-[1.0625rem] leading-[1.7] text-[#15201A] shadow-[0_12px_32px_rgb(21_32_26/0.05)] focus-visible:border-[#1E6B43] focus-visible:ring-[#1E6B43]/20"
@@ -69,7 +133,7 @@ export function CaptureDetailEditorView({
 
 				<Button
 					type="submit"
-					disabled={updatePending}
+					disabled={updatePending || editingDisabled}
 					className="h-11 rounded-2xl bg-[#1E6B43] font-sans text-base font-semibold text-white shadow-[0_8px_18px_rgb(30_107_67/0.22)] hover:bg-[#185838]"
 				>
 					{updatePending ? "保存しています" : "保存する"}

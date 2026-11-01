@@ -1,11 +1,14 @@
 "use client";
 
+import { useCallback, useState, useTransition } from "react";
+
 import { Button } from "@/components/ui/button";
 
-import { CaptureList, type CaptureListItemView } from "./capture-list";
-import { useState, useTransition } from "react";
 import { listCapturesAction } from "./actions";
+import { CaptureList, type CaptureListItemView } from "./capture-list";
+import { isCaptureProcessing } from "./capture-processing-status";
 import { mapCaptureResponsesToListItemViews } from "./map-capture-to-list-item";
+import { useCapturePolling } from "./use-capture-polling";
 
 type CaptureListPagerProps = {
 	initialItems: CaptureListItemView[];
@@ -25,6 +28,32 @@ export function CaptureListPager({
 	const [hasNextPage, setHasNextPage] = useState<boolean>(initialHasNextPage);
 	const [error, setError] = useState<string | null>(null);
 	const [pending, startTransition] = useTransition();
+	const processingIds = items
+		.filter(({ status }) => isCaptureProcessing(status))
+		.map(({ id }) => id);
+	const handlePolledCapture = useCallback(
+		(capture: { id: string; rawText: string; status: string }) => {
+			setItems((current) =>
+				current.map((item) =>
+					item.id === capture.id
+						? {
+								...item,
+								rawText: capture.rawText,
+								status: capture.status,
+							}
+						: item,
+				),
+			);
+		},
+		[],
+	);
+	const {
+		error: pollingError,
+		retryPolling,
+	} = useCapturePolling({
+		captureIds: processingIds,
+		onCapture: handlePolledCapture,
+	});
 
 	function handleLoadMore() {
 		if (pending || !hasNextPage || !nextCursor) {
@@ -63,6 +92,27 @@ export function CaptureListPager({
 	return (
 		<div>
 			<CaptureList items={items} />
+
+			{pollingError ? (
+				<div className="mt-5 text-center">
+					<p
+						id="capture-list-polling-error"
+						className="text-sm text-destructive"
+						role="alert"
+					>
+						{pollingError}
+					</p>
+					<Button
+						type="button"
+						variant="ghost"
+						onClick={retryPolling}
+						aria-describedby="capture-list-polling-error"
+						className="mt-2 text-[#1E6B43]"
+					>
+						もう一度確認
+					</Button>
+				</div>
+			) : null}
 
 			{error ? (
 				<p

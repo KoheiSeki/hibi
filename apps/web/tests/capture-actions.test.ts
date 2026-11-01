@@ -2,18 +2,22 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
 	createCaptureFromApiMock,
+	getCaptureFromApiMock,
 	listCapturesFromApiMock,
 	notFoundMock,
 	redirectMock,
 	revalidatePathMock,
+	retryCaptureFromApiMock,
 	updateCaptureFromApiMock,
 	deleteCaptureFromApiMock,
 } = vi.hoisted(() => ({
 	createCaptureFromApiMock: vi.fn(),
+	getCaptureFromApiMock: vi.fn(),
 	listCapturesFromApiMock: vi.fn(),
 	notFoundMock: vi.fn(),
 	redirectMock: vi.fn(),
 	revalidatePathMock: vi.fn(),
+	retryCaptureFromApiMock: vi.fn(),
 	updateCaptureFromApiMock: vi.fn(),
 	deleteCaptureFromApiMock: vi.fn(),
 }));
@@ -21,7 +25,9 @@ const {
 vi.mock("@/lib/api/capture", () => ({
 	createCaptureFromApi: createCaptureFromApiMock,
 	deleteCaptureFromApi: deleteCaptureFromApiMock,
+	getCaptureFromApi: getCaptureFromApiMock,
 	listCapturesFromApi: listCapturesFromApiMock,
+	retryCaptureFromApi: retryCaptureFromApiMock,
 	updateCaptureFromApi: updateCaptureFromApiMock,
 }));
 vi.mock("next/navigation", () => ({
@@ -33,7 +39,9 @@ vi.mock("next/cache", () => ({ revalidatePath: revalidatePathMock }));
 import {
 	createCaptureAction,
 	deleteCaptureAction,
+	getCaptureAction,
 	listCapturesAction,
+	retryCaptureAction,
 	updateCaptureAction,
 } from "@/features/capture/actions";
 import {
@@ -476,6 +484,180 @@ describe("deleteCaptureAction", () => {
 		});
 
 		await expect(deleteCaptureAction("capture-1")).rejects.toThrow(
+			"NEXT_REDIRECT",
+		);
+		expect(redirectMock).toHaveBeenCalledWith("/login");
+	});
+});
+
+describe("getCaptureAction", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it("returns the latest capture without revalidating the route", async () => {
+		const capture = {
+			id: "capture-1",
+			rawText: "牛乳を買う",
+			status: "completed",
+			createdAt: "2026-10-04T09:00:00Z",
+			updatedAt: "2026-10-04T10:00:00Z",
+		};
+		getCaptureFromApiMock.mockResolvedValue({ ok: true, data: capture });
+
+		const state = await getCaptureAction("capture-1");
+
+		expect(getCaptureFromApiMock).toHaveBeenCalledWith("capture-1");
+		expect(revalidatePathMock).not.toHaveBeenCalled();
+		expect(state).toEqual({ status: "success", data: capture });
+	});
+
+	it("returns an action error when polling fails", async () => {
+		getCaptureFromApiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "network",
+				message: "fetch failed",
+			},
+		});
+
+		const state = await getCaptureAction("capture-1");
+
+		expect(state).toEqual({
+			status: "error",
+			message: "ネットワーク接続を確認して、もう一度お試しください。",
+		});
+	});
+
+	it("keeps a missing capture as an in-page error during polling", async () => {
+		getCaptureFromApiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "problem",
+				problem: {
+					type: "https://api.hibi.example/problems/capture-not-found",
+					title: "Capture not found",
+					status: 404,
+					detail: "The requested capture does not exist.",
+					requestId: "request-404",
+				},
+			},
+		});
+
+		const state = await getCaptureAction("missing");
+
+		expect(notFoundMock).not.toHaveBeenCalled();
+		expect(state).toEqual({
+			status: "error",
+			message:
+				"The requested capture does not exist.（参照 ID: request-404）",
+		});
+	});
+
+	it("rejects an empty capture ID without calling the API", async () => {
+		const state = await getCaptureAction("");
+
+		expect(getCaptureFromApiMock).not.toHaveBeenCalled();
+		expect(state).toEqual({
+			status: "error",
+			message: "記録を取得できませんでした。",
+		});
+	});
+
+	it("redirects unauthenticated failures to login", async () => {
+		getCaptureFromApiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "unauthenticated",
+				message: "Authentication is required.",
+			},
+		});
+		redirectMock.mockImplementation(() => {
+			throw new Error("NEXT_REDIRECT");
+		});
+
+		await expect(getCaptureAction("capture-1")).rejects.toThrow(
+			"NEXT_REDIRECT",
+		);
+		expect(redirectMock).toHaveBeenCalledWith("/login");
+	});
+});
+
+describe("retryCaptureAction", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it("returns the pending capture and revalidates list and detail", async () => {
+		const capture = {
+			id: "capture-1",
+			rawText: "牛乳を買う",
+			status: "pending",
+			createdAt: "2026-10-04T09:00:00Z",
+			updatedAt: "2026-10-04T10:00:00Z",
+		};
+		retryCaptureFromApiMock.mockResolvedValue({ ok: true, data: capture });
+
+		const state = await retryCaptureAction("capture-1");
+
+		expect(retryCaptureFromApiMock).toHaveBeenCalledWith("capture-1");
+		expect(revalidatePathMock).toHaveBeenCalledWith("/captures");
+		expect(revalidatePathMock).toHaveBeenCalledWith("/captures/capture-1");
+		expect(state).toEqual({
+			status: "success",
+			data: capture,
+			message: "もう一度整えています。",
+		});
+	});
+
+	it("rejects an empty capture ID without calling the API", async () => {
+		const state = await retryCaptureAction("");
+
+		expect(retryCaptureFromApiMock).not.toHaveBeenCalled();
+		expect(state).toEqual({
+			status: "error",
+			message: "やり直しを開始できませんでした。",
+		});
+	});
+
+	it("converts a conflict into an action error", async () => {
+		retryCaptureFromApiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "problem",
+				problem: {
+					type: "https://api.hibi.example/problems/capture-not-retryable",
+					title: "Capture cannot be retried",
+					status: 409,
+					detail: "Only failed captures can be retried.",
+					requestId: "request-409",
+				},
+			},
+		});
+
+		const state = await retryCaptureAction("capture-1");
+
+		expect(revalidatePathMock).not.toHaveBeenCalled();
+		expect(state).toEqual({
+			status: "error",
+			message:
+				"Only failed captures can be retried.（参照 ID: request-409）",
+		});
+	});
+
+	it("redirects unauthenticated failures to login", async () => {
+		retryCaptureFromApiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "unauthenticated",
+				message: "Authentication is required.",
+			},
+		});
+		redirectMock.mockImplementation(() => {
+			throw new Error("NEXT_REDIRECT");
+		});
+
+		await expect(retryCaptureAction("capture-1")).rejects.toThrow(
 			"NEXT_REDIRECT",
 		);
 		expect(redirectMock).toHaveBeenCalledWith("/login");

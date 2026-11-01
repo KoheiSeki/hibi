@@ -7,6 +7,7 @@ import {
 	deleteCapture,
 	getCapture,
 	listCaptures,
+	retryCapture,
 	updateCapture,
 } from "@hibi/api-client";
 import {
@@ -99,6 +100,24 @@ export async function updateCaptureFromApi(
 		body: {
 			rawText,
 		},
+		path: {
+			capture_id: captureId,
+		},
+	});
+	return normalizeGeneratedResult(result);
+}
+
+export async function retryCaptureFromApi(
+	captureId: string,
+): Promise<ApiResult<CaptureResponse>> {
+	const context = await getServerApiContext();
+	if (!context.ok) {
+		return context;
+	}
+
+	const result = await retryCapture({
+		baseUrl: context.baseUrl,
+		auth: context.accessToken,
 		path: {
 			capture_id: captureId,
 		},

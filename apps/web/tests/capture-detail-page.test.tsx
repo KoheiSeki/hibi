@@ -12,6 +12,9 @@ vi.mock("@/lib/api/capture", () => ({
 	getCaptureFromApi: getCaptureFromApiMock,
 }));
 vi.mock("@/features/capture/actions", () => ({
+	deleteCaptureAction: vi.fn(),
+	getCaptureAction: vi.fn(),
+	retryCaptureAction: vi.fn(),
 	updateCaptureAction: vi.fn(),
 }));
 vi.mock("@/lib/auth/require-user", () => ({
@@ -36,7 +39,7 @@ describe("CaptureDetailPage", () => {
 			data: {
 				id: "capture-1",
 				rawText: "牛乳を買う",
-				status: "active",
+				status: "pending",
 				createdAt: "2026-10-04T09:30:00Z",
 				updatedAt: "2026-10-04T09:30:00Z",
 			},
@@ -52,6 +55,7 @@ describe("CaptureDetailPage", () => {
 		expect(getCaptureFromApiMock).toHaveBeenCalledWith("capture-1");
 		expect(html).toContain("10月4日 18:30");
 		expect(html).toContain("牛乳を買う");
+		expect(html).toContain("整えています");
 		expect(html).toContain("保存する");
 		expect(html).toContain("削除する");
 	});

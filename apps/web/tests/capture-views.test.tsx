@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/features/capture/actions", () => ({
+	getCaptureAction: vi.fn(),
 	listCapturesAction: vi.fn(),
 }));
 
@@ -39,6 +40,7 @@ describe("Capture presentation", () => {
 						timeLabel: "14:02",
 						dateTime: "2026-10-02T05:02:00Z",
 						rawText: "<script>alert('xss')</script>",
+						status: "completed",
 					},
 				]}
 			/>,
@@ -48,6 +50,32 @@ describe("Capture presentation", () => {
 		expect(html).toContain("14:02");
 		expect(html).toContain("&lt;script&gt;");
 		expect(html).not.toContain("<script>");
+		expect(html).not.toContain("整えています");
+		expect(html).not.toContain("やり直せます");
+	});
+
+	it.each([
+		["pending", "整えています"],
+		["processing", "整えています"],
+		["failed", "やり直せます"],
+	] as const)("shows Japanese status copy for %s captures", (status, copy) => {
+		const html = renderToStaticMarkup(
+			<CaptureList
+				items={[
+					{
+						id: "capture-1",
+						href: "/captures/capture-1",
+						timeLabel: "14:02",
+						dateTime: "2026-10-02T05:02:00Z",
+						rawText: "牛乳を買う",
+						status,
+					},
+				]}
+			/>,
+		);
+
+		expect(html).toContain(copy);
+		expect(html).not.toContain(status);
 	});
 
 	it("renders a directional empty state", () => {
@@ -70,6 +98,7 @@ describe("Capture presentation", () => {
 			timeLabel: "14:02",
 			dateTime: "2026-10-02T05:02:00Z",
 			rawText: "牛乳を買う",
+			status: "completed",
 		};
 		const withNextPage = renderToStaticMarkup(
 			<CaptureListPager
@@ -108,6 +137,39 @@ describe("Capture presentation", () => {
 		expect(html).toContain("入力内容を確認してください");
 		expect(html).toContain("更新しました。");
 		expect(html).toContain("disabled");
+	});
+
+	it("shows processing copy and disables editing for a completed capture", () => {
+		const processing = renderToStaticMarkup(
+			<CaptureDetailEditorView
+				defaultValue="牛乳を買う"
+				timeLabel="10月2日 14:02"
+				statusMessage="整えています"
+				editingDisabled
+			/>,
+		);
+		const completed = renderToStaticMarkup(
+			<CaptureDetailEditorView
+				defaultValue="牛乳を買う"
+				timeLabel="10月2日 14:02"
+			/>,
+		);
+		const failed = renderToStaticMarkup(
+			<CaptureDetailEditorView
+				defaultValue="牛乳を買う"
+				timeLabel="10月2日 14:02"
+				statusMessage="やり直せます"
+				retryButtonProps={{ type: "button" }}
+			/>,
+		);
+
+		expect(processing).toContain("整えています");
+		expect(processing).toContain("disabled");
+		expect(completed).not.toContain("整えています");
+		expect(completed).not.toContain("やり直せます");
+		expect(completed).not.toContain("もう一度整える");
+		expect(failed).toContain("やり直せます");
+		expect(failed).toContain("もう一度整える");
 	});
 
 	it("shows a delete failure beside the delete button", () => {

@@ -1,9 +1,12 @@
 import Link from "next/link";
 
+import { captureStatusMessage } from "./capture-processing-status";
+
 export type CaptureListItemView = {
   id: string;
   href: string;
   rawText: string;
+  status: string;
   timeLabel: string;
   dateTime: string;
   dateLabel?: string;
@@ -16,8 +19,10 @@ type CaptureListProps = {
 export function CaptureList({ items }: CaptureListProps) {
   return (
     <ul className="relative" aria-label="記録の一覧">
-      {items.map((item) => (
-        <li key={item.id} className="relative">
+      {items.map((item) => {
+        const statusMessage = captureStatusMessage(item.status);
+        return (
+          <li key={item.id} className="relative">
           {item.dateLabel ? (
             <p className="pb-2 pt-6 text-xs font-medium tracking-[0.08em] text-[#5A6A62]">
               {item.dateLabel}
@@ -41,12 +46,23 @@ export function CaptureList({ items }: CaptureListProps) {
             >
               {item.timeLabel}
             </time>
-            <span className="line-clamp-2 text-[1.0625rem] leading-7 group-hover:text-[#1E6B43] group-focus-visible:rounded-md group-focus-visible:ring-2 group-focus-visible:ring-[#1E6B43]">
-              {item.rawText}
+            <span>
+              <span className="line-clamp-2 text-[1.0625rem] leading-7 group-hover:text-[#1E6B43] group-focus-visible:rounded-md group-focus-visible:ring-2 group-focus-visible:ring-[#1E6B43]">
+                {item.rawText}
+              </span>
+              {statusMessage ? (
+                <span
+                  className="mt-1 block text-sm text-[#5A6A62]"
+                  aria-live="polite"
+                >
+                  {statusMessage}
+                </span>
+              ) : null}
             </span>
           </Link>
-        </li>
-      ))}
+          </li>
+        );
+      })}
     </ul>
   );
 }

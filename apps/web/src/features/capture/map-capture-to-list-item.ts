@@ -13,6 +13,7 @@ function mapCaptureResponseToListItemView(capture: CaptureResponse) {
 		id: capture.id,
 		href: `/captures/${capture.id}`,
 		rawText: capture.rawText,
+		status: capture.status,
 		dateTime: capture.createdAt,
 		timeLabel: formatJstTime(capture.createdAt),
 	};
