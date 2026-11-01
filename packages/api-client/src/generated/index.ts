@@ -10,6 +10,7 @@ export {
   getProtectedResource,
   listCaptures,
   type Options,
+  retryCapture,
   updateCapture,
 } from "./sdk.gen";
 export type {
@@ -69,6 +70,11 @@ export type {
   ListCapturesResponses,
   ProblemDetails,
   ProtectedResourceResponse,
+  RetryCaptureData,
+  RetryCaptureError,
+  RetryCaptureErrors,
+  RetryCaptureResponse,
+  RetryCaptureResponses,
   UpdateCaptureData,
   UpdateCaptureError,
   UpdateCaptureErrors,

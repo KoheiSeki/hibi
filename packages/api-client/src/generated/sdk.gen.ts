@@ -33,6 +33,9 @@ import type {
   ListCapturesData,
   ListCapturesErrors,
   ListCapturesResponses,
+  RetryCaptureData,
+  RetryCaptureErrors,
+  RetryCaptureResponses,
   UpdateCaptureData,
   UpdateCaptureErrors,
   UpdateCaptureResponses,
@@ -142,6 +145,22 @@ export const updateCapture = <ThrowOnError extends boolean = false>(
       "Content-Type": "application/json",
       ...options.headers,
     },
+  });
+
+/**
+ * Retry Capture
+ */
+export const retryCapture = <ThrowOnError extends boolean = false>(
+  options: Options<RetryCaptureData, ThrowOnError>,
+): RequestResult<RetryCaptureResponses, RetryCaptureErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    RetryCaptureResponses,
+    RetryCaptureErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/api/v1/captures/{capture_id}/retry",
+    ...options,
   });
 
 /**

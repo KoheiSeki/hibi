@@ -49,3 +49,17 @@ class CaptureTextInvalidError(ApplicationError):
     detail = "One or more fields are invalid."
     pointer = "/rawText"
     error_code = "invalid"
+
+
+class CaptureNotEditableError(ApplicationError):
+    problem_type = "capture-not-editable"
+    title = "Capture cannot be edited"
+    status = 409
+    detail = "The capture cannot be edited in its current state."
+
+
+class CaptureNotRetryableError(ApplicationError):
+    problem_type = "capture-not-retryable"
+    title = "Capture cannot be retried"
+    status = 409
+    detail = "Only failed captures can be retried."

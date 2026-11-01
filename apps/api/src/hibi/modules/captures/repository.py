@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import func, select, tuple_, update
@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from hibi.modules.captures.models import CaptureModel, OutboxModel
 from hibi.modules.captures.types import (
+    CAPTURE_STATUS_FAILED,
     CAPTURE_STATUS_PENDING,
     OUTBOX_STATUS_PENDING,
     OUTBOX_STATUS_PUBLISHED,
@@ -106,18 +107,20 @@ class CaptureRepository:
     async def update_capture(
         self, user_id: UUID, *, capture_id: UUID, raw_text: str
     ) -> Capture | None:
-        stmt = select(CaptureModel).where(
-            CaptureModel.id == capture_id, CaptureModel.user_id == user_id
+        stmt = (
+            update(CaptureModel)
+            .where(
+                CaptureModel.id == capture_id,
+                CaptureModel.user_id == user_id,
+                CaptureModel.status.in_([CAPTURE_STATUS_PENDING, CAPTURE_STATUS_FAILED]),
+            )
+            .values(raw_text=raw_text, updated_at=func.now())
+            .returning(CaptureModel)
         )
-        result = await self._session.execute(stmt)
-        row = result.scalar_one_or_none()
+        row = await self._session.scalar(stmt)
         if row is None:
             return None
 
-        row.raw_text = raw_text
-        row.updated_at = datetime.now(UTC)
-        await self._session.flush()
-        await self._session.refresh(row)
         return _to_capture(row)
 
     async def update_processing_status(
@@ -161,6 +164,41 @@ class CaptureRepository:
         await self._session.delete(row)
         await self._session.flush()
         return True
+
+    async def retry_failed_capture(
+        self, user_id: UUID, *, capture_id: UUID, outbox_id: UUID
+    ) -> Capture | None:
+        stmt = (
+            update(CaptureModel)
+            .where(
+                CaptureModel.id == capture_id,
+                CaptureModel.user_id == user_id,
+                CaptureModel.status == CAPTURE_STATUS_FAILED,
+            )
+            .values(
+                status=CAPTURE_STATUS_PENDING,
+                processing_generation=CaptureModel.processing_generation + 1,
+                updated_at=func.now(),
+            )
+            .returning(CaptureModel)
+        )
+
+        result = await self._session.execute(stmt)
+        row = result.scalar_one_or_none()
+        if row is None:
+            return None
+
+        self._session.add(
+            OutboxModel(
+                id=outbox_id,
+                user_id=user_id,
+                aggregate_id=capture_id,
+                processing_generation=row.processing_generation,
+            )
+        )
+        await self._session.flush()
+
+        return _to_capture(row)
 
 
 def _to_capture(row: CaptureModel) -> Capture:

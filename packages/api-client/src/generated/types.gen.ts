@@ -418,6 +418,10 @@ export type UpdateCaptureErrors = {
    */
   404: ProblemDetails;
   /**
+   * Conflict.
+   */
+  409: ProblemDetails;
+  /**
    * Request validation failed.
    */
   422: ProblemDetails;
@@ -438,6 +442,53 @@ export type UpdateCaptureResponses = {
 
 export type UpdateCaptureResponse =
   UpdateCaptureResponses[keyof UpdateCaptureResponses];
+
+export type RetryCaptureData = {
+  body?: never;
+  path: {
+    /**
+     * Capture Id
+     */
+    capture_id: string;
+  };
+  query?: never;
+  url: "/api/v1/captures/{capture_id}/retry";
+};
+
+export type RetryCaptureErrors = {
+  /**
+   * Authentication failed.
+   */
+  401: ProblemDetails;
+  /**
+   * The requested resource was not found.
+   */
+  404: ProblemDetails;
+  /**
+   * Conflict.
+   */
+  409: ProblemDetails;
+  /**
+   * Request validation failed.
+   */
+  422: ProblemDetails;
+  /**
+   * An unexpected server error occurred.
+   */
+  500: ProblemDetails;
+};
+
+export type RetryCaptureError = RetryCaptureErrors[keyof RetryCaptureErrors];
+
+export type RetryCaptureResponses = {
+  /**
+   * Successful Response
+   */
+  202: ApiResponseCaptureResponse;
+};
+
+export type RetryCaptureResponse =
+  RetryCaptureResponses[keyof RetryCaptureResponses];
 
 export type EchoMessageData = {
   body: EchoRequest;

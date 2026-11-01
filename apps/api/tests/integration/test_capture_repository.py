@@ -9,11 +9,14 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from hibi.core.config import get_settings
 from hibi.db.engine import dispose_engine, get_engine
-from hibi.modules.captures.models import OutboxModel
+from hibi.modules.captures.models import CaptureModel, OutboxModel
 from hibi.modules.captures.repository import CaptureRepository
 from hibi.modules.captures.types import (
     CAPTURE_PROCESSING_REQUESTED,
+    CAPTURE_STATUS_COMPLETED,
+    CAPTURE_STATUS_FAILED,
     CAPTURE_STATUS_PENDING,
+    CAPTURE_STATUS_PROCESSING,
     OUTBOX_STATUS_PENDING,
     OUTBOX_STATUS_PUBLISHED,
     Capture,
@@ -313,3 +316,88 @@ async def test_update_outbox_published_sets_timestamp_once(
     assert second_update is False
     assert outbox.status == OUTBOX_STATUS_PUBLISHED
     assert outbox.published_at is not None
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    "capture_status",
+    [CAPTURE_STATUS_PROCESSING, CAPTURE_STATUS_COMPLETED],
+)
+async def test_update_capture_rejects_non_editable_status(
+    session: AsyncSession,
+    capture_status: str,
+) -> None:
+    user_id = uuid4()
+    await _insert_auth_user(session, user_id)
+    repo = CaptureRepository(session)
+    capture = await _create_capture(repo, user_id)
+    await session.execute(
+        update(CaptureModel).where(CaptureModel.id == capture.id).values(status=capture_status)
+    )
+
+    updated = await repo.update_capture(
+        user_id,
+        capture_id=capture.id,
+        raw_text="更新後",
+    )
+
+    assert updated is None
+    stored = await repo.get_by_id(user_id, capture_id=capture.id)
+    assert stored is not None
+    assert stored.raw_text == "牛乳を買う"
+
+
+@pytest.mark.integration
+async def test_retry_failed_capture_creates_next_generation_outbox(
+    session: AsyncSession,
+) -> None:
+    user_id = uuid4()
+    await _insert_auth_user(session, user_id)
+    repo = CaptureRepository(session)
+    capture = await _create_capture(repo, user_id)
+    await session.execute(
+        update(CaptureModel)
+        .where(CaptureModel.id == capture.id)
+        .values(status=CAPTURE_STATUS_FAILED)
+    )
+    outbox_id = uuid7()
+
+    retried = await repo.retry_failed_capture(
+        user_id,
+        capture_id=capture.id,
+        outbox_id=outbox_id,
+    )
+
+    assert retried is not None
+    assert retried.status == CAPTURE_STATUS_PENDING
+    assert retried.processing_generation == 2
+    outbox = await session.get(OutboxModel, outbox_id)
+    assert outbox is not None
+    assert outbox.aggregate_id == capture.id
+    assert outbox.processing_generation == 2
+    assert outbox.status == OUTBOX_STATUS_PENDING
+
+
+@pytest.mark.integration
+async def test_retry_non_failed_capture_does_not_create_outbox(
+    session: AsyncSession,
+) -> None:
+    user_id = uuid4()
+    await _insert_auth_user(session, user_id)
+    repo = CaptureRepository(session)
+    capture = await _create_capture(repo, user_id)
+    before = (
+        await session.scalars(select(OutboxModel).where(OutboxModel.aggregate_id == capture.id))
+    ).all()
+
+    retried = await repo.retry_failed_capture(
+        user_id,
+        capture_id=capture.id,
+        outbox_id=uuid7(),
+    )
+
+    assert retried is None
+    after = (
+        await session.scalars(select(OutboxModel).where(OutboxModel.aggregate_id == capture.id))
+    ).all()
+    assert len(after) == len(before)

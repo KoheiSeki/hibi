@@ -9,7 +9,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hibi.modules.captures.errors import (
+    CaptureNotEditableError,
     CaptureNotFoundError,
+    CaptureNotRetryableError,
     CaptureTextInvalidError,
     IdempotencyKeyConflictError,
     IdempotencyKeyInvalidError,
@@ -119,9 +121,17 @@ class CaptureService:
         updated = await self._repository.update_capture(
             command.user_id, capture_id=command.capture_id, raw_text=stripped_raw_text
         )
-        if updated is None:
+
+        if updated is not None:
+            return updated
+
+        current = await self._repository.get_by_id(
+            command.user_id, capture_id=command.capture_id
+        )
+        if current is None:
             raise CaptureNotFoundError(capture_id=command.capture_id)
-        return updated
+
+        raise CaptureNotEditableError()
 
     async def delete_capture(self, user_id: UUID, capture_id: UUID) -> None:
         is_deleted = await self._repository.delete_capture(
@@ -129,6 +139,19 @@ class CaptureService:
         )
         if not is_deleted:
             raise CaptureNotFoundError(capture_id=capture_id)
+
+    async def retry_capture(self, user_id: UUID, capture_id: UUID) -> Capture:
+        retried = await self._repository.retry_failed_capture(
+            user_id, capture_id=capture_id, outbox_id=uuid7()
+        )
+        if retried is not None:
+            return retried
+
+        current = await self._repository.get_by_id(user_id, capture_id=capture_id)
+        if current is None:
+            raise CaptureNotFoundError(capture_id)
+
+        raise CaptureNotRetryableError()
 
     async def process_capture(
         self, capture_id: UUID, processing_generation: int

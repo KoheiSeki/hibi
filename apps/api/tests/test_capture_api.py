@@ -8,7 +8,9 @@ from hibi.api.dependencies import get_principal
 from hibi.api.main import create_app
 from hibi.auth.principal import Principal
 from hibi.modules.captures.errors import (
+    CaptureNotEditableError,
     CaptureNotFoundError,
+    CaptureNotRetryableError,
     CaptureTextInvalidError,
     IdempotencyKeyConflictError,
     IdempotencyKeyRequiredError,
@@ -76,17 +78,15 @@ class FakeCaptureService:
     async def list_captures(self, query: ListCapturesQuery) -> CapturePage:
         if query.cursor:
             raise MalformedCursorError()
-        items = [
-            capture
-            for capture in self.captures.values()
-            if capture.user_id == query.user_id
-        ]
+        items = [capture for capture in self.captures.values() if capture.user_id == query.user_id]
         return CapturePage(items=items, next_cursor=None, has_next_page=False)
 
     async def update_capture(self, command: UpdateCaptureCommand) -> Capture:
         capture = self.captures.get(command.capture_id)
         if capture is None or capture.user_id != command.user_id:
             raise CaptureNotFoundError(command.capture_id)
+        if capture.status in {"processing", "completed"}:
+            raise CaptureNotEditableError()
         stripped = command.raw_text.strip()
         if stripped == "":
             raise CaptureTextInvalidError()
@@ -94,6 +94,8 @@ class FakeCaptureService:
             id=capture.id,
             user_id=capture.user_id,
             raw_text=stripped,
+            status=capture.status,
+            processing_generation=capture.processing_generation,
         )
         self.captures[updated.id] = updated
         return updated
@@ -104,10 +106,24 @@ class FakeCaptureService:
             raise CaptureNotFoundError(capture_id)
         del self.captures[capture_id]
 
+    async def retry_capture(self, user_id: UUID, capture_id: UUID) -> Capture:
+        capture = self.captures.get(capture_id)
+        if capture is None or capture.user_id != user_id:
+            raise CaptureNotFoundError(capture_id)
+        if capture.status != "failed":
+            raise CaptureNotRetryableError()
+        retried = _capture(
+            id=capture.id,
+            user_id=capture.user_id,
+            raw_text=capture.raw_text,
+            status="pending",
+            processing_generation=capture.processing_generation + 1,
+        )
+        self.captures[capture_id] = retried
+        return retried
 
-def _client(
-    fake: FakeCaptureService, *, authenticated: bool = True
-) -> TestClient:
+
+def _client(fake: FakeCaptureService, *, authenticated: bool = True) -> TestClient:
     app = create_app()
     app.dependency_overrides[_get_capture_service] = lambda: fake
     if authenticated:
@@ -130,6 +146,7 @@ def test_capture_endpoints_reject_missing_token() -> None:
         client.get(path),
         client.patch(path, json={"rawText": "低脂肪乳を買う"}),
         client.delete(path),
+        client.post(f"{path}/retry"),
     ]
     for response in requests:
         assert response.status_code == 401
@@ -247,6 +264,52 @@ def test_delete_capture_then_get_returns_404() -> None:
     get_response = client.get(f"/api/v1/captures/{CAPTURE_ID}")
     assert get_response.status_code == 404
     assert get_response.json()["type"].endswith("/capture-not-found")
+
+
+@pytest.mark.parametrize("capture_status", ["processing", "completed"])
+def test_update_capture_rejects_non_editable_status(capture_status: str) -> None:
+    fake = FakeCaptureService()
+    fake.captures[CAPTURE_ID] = _capture(status=capture_status)
+
+    response = _client(fake).patch(
+        f"/api/v1/captures/{CAPTURE_ID}",
+        json={"rawText": "更新後"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["type"].endswith("/capture-not-editable")
+
+
+def test_retry_failed_capture_returns_202_and_location() -> None:
+    fake = FakeCaptureService()
+    fake.captures[CAPTURE_ID] = _capture(status="failed")
+
+    response = _client(fake).post(f"/api/v1/captures/{CAPTURE_ID}/retry")
+
+    assert response.status_code == 202
+    assert response.json()["data"]["status"] == "pending"
+    assert response.headers["location"] == f"/api/v1/captures/{CAPTURE_ID}"
+
+
+@pytest.mark.parametrize("capture_status", ["pending", "processing", "completed"])
+def test_retry_capture_rejects_non_failed_status(capture_status: str) -> None:
+    fake = FakeCaptureService()
+    fake.captures[CAPTURE_ID] = _capture(status=capture_status)
+
+    response = _client(fake).post(f"/api/v1/captures/{CAPTURE_ID}/retry")
+
+    assert response.status_code == 409
+    assert response.json()["type"].endswith("/capture-not-retryable")
+
+
+def test_retry_foreign_capture_is_hidden_as_not_found() -> None:
+    fake = FakeCaptureService()
+    fake.captures[CAPTURE_ID] = _capture(user_id=OTHER_ID, status="failed")
+
+    response = _client(fake).post(f"/api/v1/captures/{CAPTURE_ID}/retry")
+
+    assert response.status_code == 404
+    assert response.json()["type"].endswith("/capture-not-found")
 
 
 def test_list_captures_rejects_malformed_cursor() -> None:

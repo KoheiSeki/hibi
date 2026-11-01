@@ -63,11 +63,33 @@ async def create_capture(
     )
     result: CreateCaptureResult = await service.create_capture(command)
 
-    response.status_code = (
-        status.HTTP_202_ACCEPTED if result.created else status.HTTP_200_OK
-    )
+    response.status_code = status.HTTP_202_ACCEPTED if result.created else status.HTTP_200_OK
     response.headers["Location"] = f"/api/v1/captures/{result.capture.id}"
     return ApiResponse(data=_to_capture_response(result.capture))
+
+
+@router.post(
+    "/{capture_id}/retry",
+    operation_id="retryCapture",
+    response_model=ApiResponse[CaptureResponse],
+    status_code=status.HTTP_202_ACCEPTED,
+    responses=problem_responses(
+        status.HTTP_401_UNAUTHORIZED,
+        status.HTTP_404_NOT_FOUND,
+        status.HTTP_409_CONFLICT,
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+    ),
+)
+async def retry_capture(
+    capture_id: UUID,
+    response: Response,
+    principal: Principal = Depends(get_principal),
+    service: CaptureService = Depends(_get_capture_service),
+):
+    capture = await service.retry_capture(principal.user_id, capture_id)
+    response.headers["Location"] = f"/api/v1/captures/{capture.id}"
+    return ApiResponse(data=_to_capture_response(capture))
 
 
 @router.get(
@@ -123,6 +145,7 @@ async def list_captures(
     responses=problem_responses(
         status.HTTP_401_UNAUTHORIZED,
         status.HTTP_404_NOT_FOUND,
+        status.HTTP_409_CONFLICT,
         status.HTTP_422_UNPROCESSABLE_CONTENT,
         status.HTTP_500_INTERNAL_SERVER_ERROR,
     ),

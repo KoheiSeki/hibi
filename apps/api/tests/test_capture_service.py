@@ -1,4 +1,5 @@
 import hashlib
+from dataclasses import replace
 from datetime import UTC, datetime
 from uuid import UUID, uuid4, uuid7
 
@@ -6,7 +7,9 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 from hibi.modules.captures.errors import (
+    CaptureNotEditableError,
     CaptureNotFoundError,
+    CaptureNotRetryableError,
     CaptureTextInvalidError,
     IdempotencyKeyConflictError,
     IdempotencyKeyInvalidError,
@@ -46,6 +49,7 @@ class FakeCaptureRepository:
         self._create_attempts = 0
         self._raise_on_create: IntegrityError | None = None
         self._row_after_conflict: Capture | None = None
+        self.retry_outbox_ids: list[UUID] = []
 
     def fail_create_then_return(self, existing: Capture) -> None:
         self._raise_on_create = _integrity_error()
@@ -124,6 +128,8 @@ class FakeCaptureRepository:
         for index, capture in enumerate(self.captures):
             if capture.id != capture_id or capture.user_id != user_id:
                 continue
+            if capture.status not in {"pending", "failed"}:
+                return None
             updated = Capture(
                 id=capture.id,
                 user_id=capture.user_id,
@@ -137,6 +143,25 @@ class FakeCaptureRepository:
             )
             self.captures[index] = updated
             return updated
+        return None
+
+    async def retry_failed_capture(
+        self, user_id: UUID, *, capture_id: UUID, outbox_id: UUID
+    ) -> Capture | None:
+        for index, capture in enumerate(self.captures):
+            if capture.id != capture_id or capture.user_id != user_id:
+                continue
+            if capture.status != "failed":
+                return None
+            retried = replace(
+                capture,
+                status="pending",
+                processing_generation=capture.processing_generation + 1,
+                updated_at=datetime.now(UTC),
+            )
+            self.captures[index] = retried
+            self.retry_outbox_ids.append(outbox_id)
+            return retried
         return None
 
     async def delete_capture(self, user_id: UUID, *, capture_id: UUID) -> bool:
@@ -161,9 +186,7 @@ def _create_command(
     raw_text: str = "牛乳を買う",
     idempotency_key: str | None = _KEY,
 ) -> CreateCaptureCommand:
-    return CreateCaptureCommand(
-        user_id=user_id, raw_text=raw_text, idempotency_key=idempotency_key
-    )
+    return CreateCaptureCommand(user_id=user_id, raw_text=raw_text, idempotency_key=idempotency_key)
 
 
 @pytest.mark.asyncio
@@ -171,9 +194,7 @@ async def test_create_capture_trims_and_marks_pending() -> None:
     service, repo, _session = _service()
     user_id = uuid4()
 
-    result = await service.create_capture(
-        _create_command(user_id, raw_text="  牛乳を買う  ")
-    )
+    result = await service.create_capture(_create_command(user_id, raw_text="  牛乳を買う  "))
 
     assert result.created is True
     assert result.capture.status == "pending"
@@ -231,9 +252,7 @@ async def test_create_and_update_reject_blank_or_too_long_text() -> None:
     created = await service.create_capture(_create_command(user_id))
     with pytest.raises(CaptureTextInvalidError):
         await service.update_capture(
-            UpdateCaptureCommand(
-                user_id=user_id, capture_id=created.capture.id, raw_text="   "
-            )
+            UpdateCaptureCommand(user_id=user_id, capture_id=created.capture.id, raw_text="   ")
         )
 
 
@@ -279,9 +298,7 @@ async def test_list_captures_excludes_others_and_orders_newest_first() -> None:
         _create_command(other_id, raw_text="他人のメモ", idempotency_key=f"{_KEY}c")
     )
 
-    page = await service.list_captures(
-        ListCapturesQuery(user_id=owner_id, limit=10, cursor=None)
-    )
+    page = await service.list_captures(ListCapturesQuery(user_id=owner_id, limit=10, cursor=None))
 
     assert [item.id for item in page.items] == [newer.capture.id, older.capture.id]
     assert all(item.user_id == owner_id for item in page.items)
@@ -297,6 +314,65 @@ async def test_list_captures_rejects_malformed_cursor() -> None:
         await service.list_captures(
             ListCapturesQuery(user_id=uuid4(), limit=20, cursor="not-a-cursor")
         )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("capture_status", ["processing", "completed"])
+async def test_update_capture_rejects_non_editable_status(
+    capture_status: str,
+) -> None:
+    service, repo, _session = _service()
+    user_id = uuid4()
+    created = await service.create_capture(_create_command(user_id))
+    repo.captures[0] = replace(created.capture, status=capture_status)
+
+    with pytest.raises(CaptureNotEditableError):
+        await service.update_capture(
+            UpdateCaptureCommand(
+                user_id=user_id,
+                capture_id=created.capture.id,
+                raw_text="更新後",
+            )
+        )
+
+
+@pytest.mark.asyncio
+async def test_retry_capture_transitions_failed_to_new_pending_generation() -> None:
+    service, repo, _session = _service()
+    user_id = uuid4()
+    created = await service.create_capture(_create_command(user_id))
+    repo.captures[0] = replace(created.capture, status="failed")
+
+    retried = await service.retry_capture(user_id, created.capture.id)
+
+    assert retried.status == "pending"
+    assert retried.processing_generation == 2
+    assert len(repo.retry_outbox_ids) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("capture_status", ["pending", "processing", "completed"])
+async def test_retry_capture_rejects_non_failed_status(capture_status: str) -> None:
+    service, repo, _session = _service()
+    user_id = uuid4()
+    created = await service.create_capture(_create_command(user_id))
+    repo.captures[0] = replace(created.capture, status=capture_status)
+
+    with pytest.raises(CaptureNotRetryableError):
+        await service.retry_capture(user_id, created.capture.id)
+
+    assert repo.retry_outbox_ids == []
+
+
+@pytest.mark.asyncio
+async def test_retry_capture_hides_foreign_capture_as_not_found() -> None:
+    service, repo, _session = _service()
+    owner_id = uuid4()
+    created = await service.create_capture(_create_command(owner_id))
+    repo.captures[0] = replace(created.capture, status="failed")
+
+    with pytest.raises(CaptureNotFoundError):
+        await service.retry_capture(uuid4(), created.capture.id)
 
 
 @pytest.mark.asyncio
