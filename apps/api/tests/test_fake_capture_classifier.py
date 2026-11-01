@@ -4,12 +4,12 @@ from pathlib import Path
 
 import pytest
 
+from hibi.ai.classification import CAPTURE_QUESTION_VERSION
 from hibi.ai.fake_classifier import FakeCaptureClassifier
 
 _DATASET_PATH = (
     Path(__file__).resolve().parents[3] / "docs" / "ai" / "evals" / "capture-route-v1.jsonl"
 )
-_QUESTION_VERSION = "capture-classify-v1"
 
 
 def _clear_cases() -> list[dict[str, object]]:
@@ -24,10 +24,10 @@ def _clear_cases() -> list[dict[str, object]]:
 def test_fake_classifier_returns_dataset_category(case: dict[str, object]) -> None:
     result = FakeCaptureClassifier().classify_capture(
         str(case["rawText"]),
-        question_version=_QUESTION_VERSION,
+        question_version=CAPTURE_QUESTION_VERSION,
     )
 
     assert result.category == case["category"]
     assert result.confidence == Decimal(str(case["confidence"]))
     assert result.urgency_score == 0.5
-    assert result.question_version == _QUESTION_VERSION
+    assert result.question_version == CAPTURE_QUESTION_VERSION

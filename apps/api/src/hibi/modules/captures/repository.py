@@ -40,7 +40,9 @@ class CaptureRepository:
             return None
         return _to_capture(row)
 
-    async def get_by_idempotency_key(self, user_id: UUID, *, key: str) -> Capture | None:
+    async def get_by_idempotency_key(
+        self, user_id: UUID, *, key: str
+    ) -> Capture | None:
         stmt = select(CaptureModel).where(
             CaptureModel.user_id == user_id, CaptureModel.idempotency_key == key
         )
@@ -64,7 +66,9 @@ class CaptureRepository:
                 tuple_(CaptureModel.created_at, CaptureModel.id)
                 < (start_created_at, start_capture_id)
             )
-        stmt = stmt.order_by(CaptureModel.created_at.desc(), CaptureModel.id.desc()).limit(limit)
+        stmt = stmt.order_by(
+            CaptureModel.created_at.desc(), CaptureModel.id.desc()
+        ).limit(limit)
         result = await self._session.execute(stmt)
         return [_to_capture(row) for row in result.scalars().all()]
 
@@ -115,7 +119,9 @@ class CaptureRepository:
             .where(
                 CaptureModel.id == capture_id,
                 CaptureModel.user_id == user_id,
-                CaptureModel.status.in_([CAPTURE_STATUS_PENDING, CAPTURE_STATUS_FAILED]),
+                CaptureModel.status.in_(
+                    [CAPTURE_STATUS_PENDING, CAPTURE_STATUS_FAILED]
+                ),
             )
             .values(raw_text=raw_text, updated_at=func.now())
             .returning(CaptureModel)
@@ -149,7 +155,9 @@ class CaptureRepository:
     async def update_outbox_published(self, *, outbox_id: UUID) -> bool:
         stmt = (
             update(OutboxModel)
-            .where(OutboxModel.id == outbox_id, OutboxModel.status == OUTBOX_STATUS_PENDING)
+            .where(
+                OutboxModel.id == outbox_id, OutboxModel.status == OUTBOX_STATUS_PENDING
+            )
             .values(status=OUTBOX_STATUS_PUBLISHED, published_at=func.now())
             .returning(OutboxModel.id)
         )

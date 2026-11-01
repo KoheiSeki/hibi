@@ -8,6 +8,8 @@ from uuid import UUID, uuid7
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from hibi.ai.classification import CAPTURE_QUESTION_VERSION
+from hibi.ai.fake_classifier import FakeCaptureClassifier
 from hibi.modules.captures.errors import (
     CaptureNotEditableError,
     CaptureNotFoundError,
@@ -17,6 +19,10 @@ from hibi.modules.captures.errors import (
     IdempotencyKeyInvalidError,
     IdempotencyKeyRequiredError,
     MalformedCursorError,
+)
+from hibi.modules.captures.policies import (
+    CAPTURE_ROUTE_POLICY_VERSION,
+    decide_capture_route,
 )
 from hibi.modules.captures.repository import CaptureRepository
 from hibi.modules.captures.types import (
@@ -37,13 +43,17 @@ _MAX_CAPTURE_LENGTH = 2_000
 
 
 class CaptureService:
-    def __init__(self, session: AsyncSession, repository: CaptureRepository) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        repository: CaptureRepository,
+        classifier: FakeCaptureClassifier | None = None,
+    ) -> None:
         self._session = session
         self._repository = repository
+        self._classifier = classifier or FakeCaptureClassifier()
 
-    async def create_capture(
-        self, command: CreateCaptureCommand
-    ) -> CreateCaptureResult:
+    async def create_capture(self, command: CreateCaptureCommand) -> CreateCaptureResult:
         idempotency_key = command.idempotency_key
         if idempotency_key is None or idempotency_key == "":
             raise IdempotencyKeyRequiredError()
@@ -110,9 +120,7 @@ class CaptureService:
             last = items[-1]
             next_cursor = self._encode_cursor(last.created_at, last.id)
 
-        return CapturePage(
-            items=items, next_cursor=next_cursor, has_next_page=has_next_page
-        )
+        return CapturePage(items=items, next_cursor=next_cursor, has_next_page=has_next_page)
 
     async def update_capture(self, command: UpdateCaptureCommand) -> Capture:
 
@@ -125,18 +133,14 @@ class CaptureService:
         if updated is not None:
             return updated
 
-        current = await self._repository.get_by_id(
-            command.user_id, capture_id=command.capture_id
-        )
+        current = await self._repository.get_by_id(command.user_id, capture_id=command.capture_id)
         if current is None:
             raise CaptureNotFoundError(capture_id=command.capture_id)
 
         raise CaptureNotEditableError()
 
     async def delete_capture(self, user_id: UUID, capture_id: UUID) -> None:
-        is_deleted = await self._repository.delete_capture(
-            user_id, capture_id=capture_id
-        )
+        is_deleted = await self._repository.delete_capture(user_id, capture_id=capture_id)
         if not is_deleted:
             raise CaptureNotFoundError(capture_id=capture_id)
 
@@ -153,9 +157,7 @@ class CaptureService:
 
         raise CaptureNotRetryableError()
 
-    async def process_capture(
-        self, capture_id: UUID, processing_generation: int
-    ) -> None:
+    async def process_capture(self, capture_id: UUID, processing_generation: int) -> None:
         capture = await self._repository.get_by_capture_id(capture_id)
         if (
             capture is None
@@ -174,18 +176,26 @@ class CaptureService:
         if not is_started:
             return
 
-        # todo: captureの分類、文章生成処理
-
-        await self._repository.update_processing_status(
-            capture_id=capture_id,
-            processing_generation=capture.processing_generation,
-            expected_status=CAPTURE_STATUS_PROCESSING,
-            status=CAPTURE_STATUS_COMPLETED,
+        classification = self._classifier.classify_capture(
+            capture.raw_text,
+            question_version=CAPTURE_QUESTION_VERSION,
+        )
+        route = decide_capture_route(
+            category=classification.category, confidence=classification.confidence
         )
 
-    async def mark_processing_failed(
-        self, capture_id: UUID, processing_generation: int
-    ) -> None:
+        await self._repository.complete_capture_classification(
+            capture_id=capture_id,
+            processing_generation=capture.processing_generation,
+            category=classification.category,
+            route=route,
+            urgency="normal",
+            confidence=classification.confidence,
+            policy_version=CAPTURE_ROUTE_POLICY_VERSION,
+            question_version=classification.question_version,
+        )
+
+    async def mark_processing_failed(self, capture_id: UUID, processing_generation: int) -> None:
         await self._repository.update_processing_status(
             capture_id=capture_id,
             processing_generation=processing_generation,
@@ -213,11 +223,9 @@ class CaptureService:
             padded = cursor + "=" * (-len(cursor) % 4)
             raw = urlsafe_b64decode(padded)
             payload = json.loads(raw)
-            created_at = datetime.fromisoformat(
-                str(payload["c"]).replace("Z", "+00:00")
-            )
+            created_at = datetime.fromisoformat(str(payload["c"]).replace("Z", "+00:00"))
             capture_id = UUID(str(payload["i"]))
-        except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+        except KeyError, TypeError, ValueError, json.JSONDecodeError:
             raise MalformedCursorError() from None
 
         if created_at.tzinfo is None:
