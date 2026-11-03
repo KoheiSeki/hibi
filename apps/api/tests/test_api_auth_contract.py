@@ -1,8 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
 import jwt
-from cryptography.hazmat.primitives.asymmetric import rsa
-
 from auth_contract_helpers import (
     TEST_AUDIENCE,
     TEST_ISSUER,
@@ -11,6 +9,7 @@ from auth_contract_helpers import (
     create_auth_contract_client,
     encode_access_token,
 )
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 ME_PATH = "/api/v1/me"
 

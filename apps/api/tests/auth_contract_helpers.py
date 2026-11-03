@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from hibi.api.dependencies import get_jwt_verifier
 from hibi.api.main import create_app
-from hibi.auth.jwt_verifier import JwtVerifier, JwksProvider
+from hibi.auth.jwt_verifier import JwksProvider, JwtVerifier
 
 TEST_ISSUER = "http://127.0.0.1:54321/auth/v1"
 TEST_AUDIENCE = "authenticated"

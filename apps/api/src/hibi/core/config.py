@@ -22,9 +22,7 @@ class Settings(BaseSettings):
     @property
     def allowed_jwt_algorithms(self) -> frozenset[str]:
         algorithms = frozenset(
-            value.strip()
-            for value in self.supabase_jwt_algorithms.split(",")
-            if value.strip()
+            value.strip() for value in self.supabase_jwt_algorithms.split(",") if value.strip()
         )
         if not algorithms:
             raise ValueError("HIBI_SUPABASE_JWT_ALGORITHMS must not be empty")

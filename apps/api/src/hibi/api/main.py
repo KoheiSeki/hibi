@@ -97,9 +97,7 @@ def create_app(resource_lookup: ResourceLookup = _default_resource_lookup) -> Fa
     async def get_protected_resource(
         principal: Principal = Depends(get_principal),
     ) -> ApiResponse[ProtectedResourceResponse]:
-        value = get_owned_resource(
-            principal=principal, repository_lookup=resource_lookup
-        )
+        value = get_owned_resource(principal=principal, repository_lookup=resource_lookup)
         return ApiResponse(data=ProtectedResourceResponse(value=value))
 
     register_exception_handlers(app)

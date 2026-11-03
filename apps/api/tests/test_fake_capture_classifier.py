@@ -20,9 +20,10 @@ def _clear_cases() -> list[dict[str, object]]:
     ]
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("case", _clear_cases(), ids=lambda case: str(case["rawText"]))
-def test_fake_classifier_returns_dataset_category(case: dict[str, object]) -> None:
-    result = FakeCaptureClassifier().classify_capture(
+async def test_fake_classifier_returns_dataset_category(case: dict[str, object]) -> None:
+    result = await FakeCaptureClassifier().classify_capture(
         str(case["rawText"]),
         question_version=CAPTURE_QUESTION_VERSION,
     )

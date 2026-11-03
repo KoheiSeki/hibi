@@ -35,7 +35,7 @@ async def test_process_capture_job_commits_successful_processing(
     calls: list[tuple[UUID, int]] = []
 
     class FakeService:
-        def __init__(self, *, session: object, repository: object) -> None:
+        def __init__(self, *, session: object, repository: object, classifier: object) -> None:
             pass
 
         async def process_capture(self, capture_id: UUID, processing_generation: int) -> None:
@@ -63,7 +63,7 @@ async def test_process_capture_job_rolls_back_and_schedules_retry(
     session = object()
 
     class FailingService:
-        def __init__(self, *, session: object, repository: object) -> None:
+        def __init__(self, *, session: object, repository: object, classifier: object) -> None:
             pass
 
         async def process_capture(self, capture_id: UUID, processing_generation: int) -> None:
@@ -103,7 +103,8 @@ async def test_process_capture_job_commits_failed_status_in_separate_transaction
     marked_failed: list[tuple[UUID, int]] = []
 
     class FailingService:
-        def __init__(self, *, session: object, repository: object) -> None:
+        def __init__(self, *, session: object, repository: object, classifier: object) -> None:
+            del classifier
             self._session = session
 
         async def process_capture(self, capture_id: UUID, processing_generation: int) -> None:

@@ -66,9 +66,7 @@ async def create_capture(
     )
     result: CreateCaptureResult = await service.create_capture(command)
 
-    response.status_code = (
-        status.HTTP_202_ACCEPTED if result.created else status.HTTP_200_OK
-    )
+    response.status_code = status.HTTP_202_ACCEPTED if result.created else status.HTTP_200_OK
     response.headers["Location"] = f"/api/v1/captures/{result.capture.id}"
     return ApiResponse(data=_to_capture_response(result.capture))
 
@@ -198,9 +196,7 @@ def _to_capture_response(capture: Capture) -> CaptureResponse:
         category=capture.category,
         route=capture.route,
         urgency=capture.urgency,
-        confidence=(
-            float(capture.confidence) if capture.confidence is not None else None
-        ),
+        confidence=(float(capture.confidence) if capture.confidence is not None else None),
         policy_version=capture.policy_version,
         question_version=capture.question_version,
         processed_at=capture.processed_at,
