@@ -55,6 +55,14 @@ export type ApiResponseUserResponse = {
  */
 export type CaptureResponse = {
   /**
+   * Category
+   */
+  category?: string | null;
+  /**
+   * Confidence
+   */
+  confidence?: number | null;
+  /**
    * Createdat
    */
   createdAt: string;
@@ -63,9 +71,25 @@ export type CaptureResponse = {
    */
   id: string;
   /**
+   * Policyversion
+   */
+  policyVersion?: string | null;
+  /**
+   * Processedat
+   */
+  processedAt?: string | null;
+  /**
+   * Questionversion
+   */
+  questionVersion?: string | null;
+  /**
    * Rawtext
    */
   rawText: string;
+  /**
+   * Route
+   */
+  route?: string | null;
   /**
    * Status
    */
@@ -74,6 +98,10 @@ export type CaptureResponse = {
    * Updatedat
    */
   updatedAt: string;
+  /**
+   * Urgency
+   */
+  urgency?: string | null;
 };
 
 /**

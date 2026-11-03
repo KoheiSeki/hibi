@@ -18,3 +18,10 @@ class CaptureResponse(ApiModel):
     status: str
     created_at: datetime
     updated_at: datetime
+    category: str | None = None
+    route: str | None = None
+    urgency: str | None = None
+    confidence: float | None = None
+    policy_version: str | None = None
+    question_version: str | None = None
+    processed_at: datetime | None = None
