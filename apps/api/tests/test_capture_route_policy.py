@@ -4,7 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from hibi.modules.captures.policies import decide_capture_route
+from hibi.ai.classification import CAPTURE_QUESTION_VERSION, Classification
+from hibi.modules.captures.policies import decide_capture_route, normalize_classification
 
 _DATASET_PATH = (
     Path(__file__).resolve().parents[3] / "docs" / "ai" / "evals" / "capture-route-v1.jsonl"
@@ -34,3 +35,38 @@ def test_dataset_covers_confidence_threshold_boundary() -> None:
 
     assert Decimal("0.7") in confidences
     assert Decimal("0.69") in confidences
+
+
+def _classification(**overrides: object) -> Classification:
+    values: dict[str, object] = {
+        "category": "shopping",
+        "confidence": Decimal("0.9"),
+        "urgency_score": 0.5,
+        "question_version": CAPTURE_QUESTION_VERSION,
+    }
+    values.update(overrides)
+    return Classification(**values)  # type: ignore[arg-type]
+
+
+def test_normalize_classification_keeps_a_valid_result() -> None:
+    classification = _classification()
+
+    assert normalize_classification(classification) is classification
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"category": "unknown"},
+        {"confidence": Decimal("-0.01")},
+        {"confidence": Decimal("1.01")},
+        {"question_version": "capture-classify-v0"},
+    ],
+)
+def test_normalize_classification_replaces_invalid_schema(overrides: dict[str, object]) -> None:
+    normalized = normalize_classification(_classification(**overrides))
+
+    assert normalized.category == "chat"
+    assert normalized.confidence == Decimal("0")
+    assert normalized.question_version == CAPTURE_QUESTION_VERSION
+    assert normalized.urgency_score == 0.5

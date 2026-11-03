@@ -5,7 +5,11 @@ from uuid import UUID, uuid4, uuid7
 
 import pytest
 
-from hibi.ai.classification import CAPTURE_QUESTION_VERSION, Classification
+from hibi.ai.classification import (
+    CAPTURE_QUESTION_VERSION,
+    Classification,
+    ClassificationTimeoutError,
+)
 from hibi.modules.captures.policies import CAPTURE_ROUTE_POLICY_VERSION
 from hibi.modules.captures.service import CaptureService
 from hibi.modules.captures.types import (
@@ -116,6 +120,17 @@ class RecordingClassifier:
         )
 
 
+class ScriptedClassifier:
+    def __init__(self, result: Classification | Exception) -> None:
+        self._result = result
+
+    def classify_capture(self, text: str, *, question_version: str) -> Classification:
+        del text, question_version
+        if isinstance(self._result, Exception):
+            raise self._result
+        return self._result
+
+
 def _capture(
     *,
     status: str = CAPTURE_STATUS_PENDING,
@@ -145,7 +160,7 @@ def _capture(
 
 def _service(
     repository: FakeProcessCaptureRepository,
-    classifier: RecordingClassifier | None = None,
+    classifier: RecordingClassifier | ScriptedClassifier | None = None,
 ) -> CaptureService:
     return CaptureService(object(), repository, classifier)  # type: ignore[arg-type]
 
@@ -184,6 +199,43 @@ async def test_process_capture_keeps_low_confidence_category_and_clarifies_route
     assert repository.capture.category == "shopping"
     assert repository.capture.route == "clarify"
     assert repository.capture.confidence == Decimal("0.69")
+
+
+@pytest.mark.asyncio
+async def test_process_capture_reraises_classification_timeout() -> None:
+    capture = _capture()
+    repository = FakeProcessCaptureRepository(capture)
+    classifier = ScriptedClassifier(ClassificationTimeoutError())
+
+    with pytest.raises(ClassificationTimeoutError):
+        await _service(repository, classifier).process_capture(capture.id, 1)
+
+    assert repository.classifications == []
+    assert repository.capture is not None
+    assert repository.capture.status == CAPTURE_STATUS_PROCESSING
+
+
+@pytest.mark.asyncio
+async def test_process_capture_completes_invalid_schema_as_clarification() -> None:
+    capture = _capture()
+    repository = FakeProcessCaptureRepository(capture)
+    classifier = ScriptedClassifier(
+        Classification(
+            category="unknown",
+            confidence=Decimal("0.9"),
+            urgency_score=0.5,
+            question_version=CAPTURE_QUESTION_VERSION,
+        )
+    )
+
+    await _service(repository, classifier).process_capture(capture.id, 1)
+
+    assert repository.capture is not None
+    assert repository.capture.status == CAPTURE_STATUS_COMPLETED
+    assert repository.capture.category == "chat"
+    assert repository.capture.route == "clarify"
+    assert repository.capture.confidence == Decimal("0")
+    assert repository.capture.question_version == CAPTURE_QUESTION_VERSION
 
 
 @pytest.mark.asyncio

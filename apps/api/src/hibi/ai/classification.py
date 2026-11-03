@@ -10,3 +10,8 @@ class Classification:
     confidence: Decimal
     urgency_score: float
     question_version: str
+
+
+@dataclass
+class ClassificationTimeoutError(Exception):
+    pass
