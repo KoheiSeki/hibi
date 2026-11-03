@@ -15,6 +15,7 @@ dependencies = [
   "arq>=0.26,<1",
   "typesafe-sdk>=0.7,<1",
   "structlog>=26.1.0",
+  "openai>=3.42.1",
 ]
 
 [dependency-groups]

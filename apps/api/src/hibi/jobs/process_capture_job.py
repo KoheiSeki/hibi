@@ -4,7 +4,10 @@ from uuid import UUID
 
 from arq import Retry
 
-from hibi.ai.classifier_factory import build_capture_classifier
+from hibi.ai.classifier_factory import (
+    build_capture_classifier,
+    build_clarification_generator,
+)
 from hibi.db.session import session_scope
 from hibi.jobs.job_logging import log_job_failure
 from hibi.modules.captures.repository import CaptureRepository
@@ -32,6 +35,7 @@ async def process_capture_job(
                 session=session,
                 repository=CaptureRepository(session=session),
                 classifier=build_capture_classifier(),
+                generator=build_clarification_generator(),
             )
             await service.process_capture(capture_id, processing_generation)
     except Exception as error:
@@ -44,6 +48,7 @@ async def process_capture_job(
                     session=session,
                     repository=CaptureRepository(session=session),
                     classifier=build_capture_classifier(),
+                    generator=build_clarification_generator(),
                 )
                 await service.mark_processing_failed(capture_id, processing_generation)
         log_job_failure(

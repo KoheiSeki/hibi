@@ -14,7 +14,6 @@ from hibi.ai.classification import (
     ClarificationGenerator,
     normalize_clarification_text,
 )
-from hibi.ai.fake_clarification import FakeClarificationGenerator
 from hibi.modules.captures.errors import (
     CaptureNotEditableError,
     CaptureNotFoundError,
@@ -55,12 +54,12 @@ class CaptureService:
         session: AsyncSession,
         repository: CaptureRepository,
         classifier: CaptureClassifier,
-        generator: ClarificationGenerator | None = None,
+        generator: ClarificationGenerator,
     ) -> None:
         self._session = session
         self._repository = repository
         self._classifier = classifier
-        self._generator = generator or FakeClarificationGenerator()
+        self._generator = generator
 
     async def create_capture(self, command: CreateCaptureCommand) -> CreateCaptureResult:
         idempotency_key = command.idempotency_key

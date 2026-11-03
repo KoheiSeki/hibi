@@ -14,6 +14,7 @@ from hibi.ai.classification import (
     Classification,
     ClassificationTimeoutError,
 )
+from hibi.ai.fake_clarification import FakeClarificationGenerator
 from hibi.ai.fake_classifier import FakeCaptureClassifier
 from hibi.ai.metrics import llm_call_count, reset_llm_call
 from hibi.modules.captures.policies import CAPTURE_ROUTE_POLICY_VERSION
@@ -194,13 +195,13 @@ def _capture(
 def _service(
     repository: FakeProcessCaptureRepository,
     classifier: RecordingClassifier | ScriptedClassifier | FakeCaptureClassifier | None = None,
-    generator: ScriptedGenerator | None = None,
+    generator: ScriptedGenerator | FakeClarificationGenerator | None = None,
 ) -> CaptureService:
     return CaptureService(
         cast(AsyncSession, None),
         cast(CaptureRepository, repository),
         classifier or FakeCaptureClassifier(),
-        generator,
+        generator or FakeClarificationGenerator(),
     )
 
 

@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,12 +18,19 @@ class Settings(BaseSettings):
 
     redis_url: str = "redis://localhost:6379/0"
 
-    jev_api_key: str = ""
+    jev_api_key: SecretStr = SecretStr("")
+
+    open_ai_api_key: SecretStr = SecretStr("")
+    open_ai_base_url: str = ""
+    open_ai_model: str = ""
+    open_ai_timeout_seconds: float = 30.0
 
     @property
     def allowed_jwt_algorithms(self) -> frozenset[str]:
         algorithms = frozenset(
-            value.strip() for value in self.supabase_jwt_algorithms.split(",") if value.strip()
+            value.strip()
+            for value in self.supabase_jwt_algorithms.split(",")
+            if value.strip()
         )
         if not algorithms:
             raise ValueError("HIBI_SUPABASE_JWT_ALGORITHMS must not be empty")
