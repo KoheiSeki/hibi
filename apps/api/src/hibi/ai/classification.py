@@ -19,4 +19,10 @@ class ClassificationTimeoutError(Exception):
 
 
 class CaptureClassifier(Protocol):
-    async def classify_capture(self, text: str, *, question_version: str) -> Classification: ...
+    async def classify_capture(
+        self, text: str, *, question_version: str
+    ) -> Classification: ...
+
+
+class ClarificationGenerator(Protocol):
+    async def generate_clarification(self, text: str, *, category: str) -> str: ...
