@@ -107,6 +107,8 @@
 
 ## Week 6: LLM System Twoとハイブリッド分岐
 
+方針は [24-week6-llm-system-two.md](./24-week6-llm-system-two.md)。
+
 - LLM portとadapterを実装する
 - structured outputを実装する
 - timeout、rate limit、invalid outputを処理する
