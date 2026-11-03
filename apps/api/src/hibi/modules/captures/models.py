@@ -33,12 +33,8 @@ class CaptureModel(Base):
     question_version: Mapped[str | None] = mapped_column()
     processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     clarification_text: Mapped[str | None] = mapped_column()
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class OutboxModel(Base):
@@ -56,6 +52,4 @@ class OutboxModel(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

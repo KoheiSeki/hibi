@@ -27,9 +27,7 @@ class ClarificationProviderError(Exception):
 
 
 class CaptureClassifier(Protocol):
-    async def classify_capture(
-        self, text: str, *, question_version: str
-    ) -> Classification: ...
+    async def classify_capture(self, text: str, *, question_version: str) -> Classification: ...
 
 
 class ClarificationGenerator(Protocol):
