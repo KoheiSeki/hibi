@@ -195,6 +195,7 @@ class CaptureService:
             confidence=normalized_classification.confidence,
             policy_version=CAPTURE_ROUTE_POLICY_VERSION,
             question_version=normalized_classification.question_version,
+            clarification_text=None
         )
 
     async def mark_processing_failed(self, capture_id: UUID, processing_generation: int) -> None:

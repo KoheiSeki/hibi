@@ -124,6 +124,7 @@ class FakeCaptureRepository:
             policy_version=None,
             question_version=None,
             processed_at=None,
+            clarification_text=None,
             created_at=now,
             updated_at=now,
         )
@@ -153,6 +154,7 @@ class FakeCaptureRepository:
                 policy_version=capture.policy_version,
                 question_version=capture.question_version,
                 processed_at=capture.processed_at,
+                clarification_text=capture.clarification_text,
                 created_at=capture.created_at,
                 updated_at=datetime.now(UTC),
             )
@@ -414,6 +416,7 @@ async def test_create_capture_replays_after_integrity_error_when_hash_matches() 
         policy_version=None,
         question_version=None,
         processed_at=None,
+        clarification_text=None,
         created_at=datetime.now(UTC),
         updated_at=datetime.now(UTC),
     )
@@ -447,6 +450,7 @@ async def test_create_capture_conflicts_after_integrity_error_when_hash_differs(
         policy_version=None,
         question_version=None,
         processed_at=None,
+        clarification_text=None,
         created_at=datetime.now(UTC),
         updated_at=datetime.now(UTC),
     )

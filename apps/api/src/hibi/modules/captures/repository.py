@@ -40,7 +40,9 @@ class CaptureRepository:
             return None
         return _to_capture(row)
 
-    async def get_by_idempotency_key(self, user_id: UUID, *, key: str) -> Capture | None:
+    async def get_by_idempotency_key(
+        self, user_id: UUID, *, key: str
+    ) -> Capture | None:
         stmt = select(CaptureModel).where(
             CaptureModel.user_id == user_id, CaptureModel.idempotency_key == key
         )
@@ -64,7 +66,9 @@ class CaptureRepository:
                 tuple_(CaptureModel.created_at, CaptureModel.id)
                 < (start_created_at, start_capture_id)
             )
-        stmt = stmt.order_by(CaptureModel.created_at.desc(), CaptureModel.id.desc()).limit(limit)
+        stmt = stmt.order_by(
+            CaptureModel.created_at.desc(), CaptureModel.id.desc()
+        ).limit(limit)
         result = await self._session.execute(stmt)
         return [_to_capture(row) for row in result.scalars().all()]
 
@@ -115,7 +119,9 @@ class CaptureRepository:
             .where(
                 CaptureModel.id == capture_id,
                 CaptureModel.user_id == user_id,
-                CaptureModel.status.in_([CAPTURE_STATUS_PENDING, CAPTURE_STATUS_FAILED]),
+                CaptureModel.status.in_(
+                    [CAPTURE_STATUS_PENDING, CAPTURE_STATUS_FAILED]
+                ),
             )
             .values(raw_text=raw_text, updated_at=func.now())
             .returning(CaptureModel)
@@ -149,7 +155,9 @@ class CaptureRepository:
     async def update_outbox_published(self, *, outbox_id: UUID) -> bool:
         stmt = (
             update(OutboxModel)
-            .where(OutboxModel.id == outbox_id, OutboxModel.status == OUTBOX_STATUS_PENDING)
+            .where(
+                OutboxModel.id == outbox_id, OutboxModel.status == OUTBOX_STATUS_PENDING
+            )
             .values(status=OUTBOX_STATUS_PUBLISHED, published_at=func.now())
             .returning(OutboxModel.id)
         )
@@ -214,6 +222,7 @@ class CaptureRepository:
         confidence: Decimal,
         policy_version: str,
         question_version: str,
+        clarification_text: str | None,
     ) -> Capture | None:
         stmt = (
             update(CaptureModel)
@@ -231,6 +240,7 @@ class CaptureRepository:
                 policy_version=policy_version,
                 question_version=question_version,
                 processed_at=func.now(),
+                clarification_text=clarification_text,
                 updated_at=func.now(),
             )
             .returning(CaptureModel)
@@ -259,6 +269,7 @@ def _to_capture(row: CaptureModel) -> Capture:
         policy_version=row.policy_version,
         question_version=row.question_version,
         processed_at=row.processed_at,
+        clarification_text=row.clarification_text,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )

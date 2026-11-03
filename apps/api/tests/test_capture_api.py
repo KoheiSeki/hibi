@@ -50,6 +50,7 @@ def _capture(**overrides: object) -> Capture:
         "policy_version": None,
         "question_version": None,
         "processed_at": None,
+        "clarification_text": None,
         "created_at": _NOW,
         "updated_at": _NOW,
     }

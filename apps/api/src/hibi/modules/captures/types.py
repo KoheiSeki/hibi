@@ -33,6 +33,7 @@ class Capture:
     policy_version: str | None
     question_version: str | None
     processed_at: datetime | None
+    clarification_text: str | None
     created_at: datetime
     updated_at: datetime
 

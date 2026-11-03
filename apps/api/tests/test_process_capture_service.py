@@ -73,6 +73,7 @@ class FakeProcessCaptureRepository:
         confidence: Decimal,
         policy_version: str,
         question_version: str,
+        clarification_text: str | None = None,
     ) -> Capture | None:
         if self.fail_processing:
             raise RuntimeError("temporary processing failure")
@@ -91,6 +92,7 @@ class FakeProcessCaptureRepository:
                 "confidence": confidence,
                 "policy_version": policy_version,
                 "question_version": question_version,
+                "clarification_text": clarification_text,
             }
         )
         self.capture = replace(
@@ -103,6 +105,7 @@ class FakeProcessCaptureRepository:
             policy_version=policy_version,
             question_version=question_version,
             processed_at=datetime.now(UTC),
+            clarification_text=clarification_text,
         )
         return self.capture
 
@@ -154,6 +157,7 @@ def _capture(
         policy_version=None,
         question_version=None,
         processed_at=None,
+        clarification_text=None,
         created_at=now,
         updated_at=now,
     )
