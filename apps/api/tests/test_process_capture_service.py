@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from hibi.ai.classification import (
     CAPTURE_QUESTION_VERSION,
+    CLARIFICATION_FALLBACK_TEXT,
+    ClarificationProviderError,
     Classification,
     ClassificationTimeoutError,
 )
@@ -139,6 +141,28 @@ class ScriptedClassifier:
         return self._result
 
 
+class ScriptedGenerator:
+    def __init__(self, result: str | Exception) -> None:
+        self._result = result
+
+    async def generate_clarification(self, text: str, *, category: str) -> str:
+        del text, category
+        if isinstance(self._result, Exception):
+            raise self._result
+        return self._result
+
+
+def _low_confidence_classifier() -> ScriptedClassifier:
+    return ScriptedClassifier(
+        Classification(
+            category="shopping",
+            confidence=Decimal("0.69"),
+            urgency_score=0.5,
+            question_version=CAPTURE_QUESTION_VERSION,
+        )
+    )
+
+
 def _capture(
     *,
     status: str = CAPTURE_STATUS_PENDING,
@@ -170,11 +194,13 @@ def _capture(
 def _service(
     repository: FakeProcessCaptureRepository,
     classifier: RecordingClassifier | ScriptedClassifier | FakeCaptureClassifier | None = None,
+    generator: ScriptedGenerator | None = None,
 ) -> CaptureService:
     return CaptureService(
         cast(AsyncSession, None),
         cast(CaptureRepository, repository),
         classifier or FakeCaptureClassifier(),
+        generator,
     )
 
 
@@ -229,6 +255,64 @@ async def test_process_capture_does_not_generate_clarification_for_high_confiden
     assert repository.capture.route == "shopping"
     assert repository.capture.clarification_text is None
     assert llm_call_count() == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source", ["timeout", "rate_limit"])
+async def test_process_capture_reraises_clarification_provider_error(source: str) -> None:
+    assert source in {"timeout", "rate_limit"}
+    capture = _capture()
+    repository = FakeProcessCaptureRepository(capture)
+
+    with pytest.raises(ClarificationProviderError):
+        await _service(
+            repository,
+            _low_confidence_classifier(),
+            ScriptedGenerator(ClarificationProviderError()),
+        ).process_capture(capture.id, 1)
+
+    assert repository.classifications == []
+    assert repository.capture is not None
+    assert repository.capture.status == CAPTURE_STATUS_PROCESSING
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("output", ["", "あ" * 501])
+async def test_process_capture_stores_fallback_for_invalid_clarification(output: str) -> None:
+    reset_llm_call()
+    capture = _capture()
+    repository = FakeProcessCaptureRepository(capture)
+
+    await _service(
+        repository,
+        _low_confidence_classifier(),
+        ScriptedGenerator(output),
+    ).process_capture(capture.id, 1)
+
+    assert repository.capture is not None
+    assert repository.capture.status == CAPTURE_STATUS_COMPLETED
+    assert repository.capture.route == "clarify"
+    assert repository.capture.category == "shopping"
+    assert repository.capture.confidence == Decimal("0.69")
+    assert repository.capture.clarification_text == CLARIFICATION_FALLBACK_TEXT
+    assert llm_call_count() == 0
+
+
+@pytest.mark.asyncio
+async def test_process_capture_keeps_clarification_at_max_length() -> None:
+    question = "あ" * 500
+    capture = _capture()
+    repository = FakeProcessCaptureRepository(capture)
+
+    await _service(
+        repository,
+        _low_confidence_classifier(),
+        ScriptedGenerator(question),
+    ).process_capture(capture.id, 1)
+
+    assert repository.capture is not None
+    assert repository.capture.status == CAPTURE_STATUS_COMPLETED
+    assert repository.capture.clarification_text == question
 
 
 @pytest.mark.asyncio

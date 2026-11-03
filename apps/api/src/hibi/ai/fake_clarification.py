@@ -1,3 +1,4 @@
+from hibi.ai.classification import CLARIFICATION_FALLBACK_TEXT
 from hibi.ai.metrics import record_llm_call
 
 
@@ -15,6 +16,6 @@ class FakeClarificationGenerator:
             case "note":
                 return "何を残しますか？"  # noqa: RUF001
             case "chat":
-                return "もう少し具体的に教えてください。"
+                return CLARIFICATION_FALLBACK_TEXT
             case _:
-                return "もう少し具体的に教えてください。"
+                return CLARIFICATION_FALLBACK_TEXT

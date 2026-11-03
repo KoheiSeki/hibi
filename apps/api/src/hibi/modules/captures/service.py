@@ -12,6 +12,7 @@ from hibi.ai.classification import (
     CAPTURE_QUESTION_VERSION,
     CaptureClassifier,
     ClarificationGenerator,
+    normalize_clarification_text,
 )
 from hibi.ai.fake_clarification import FakeClarificationGenerator
 from hibi.modules.captures.errors import (
@@ -195,10 +196,11 @@ class CaptureService:
         )
         clarification_text: str | None = None
         if route == CAPTURE_ROUTE_CLARIFY:
-            clarification_text = await self._generator.generate_clarification(
+            generated = await self._generator.generate_clarification(
                 capture.raw_text,
                 category=normalized_classification.category,
             )
+            clarification_text = normalize_clarification_text(generated)
 
         await self._repository.complete_capture_classification(
             capture_id=capture_id,
