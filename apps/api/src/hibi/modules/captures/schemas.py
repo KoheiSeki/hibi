@@ -25,3 +25,4 @@ class CaptureResponse(ApiModel):
     policy_version: str | None = None
     question_version: str | None = None
     processed_at: datetime | None = None
+    clarification_text: str | None = None

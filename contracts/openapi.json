@@ -94,6 +94,17 @@
             ],
             "title": "Category"
           },
+          "clarificationText": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clarificationtext"
+          },
           "confidence": {
             "anyOf": [
               {

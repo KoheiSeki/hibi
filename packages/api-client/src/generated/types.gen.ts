@@ -59,6 +59,10 @@ export type CaptureResponse = {
    */
   category?: string | null;
   /**
+   * Clarificationtext
+   */
+  clarificationText?: string | null;
+  /**
    * Confidence
    */
   confidence?: number | null;

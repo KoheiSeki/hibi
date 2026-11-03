@@ -200,4 +200,5 @@ def _to_capture_response(capture: Capture) -> CaptureResponse:
         policy_version=capture.policy_version,
         question_version=capture.question_version,
         processed_at=capture.processed_at,
+        clarification_text=capture.clarification_text,
     )

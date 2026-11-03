@@ -226,7 +226,17 @@ def test_get_own_capture_returns_200() -> None:
     fake.captures[CAPTURE_ID] = _capture()
     response = _client(fake).get(f"/api/v1/captures/{CAPTURE_ID}")
     assert response.status_code == 200
-    assert response.json()["data"]["id"] == str(CAPTURE_ID)
+    body = response.json()["data"]
+    assert body["id"] == str(CAPTURE_ID)
+    assert body["clarificationText"] is None
+
+
+def test_get_own_capture_returns_clarification_text() -> None:
+    fake = FakeCaptureService()
+    fake.captures[CAPTURE_ID] = _capture(clarification_text="それはいつ買いますか？")  # noqa: RUF001
+    response = _client(fake).get(f"/api/v1/captures/{CAPTURE_ID}")
+    assert response.status_code == 200
+    assert response.json()["data"]["clarificationText"] == "それはいつ買いますか？"  # noqa: RUF001
 
 
 @pytest.mark.parametrize("method", ["get", "patch", "delete"])
