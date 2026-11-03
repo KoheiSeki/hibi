@@ -8,7 +8,12 @@ from uuid import UUID, uuid7
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from hibi.ai.classification import CAPTURE_QUESTION_VERSION, CaptureClassifier
+from hibi.ai.classification import (
+    CAPTURE_QUESTION_VERSION,
+    CaptureClassifier,
+    ClarificationGenerator,
+)
+from hibi.ai.fake_clarification import FakeClarificationGenerator
 from hibi.modules.captures.errors import (
     CaptureNotEditableError,
     CaptureNotFoundError,
@@ -20,6 +25,7 @@ from hibi.modules.captures.errors import (
     MalformedCursorError,
 )
 from hibi.modules.captures.policies import (
+    CAPTURE_ROUTE_CLARIFY,
     CAPTURE_ROUTE_POLICY_VERSION,
     decide_capture_route,
     normalize_classification,
@@ -48,10 +54,12 @@ class CaptureService:
         session: AsyncSession,
         repository: CaptureRepository,
         classifier: CaptureClassifier,
+        generator: ClarificationGenerator | None = None,
     ) -> None:
         self._session = session
         self._repository = repository
         self._classifier = classifier
+        self._generator = generator or FakeClarificationGenerator()
 
     async def create_capture(self, command: CreateCaptureCommand) -> CreateCaptureResult:
         idempotency_key = command.idempotency_key
@@ -185,6 +193,12 @@ class CaptureService:
             category=normalized_classification.category,
             confidence=normalized_classification.confidence,
         )
+        clarification_text: str | None = None
+        if route == CAPTURE_ROUTE_CLARIFY:
+            clarification_text = await self._generator.generate_clarification(
+                capture.raw_text,
+                category=normalized_classification.category,
+            )
 
         await self._repository.complete_capture_classification(
             capture_id=capture_id,
@@ -195,7 +209,7 @@ class CaptureService:
             confidence=normalized_classification.confidence,
             policy_version=CAPTURE_ROUTE_POLICY_VERSION,
             question_version=normalized_classification.question_version,
-            clarification_text=None
+            clarification_text=clarification_text,
         )
 
     async def mark_processing_failed(self, capture_id: UUID, processing_generation: int) -> None:

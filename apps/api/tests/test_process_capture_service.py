@@ -1,9 +1,11 @@
 from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import cast
 from uuid import UUID, uuid4, uuid7
 
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from hibi.ai.classification import (
     CAPTURE_QUESTION_VERSION,
@@ -11,7 +13,9 @@ from hibi.ai.classification import (
     ClassificationTimeoutError,
 )
 from hibi.ai.fake_classifier import FakeCaptureClassifier
+from hibi.ai.metrics import llm_call_count, reset_llm_call
 from hibi.modules.captures.policies import CAPTURE_ROUTE_POLICY_VERSION
+from hibi.modules.captures.repository import CaptureRepository
 from hibi.modules.captures.service import CaptureService
 from hibi.modules.captures.types import (
     CAPTURE_STATUS_COMPLETED,
@@ -168,10 +172,10 @@ def _service(
     classifier: RecordingClassifier | ScriptedClassifier | FakeCaptureClassifier | None = None,
 ) -> CaptureService:
     return CaptureService(
-        object(),
-        repository,
+        cast(AsyncSession, None),
+        cast(CaptureRepository, repository),
         classifier or FakeCaptureClassifier(),
-    )  # type: ignore[arg-type]
+    )
 
 
 @pytest.mark.asyncio
@@ -199,6 +203,7 @@ async def test_process_capture_saves_classification_when_completed() -> None:
 
 @pytest.mark.asyncio
 async def test_process_capture_keeps_low_confidence_category_and_clarifies_route() -> None:
+    reset_llm_call()
     capture = _capture(raw_text="境界未満の牛乳")
     repository = FakeProcessCaptureRepository(capture)
 
@@ -208,6 +213,22 @@ async def test_process_capture_keeps_low_confidence_category_and_clarifies_route
     assert repository.capture.category == "shopping"
     assert repository.capture.route == "clarify"
     assert repository.capture.confidence == Decimal("0.69")
+    assert repository.capture.clarification_text == "それはいつ買いますか？"  # noqa: RUF001
+    assert llm_call_count() == 1
+
+
+@pytest.mark.asyncio
+async def test_process_capture_does_not_generate_clarification_for_high_confidence() -> None:
+    reset_llm_call()
+    capture = _capture()
+    repository = FakeProcessCaptureRepository(capture)
+
+    await _service(repository, RecordingClassifier()).process_capture(capture.id, 1)
+
+    assert repository.capture is not None
+    assert repository.capture.route == "shopping"
+    assert repository.capture.clarification_text is None
+    assert llm_call_count() == 0
 
 
 @pytest.mark.asyncio
