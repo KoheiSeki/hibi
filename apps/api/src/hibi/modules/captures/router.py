@@ -3,6 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from hibi.ai.classifier_factory import build_capture_classifier
 from hibi.api.dependencies import get_principal
 from hibi.api.openapi import problem_responses
 from hibi.api.schemas import ApiResponse, ApiResponseWithMeta, CursorMeta
@@ -30,7 +31,9 @@ def _get_capture_service(
     session: AsyncSession = Depends(get_session),
 ) -> CaptureService:
     repository = CaptureRepository(session=session)
-    return CaptureService(session=session, repository=repository)
+    return CaptureService(
+        session=session, repository=repository, classifier=build_capture_classifier()
+    )
 
 
 @router.post(

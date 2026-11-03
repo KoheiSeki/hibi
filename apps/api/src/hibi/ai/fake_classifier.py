@@ -5,7 +5,11 @@ from pathlib import Path
 from hibi.ai.classification import Classification
 
 _DATASET_PATH = (
-    Path(__file__).resolve().parents[5] / "docs" / "ai" / "evals" / "capture-route-v1.jsonl"
+    Path(__file__).resolve().parents[5]
+    / "docs"
+    / "ai"
+    / "evals"
+    / "capture-route-v1.jsonl"
 )
 
 
@@ -23,7 +27,9 @@ def _load_cases() -> dict[str, tuple[str, Decimal]]:
 
 
 class FakeCaptureClassifier:
-    def classify_capture(self, text: str, *, question_version: str) -> Classification:
+    async def classify_capture(
+        self, text: str, *, question_version: str
+    ) -> Classification:
         cases = _load_cases()
         matched = cases.get(text)
         if matched is None:

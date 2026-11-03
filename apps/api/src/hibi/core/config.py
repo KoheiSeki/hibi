@@ -17,6 +17,8 @@ class Settings(BaseSettings):
 
     redis_url: str = "redis://localhost:6379/0"
 
+    jev_api_key: str = ""
+
     @property
     def allowed_jwt_algorithms(self) -> frozenset[str]:
         algorithms = frozenset(

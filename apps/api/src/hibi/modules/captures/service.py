@@ -8,8 +8,7 @@ from uuid import UUID, uuid7
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from hibi.ai.classification import CAPTURE_QUESTION_VERSION
-from hibi.ai.fake_classifier import FakeCaptureClassifier
+from hibi.ai.classification import CAPTURE_QUESTION_VERSION, CaptureClassifier
 from hibi.modules.captures.errors import (
     CaptureNotEditableError,
     CaptureNotFoundError,
@@ -48,11 +47,11 @@ class CaptureService:
         self,
         session: AsyncSession,
         repository: CaptureRepository,
-        classifier: FakeCaptureClassifier | None = None,
+        classifier: CaptureClassifier,
     ) -> None:
         self._session = session
         self._repository = repository
-        self._classifier = classifier or FakeCaptureClassifier()
+        self._classifier = classifier
 
     async def create_capture(self, command: CreateCaptureCommand) -> CreateCaptureResult:
         idempotency_key = command.idempotency_key
@@ -177,13 +176,14 @@ class CaptureService:
         if not is_started:
             return
 
-        classification = self._classifier.classify_capture(
+        classification = await self._classifier.classify_capture(
             capture.raw_text,
             question_version=CAPTURE_QUESTION_VERSION,
         )
         normalized_classification = normalize_classification(classification)
         route = decide_capture_route(
-            category=normalized_classification.category, confidence=normalized_classification.confidence
+            category=normalized_classification.category,
+            confidence=normalized_classification.confidence,
         )
 
         await self._repository.complete_capture_classification(

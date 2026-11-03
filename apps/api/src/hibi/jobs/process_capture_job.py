@@ -4,6 +4,7 @@ from uuid import UUID
 
 from arq import Retry
 
+from hibi.ai.classifier_factory import build_capture_classifier
 from hibi.db.session import session_scope
 from hibi.jobs.job_logging import log_job_failure
 from hibi.modules.captures.repository import CaptureRepository
@@ -27,7 +28,11 @@ async def process_capture_job(
 
     try:
         async with session_scope() as session:
-            service = CaptureService(session=session, repository=CaptureRepository(session=session))
+            service = CaptureService(
+                session=session,
+                repository=CaptureRepository(session=session),
+                classifier=build_capture_classifier(),
+            )
             await service.process_capture(capture_id, processing_generation)
     except Exception as error:
         is_final_attempt = attempt >= CAPTURE_PROCESSING_MAX_ATTEMPTS
@@ -36,7 +41,9 @@ async def process_capture_job(
         if is_final_attempt:
             async with session_scope() as session:
                 service = CaptureService(
-                    session=session, repository=CaptureRepository(session=session)
+                    session=session,
+                    repository=CaptureRepository(session=session),
+                    classifier=build_capture_classifier(),
                 )
                 await service.mark_processing_failed(capture_id, processing_generation)
         log_job_failure(

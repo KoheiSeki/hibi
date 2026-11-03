@@ -6,6 +6,7 @@ from uuid import UUID, uuid4, uuid7
 import pytest
 from sqlalchemy.exc import IntegrityError
 
+from hibi.ai.fake_classifier import FakeCaptureClassifier
 from hibi.modules.captures.errors import (
     CaptureNotEditableError,
     CaptureNotFoundError,
@@ -191,7 +192,11 @@ def _service(
 ) -> tuple[CaptureService, FakeCaptureRepository, FakeSession]:
     repository = repo or FakeCaptureRepository()
     session = FakeSession()
-    return CaptureService(session, repository), repository, session  # type: ignore[arg-type]
+    return (
+        CaptureService(session, repository, FakeCaptureClassifier()),
+        repository,
+        session,
+    )  # type: ignore[arg-type]
 
 
 def _create_command(

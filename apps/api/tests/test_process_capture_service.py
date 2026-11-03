@@ -10,6 +10,7 @@ from hibi.ai.classification import (
     Classification,
     ClassificationTimeoutError,
 )
+from hibi.ai.fake_classifier import FakeCaptureClassifier
 from hibi.modules.captures.policies import CAPTURE_ROUTE_POLICY_VERSION
 from hibi.modules.captures.service import CaptureService
 from hibi.modules.captures.types import (
@@ -110,7 +111,7 @@ class RecordingClassifier:
     def __init__(self) -> None:
         self.texts: list[str] = []
 
-    def classify_capture(self, text: str, *, question_version: str) -> Classification:
+    async def classify_capture(self, text: str, *, question_version: str) -> Classification:
         self.texts.append(text)
         return Classification(
             category="shopping",
@@ -124,7 +125,7 @@ class ScriptedClassifier:
     def __init__(self, result: Classification | Exception) -> None:
         self._result = result
 
-    def classify_capture(self, text: str, *, question_version: str) -> Classification:
+    async def classify_capture(self, text: str, *, question_version: str) -> Classification:
         del text, question_version
         if isinstance(self._result, Exception):
             raise self._result
@@ -160,9 +161,13 @@ def _capture(
 
 def _service(
     repository: FakeProcessCaptureRepository,
-    classifier: RecordingClassifier | ScriptedClassifier | None = None,
+    classifier: RecordingClassifier | ScriptedClassifier | FakeCaptureClassifier | None = None,
 ) -> CaptureService:
-    return CaptureService(object(), repository, classifier)  # type: ignore[arg-type]
+    return CaptureService(
+        object(),
+        repository,
+        classifier or FakeCaptureClassifier(),
+    )  # type: ignore[arg-type]
 
 
 @pytest.mark.asyncio
