@@ -125,6 +125,8 @@
 
 ## Week 7: 3つの日常シナリオ
 
+方針は [25-week7-daily-scenarios.md](./25-week7-daily-scenarios.md)。
+
 - shoppingシナリオを縦切り実装する
 - reminder/appointmentシナリオを縦切り実装する
 - expenseシナリオを縦切り実装する
