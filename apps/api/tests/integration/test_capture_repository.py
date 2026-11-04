@@ -1,5 +1,6 @@
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from uuid import UUID, uuid4, uuid7
 
 import pytest
@@ -7,9 +8,16 @@ from sqlalchemy import select, text, update
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from hibi.ai.classification import CAPTURE_QUESTION_VERSION
 from hibi.core.config import get_settings
 from hibi.db.engine import dispose_engine, get_engine
-from hibi.modules.captures.models import CaptureModel, OutboxModel
+from hibi.modules.captures.models import CaptureModel, CaptureScenarioModel, OutboxModel
+from hibi.modules.captures.policies import (
+    CAPTURE_ROUTE_POLICY_VERSION,
+    CAPTURE_SCENARIO_STATUS_PROPOSED,
+    ScenarioProposal,
+    propose_capture_scenario,
+)
 from hibi.modules.captures.repository import CaptureRepository
 from hibi.modules.captures.types import (
     CAPTURE_PROCESSING_REQUESTED,
@@ -401,3 +409,100 @@ async def test_retry_non_failed_capture_does_not_create_outbox(
         await session.scalars(select(OutboxModel).where(OutboxModel.aggregate_id == capture.id))
     ).all()
     assert len(after) == len(before)
+
+
+async def _complete_classification(
+    repo: CaptureRepository,
+    capture: Capture,
+    *,
+    processing_generation: int = 1,
+    scenario: ScenarioProposal | None,
+) -> Capture | None:
+    return await repo.complete_capture_classification(
+        capture_id=capture.id,
+        processing_generation=processing_generation,
+        category="reminder",
+        route="reminder",
+        urgency="normal",
+        confidence=Decimal("0.9"),
+        policy_version=CAPTURE_ROUTE_POLICY_VERSION,
+        question_version=CAPTURE_QUESTION_VERSION,
+        clarification_text=None,
+        scenario=scenario,
+    )
+
+
+@pytest.mark.integration
+async def test_complete_capture_inserts_proposed_scenario(session: AsyncSession) -> None:
+    user_id = uuid4()
+    await _insert_auth_user(session, user_id)
+    repo = CaptureRepository(session)
+    capture = await _create_capture(repo, user_id, raw_text="明日の 9 時に起こして")
+    await session.execute(
+        update(CaptureModel)
+        .where(CaptureModel.id == capture.id)
+        .values(status=CAPTURE_STATUS_PROCESSING)
+    )
+    proposal = propose_capture_scenario(route="reminder", raw_text=capture.raw_text)
+
+    completed = await _complete_classification(repo, capture, scenario=proposal)
+    stored = await session.scalar(
+        select(CaptureScenarioModel).where(CaptureScenarioModel.capture_id == capture.id)
+    )
+
+    assert completed is not None
+    assert stored is not None
+    assert stored.user_id == user_id
+    assert stored.status == CAPTURE_SCENARIO_STATUS_PROPOSED
+    assert stored.title == "起こして"
+    assert stored.remind_text == "明日の 9 時"
+    assert stored.amount is None
+
+
+@pytest.mark.integration
+async def test_complete_capture_does_not_insert_scenario_for_other_generation(
+    session: AsyncSession,
+) -> None:
+    user_id = uuid4()
+    await _insert_auth_user(session, user_id)
+    repo = CaptureRepository(session)
+    capture = await _create_capture(repo, user_id)
+    await session.execute(
+        update(CaptureModel)
+        .where(CaptureModel.id == capture.id)
+        .values(status=CAPTURE_STATUS_PROCESSING)
+    )
+
+    completed = await _complete_classification(
+        repo,
+        capture,
+        processing_generation=2,
+        scenario=propose_capture_scenario(route="shopping", raw_text="牛乳を買う"),
+    )
+    stored = await session.scalar(
+        select(CaptureScenarioModel).where(CaptureScenarioModel.capture_id == capture.id)
+    )
+
+    assert completed is None
+    assert stored is None
+
+
+@pytest.mark.integration
+async def test_complete_capture_without_scenario_inserts_no_row(session: AsyncSession) -> None:
+    user_id = uuid4()
+    await _insert_auth_user(session, user_id)
+    repo = CaptureRepository(session)
+    capture = await _create_capture(repo, user_id)
+    await session.execute(
+        update(CaptureModel)
+        .where(CaptureModel.id == capture.id)
+        .values(status=CAPTURE_STATUS_PROCESSING)
+    )
+
+    completed = await _complete_classification(repo, capture, scenario=None)
+    stored = await session.scalar(
+        select(CaptureScenarioModel).where(CaptureScenarioModel.capture_id == capture.id)
+    )
+
+    assert completed is not None
+    assert stored is None

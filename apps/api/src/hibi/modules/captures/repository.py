@@ -5,7 +5,8 @@ from uuid import UUID
 from sqlalchemy import func, select, tuple_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from hibi.modules.captures.models import CaptureModel, OutboxModel
+from hibi.modules.captures.models import CaptureModel, CaptureScenarioModel, OutboxModel
+from hibi.modules.captures.policies import ScenarioProposal
 from hibi.modules.captures.types import (
     CAPTURE_STATUS_COMPLETED,
     CAPTURE_STATUS_FAILED,
@@ -40,7 +41,9 @@ class CaptureRepository:
             return None
         return _to_capture(row)
 
-    async def get_by_idempotency_key(self, user_id: UUID, *, key: str) -> Capture | None:
+    async def get_by_idempotency_key(
+        self, user_id: UUID, *, key: str
+    ) -> Capture | None:
         stmt = select(CaptureModel).where(
             CaptureModel.user_id == user_id, CaptureModel.idempotency_key == key
         )
@@ -64,7 +67,9 @@ class CaptureRepository:
                 tuple_(CaptureModel.created_at, CaptureModel.id)
                 < (start_created_at, start_capture_id)
             )
-        stmt = stmt.order_by(CaptureModel.created_at.desc(), CaptureModel.id.desc()).limit(limit)
+        stmt = stmt.order_by(
+            CaptureModel.created_at.desc(), CaptureModel.id.desc()
+        ).limit(limit)
         result = await self._session.execute(stmt)
         return [_to_capture(row) for row in result.scalars().all()]
 
@@ -115,7 +120,9 @@ class CaptureRepository:
             .where(
                 CaptureModel.id == capture_id,
                 CaptureModel.user_id == user_id,
-                CaptureModel.status.in_([CAPTURE_STATUS_PENDING, CAPTURE_STATUS_FAILED]),
+                CaptureModel.status.in_(
+                    [CAPTURE_STATUS_PENDING, CAPTURE_STATUS_FAILED]
+                ),
             )
             .values(raw_text=raw_text, updated_at=func.now())
             .returning(CaptureModel)
@@ -149,7 +156,9 @@ class CaptureRepository:
     async def update_outbox_published(self, *, outbox_id: UUID) -> bool:
         stmt = (
             update(OutboxModel)
-            .where(OutboxModel.id == outbox_id, OutboxModel.status == OUTBOX_STATUS_PENDING)
+            .where(
+                OutboxModel.id == outbox_id, OutboxModel.status == OUTBOX_STATUS_PENDING
+            )
             .values(status=OUTBOX_STATUS_PUBLISHED, published_at=func.now())
             .returning(OutboxModel.id)
         )
@@ -215,6 +224,7 @@ class CaptureRepository:
         policy_version: str,
         question_version: str,
         clarification_text: str | None,
+        scenario: ScenarioProposal | None = None,
     ) -> Capture | None:
         stmt = (
             update(CaptureModel)
@@ -241,6 +251,23 @@ class CaptureRepository:
         row = result.scalar_one_or_none()
         if row is None:
             return None
+
+        if scenario is not None:
+            self._session.add(
+                CaptureScenarioModel(
+                    capture_id=row.id,
+                    user_id=row.user_id,
+                    route=scenario.route,
+                    status=scenario.status,
+                    title=scenario.title,
+                    amount=scenario.amount,
+                    remind_text=scenario.remind_text,
+                    policy_version=scenario.policy_version,
+                    created_at=func.now(),
+                    updated_at=func.now(),
+                )
+            )
+            await self._session.flush()
 
         return _to_capture(row)
 

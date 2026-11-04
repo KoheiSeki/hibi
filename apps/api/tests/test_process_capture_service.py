@@ -17,7 +17,13 @@ from hibi.ai.classification import (
 from hibi.ai.fake_clarification import FakeClarificationGenerator
 from hibi.ai.fake_classifier import FakeCaptureClassifier
 from hibi.ai.metrics import llm_call_count, reset_llm_call
-from hibi.modules.captures.policies import CAPTURE_ROUTE_POLICY_VERSION
+from hibi.modules.captures.policies import (
+    CAPTURE_ROUTE_POLICY_VERSION,
+    CAPTURE_SCENARIO_POLICY_VERSION,
+    CAPTURE_SCENARIO_STATUS_PROPOSED,
+    ScenarioProposal,
+    propose_capture_scenario,
+)
 from hibi.modules.captures.repository import CaptureRepository
 from hibi.modules.captures.service import CaptureService
 from hibi.modules.captures.types import (
@@ -42,6 +48,7 @@ class FakeProcessCaptureRepository:
         self.fail_processing = fail_processing
         self.transitions: list[tuple[str, str]] = []
         self.classifications: list[dict[str, object]] = []
+        self.scenario: ScenarioProposal | None = None
 
     async def get_by_capture_id(self, capture_id: UUID) -> Capture | None:
         if self.capture is None or self.capture.id != capture_id:
@@ -81,6 +88,7 @@ class FakeProcessCaptureRepository:
         policy_version: str,
         question_version: str,
         clarification_text: str | None = None,
+        scenario: ScenarioProposal | None = None,
     ) -> Capture | None:
         if self.fail_processing:
             raise RuntimeError("temporary processing failure")
@@ -114,6 +122,7 @@ class FakeProcessCaptureRepository:
             processed_at=datetime.now(UTC),
             clarification_text=clarification_text,
         )
+        self.scenario = scenario
         return self.capture
 
 
@@ -430,3 +439,70 @@ async def test_mark_processing_failed_does_not_overwrite_newer_generation() -> N
 
     assert repository.capture is not None
     assert repository.capture.status == CAPTURE_STATUS_PENDING
+
+
+def _proposal() -> ScenarioProposal:
+    proposal = propose_capture_scenario(route="reminder", raw_text="明日の 9 時に起こして")
+    assert proposal is not None
+    return proposal
+
+
+async def _complete(
+    repository: FakeProcessCaptureRepository,
+    capture: Capture,
+    *,
+    processing_generation: int = 1,
+    scenario: ScenarioProposal | None,
+) -> Capture | None:
+    return await repository.complete_capture_classification(
+        capture_id=capture.id,
+        processing_generation=processing_generation,
+        category="reminder",
+        route="reminder",
+        urgency="normal",
+        confidence=Decimal("0.9"),
+        policy_version=CAPTURE_ROUTE_POLICY_VERSION,
+        question_version=CAPTURE_QUESTION_VERSION,
+        clarification_text=None,
+        scenario=scenario,
+    )
+
+
+@pytest.mark.asyncio
+async def test_complete_capture_stores_proposed_scenario_for_same_generation() -> None:
+    capture = _capture(status=CAPTURE_STATUS_PROCESSING)
+    repository = FakeProcessCaptureRepository(capture)
+    proposal = _proposal()
+
+    completed = await _complete(repository, capture, scenario=proposal)
+
+    assert completed is not None
+    assert repository.scenario == proposal
+    assert repository.scenario.status == CAPTURE_SCENARIO_STATUS_PROPOSED
+    assert repository.scenario.policy_version == CAPTURE_SCENARIO_POLICY_VERSION
+
+
+@pytest.mark.asyncio
+async def test_complete_capture_does_not_store_scenario_for_other_generation() -> None:
+    capture = _capture(status=CAPTURE_STATUS_PROCESSING)
+    repository = FakeProcessCaptureRepository(capture)
+
+    completed = await _complete(repository, capture, processing_generation=2, scenario=_proposal())
+
+    assert completed is None
+    assert repository.scenario is None
+    assert repository.capture is not None
+    assert repository.capture.status == CAPTURE_STATUS_PROCESSING
+
+
+@pytest.mark.asyncio
+async def test_complete_capture_without_scenario_leaves_it_empty() -> None:
+    capture = _capture(status=CAPTURE_STATUS_PROCESSING)
+    repository = FakeProcessCaptureRepository(capture)
+
+    completed = await _complete(repository, capture, scenario=None)
+
+    assert completed is not None
+    assert repository.scenario is None
+    assert repository.capture is not None
+    assert repository.capture.status == CAPTURE_STATUS_COMPLETED
