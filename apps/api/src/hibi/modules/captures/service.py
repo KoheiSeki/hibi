@@ -29,6 +29,7 @@ from hibi.modules.captures.policies import (
     CAPTURE_ROUTE_POLICY_VERSION,
     decide_capture_route,
     normalize_classification,
+    propose_capture_scenario,
 )
 from hibi.modules.captures.repository import CaptureRepository
 from hibi.modules.captures.types import (
@@ -201,6 +202,8 @@ class CaptureService:
             )
             clarification_text = normalize_clarification_text(generated)
 
+        scenario = propose_capture_scenario(route=route, raw_text=capture.raw_text)
+
         await self._repository.complete_capture_classification(
             capture_id=capture_id,
             processing_generation=capture.processing_generation,
@@ -211,6 +214,7 @@ class CaptureService:
             policy_version=CAPTURE_ROUTE_POLICY_VERSION,
             question_version=normalized_classification.question_version,
             clarification_text=clarification_text,
+            scenario=scenario,
         )
 
     async def mark_processing_failed(self, capture_id: UUID, processing_generation: int) -> None:

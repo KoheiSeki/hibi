@@ -250,6 +250,7 @@ async def test_process_capture_keeps_low_confidence_category_and_clarifies_route
     assert repository.capture.route == "clarify"
     assert repository.capture.confidence == Decimal("0.69")
     assert repository.capture.clarification_text == "それはいつ買いますか？"  # noqa: RUF001
+    assert repository.scenario is None
     assert llm_call_count() == 1
 
 
@@ -265,6 +266,62 @@ async def test_process_capture_does_not_generate_clarification_for_high_confiden
     assert repository.capture.route == "shopping"
     assert repository.capture.clarification_text is None
     assert llm_call_count() == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("raw_text", "route", "title", "amount", "remind_text"),
+    [
+        ("牛乳を買う", "shopping", "牛乳", None, None),
+        ("明日の 9 時に起こして", "reminder", "起こして", None, "明日の 9 時"),
+        ("ランチ 1200 円", "expense", "ランチ", 1200, None),
+    ],
+)
+async def test_process_capture_proposes_scenario_for_confirmed_routes(
+    raw_text: str,
+    route: str,
+    title: str,
+    amount: int | None,
+    remind_text: str | None,
+) -> None:
+    reset_llm_call()
+    capture = _capture(raw_text=raw_text)
+    repository = FakeProcessCaptureRepository(capture)
+
+    await _service(repository).process_capture(capture.id, 1)
+
+    assert repository.capture is not None
+    assert repository.capture.status == CAPTURE_STATUS_COMPLETED
+    assert repository.capture.route == route
+    assert repository.scenario is not None
+    assert repository.scenario.status == CAPTURE_SCENARIO_STATUS_PROPOSED
+    assert repository.scenario.title == title
+    assert repository.scenario.amount == amount
+    assert repository.scenario.remind_text == remind_text
+    assert llm_call_count() == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("raw_text", "route"),
+    [
+        ("あとで読む記事", "note"),
+        ("今日どうだった", "chat"),
+    ],
+)
+async def test_process_capture_does_not_propose_scenario_for_note_or_chat(
+    raw_text: str,
+    route: str,
+) -> None:
+    capture = _capture(raw_text=raw_text)
+    repository = FakeProcessCaptureRepository(capture)
+
+    await _service(repository).process_capture(capture.id, 1)
+
+    assert repository.capture is not None
+    assert repository.capture.status == CAPTURE_STATUS_COMPLETED
+    assert repository.capture.route == route
+    assert repository.scenario is None
 
 
 @pytest.mark.asyncio
