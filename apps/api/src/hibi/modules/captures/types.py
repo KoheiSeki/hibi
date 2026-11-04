@@ -36,6 +36,7 @@ class Capture:
     clarification_text: str | None
     created_at: datetime
     updated_at: datetime
+    scenario: CaptureScenario | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,3 +78,13 @@ class OutboxEvent:
     id: UUID
     aggregate_id: UUID
     processing_generation: int
+
+
+@dataclass(frozen=True, slots=True)
+class CaptureScenario:
+    route: str
+    status: str
+    title: str
+    amount: int | None
+    remind_text: str | None
+    policy_version: str

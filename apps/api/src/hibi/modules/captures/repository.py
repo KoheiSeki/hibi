@@ -19,6 +19,7 @@ from hibi.modules.captures.types import (
     OUTBOX_STATUS_PENDING,
     OUTBOX_STATUS_PUBLISHED,
     Capture,
+    CaptureScenario,
     OutboxEvent,
 )
 
@@ -43,7 +44,8 @@ class CaptureRepository:
         row = result.scalar_one_or_none()
         if row is None:
             return None
-        return _to_capture(row)
+        scenario_row = await self.get_capture_scenario(user_id, capture_id=capture_id)
+        return _to_capture(row, scenario_row)
 
     async def get_by_idempotency_key(
         self, user_id: UUID, *, key: str
@@ -85,7 +87,20 @@ class CaptureRepository:
             CaptureModel.created_at.desc(), CaptureModel.id.desc()
         ).limit(limit)
         result = await self._session.execute(stmt)
-        return [_to_capture(row) for row in result.scalars().all()]
+        rows = result.scalars().all()
+        if not rows:
+            return []
+
+        scenario_result = await self._session.execute(
+            select(CaptureScenarioModel).where(
+                CaptureScenarioModel.user_id == user_id,
+                CaptureScenarioModel.capture_id.in_([row.id for row in rows]),
+            )
+        )
+        scenarios = {
+            scenario.capture_id: scenario for scenario in scenario_result.scalars()
+        }
+        return [_to_capture(row, scenarios.get(row.id)) for row in rows]
 
     async def list_pending_outbox_events(self, *, limit: int) -> list[OutboxEvent]:
         stmt = (
@@ -299,7 +314,20 @@ class CaptureRepository:
         return await self._session.scalar(stmt) is not None
 
 
-def _to_capture(row: CaptureModel) -> Capture:
+def _to_capture(
+    row: CaptureModel, scenario_row: CaptureScenarioModel | None = None
+) -> Capture:
+    scenario = None
+    if scenario_row is not None:
+        scenario = CaptureScenario(
+            route=scenario_row.route,
+            status=scenario_row.status,
+            title=scenario_row.title,
+            amount=scenario_row.amount,
+            remind_text=scenario_row.remind_text,
+            policy_version=scenario_row.policy_version,
+        )
+
     return Capture(
         id=row.id,
         user_id=row.user_id,
@@ -318,6 +346,7 @@ def _to_capture(row: CaptureModel) -> Capture:
         clarification_text=row.clarification_text,
         created_at=row.created_at,
         updated_at=row.updated_at,
+        scenario=scenario,
     )
 
 

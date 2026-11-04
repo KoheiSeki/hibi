@@ -26,3 +26,13 @@ class CaptureResponse(ApiModel):
     question_version: str | None = None
     processed_at: datetime | None = None
     clarification_text: str | None = None
+    scenario: ScenarioResponse | None = None
+
+
+class ScenarioResponse(ApiModel):
+    route: str
+    status: str
+    title: str
+    amount: int | None = None
+    remind_text: str | None = None
+    policy_version: str

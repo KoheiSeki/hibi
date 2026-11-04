@@ -94,6 +94,7 @@ export type CaptureResponse = {
    * Route
    */
   route?: string | null;
+  scenario?: ScenarioResponse | null;
   /**
    * Status
    */
@@ -222,6 +223,36 @@ export type ProtectedResourceResponse = {
    * Value
    */
   value: string;
+};
+
+/**
+ * ScenarioResponse
+ */
+export type ScenarioResponse = {
+  /**
+   * Amount
+   */
+  amount?: number | null;
+  /**
+   * Policyversion
+   */
+  policyVersion: string;
+  /**
+   * Remindtext
+   */
+  remindText?: string | null;
+  /**
+   * Route
+   */
+  route: string;
+  /**
+   * Status
+   */
+  status: string;
+  /**
+   * Title
+   */
+  title: string;
 };
 
 /**
@@ -521,6 +552,54 @@ export type RetryCaptureResponses = {
 
 export type RetryCaptureResponse =
   RetryCaptureResponses[keyof RetryCaptureResponses];
+
+export type AcceptCaptureScenarioData = {
+  body?: never;
+  path: {
+    /**
+     * Capture Id
+     */
+    capture_id: string;
+  };
+  query?: never;
+  url: "/api/v1/captures/{capture_id}/scenario/accept";
+};
+
+export type AcceptCaptureScenarioErrors = {
+  /**
+   * Authentication failed.
+   */
+  401: ProblemDetails;
+  /**
+   * The requested resource was not found.
+   */
+  404: ProblemDetails;
+  /**
+   * Conflict.
+   */
+  409: ProblemDetails;
+  /**
+   * Request validation failed.
+   */
+  422: ProblemDetails;
+  /**
+   * An unexpected server error occurred.
+   */
+  500: ProblemDetails;
+};
+
+export type AcceptCaptureScenarioError =
+  AcceptCaptureScenarioErrors[keyof AcceptCaptureScenarioErrors];
+
+export type AcceptCaptureScenarioResponses = {
+  /**
+   * Successful Response
+   */
+  200: ApiResponseCaptureResponse;
+};
+
+export type AcceptCaptureScenarioResponse =
+  AcceptCaptureScenarioResponses[keyof AcceptCaptureScenarioResponses];
 
 export type EchoMessageData = {
   body: EchoRequest;

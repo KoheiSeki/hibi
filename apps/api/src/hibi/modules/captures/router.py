@@ -16,11 +16,13 @@ from hibi.modules.captures.repository import CaptureRepository
 from hibi.modules.captures.schemas import (
     CaptureResponse,
     CreateCaptureRequest,
+    ScenarioResponse,
     UpdateCaptureRequest,
 )
 from hibi.modules.captures.service import CaptureService
 from hibi.modules.captures.types import (
     Capture,
+    CaptureScenario,
     CreateCaptureCommand,
     CreateCaptureResult,
     ListCapturesQuery,
@@ -72,9 +74,7 @@ async def create_capture(
     )
     result: CreateCaptureResult = await service.create_capture(command)
 
-    response.status_code = (
-        status.HTTP_202_ACCEPTED if result.created else status.HTTP_200_OK
-    )
+    response.status_code = status.HTTP_202_ACCEPTED if result.created else status.HTTP_200_OK
     response.headers["Location"] = f"/api/v1/captures/{result.capture.id}"
     return ApiResponse(data=_to_capture_response(result.capture))
 
@@ -227,11 +227,23 @@ def _to_capture_response(capture: Capture) -> CaptureResponse:
         category=capture.category,
         route=capture.route,
         urgency=capture.urgency,
-        confidence=(
-            float(capture.confidence) if capture.confidence is not None else None
-        ),
+        confidence=(float(capture.confidence) if capture.confidence is not None else None),
         policy_version=capture.policy_version,
         question_version=capture.question_version,
         processed_at=capture.processed_at,
         clarification_text=capture.clarification_text,
+        scenario=_to_scenario_response(capture.scenario),
+    )
+
+
+def _to_scenario_response(scenario: CaptureScenario | None) -> ScenarioResponse | None:
+    if scenario is None:
+        return None
+    return ScenarioResponse(
+        route=scenario.route,
+        status=scenario.status,
+        title=scenario.title,
+        amount=scenario.amount,
+        remind_text=scenario.remind_text,
+        policy_version=scenario.policy_version,
     )

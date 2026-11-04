@@ -9,6 +9,9 @@ import type {
 } from "./client";
 import { client } from "./client.gen";
 import type {
+  AcceptCaptureScenarioData,
+  AcceptCaptureScenarioErrors,
+  AcceptCaptureScenarioResponses,
   CreateCaptureData,
   CreateCaptureErrors,
   CreateCaptureResponses,
@@ -160,6 +163,26 @@ export const retryCapture = <ThrowOnError extends boolean = false>(
   >({
     security: [{ scheme: "bearer", type: "http" }],
     url: "/api/v1/captures/{capture_id}/retry",
+    ...options,
+  });
+
+/**
+ * Accept Capture Scenario
+ */
+export const acceptCaptureScenario = <ThrowOnError extends boolean = false>(
+  options: Options<AcceptCaptureScenarioData, ThrowOnError>,
+): RequestResult<
+  AcceptCaptureScenarioResponses,
+  AcceptCaptureScenarioErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    AcceptCaptureScenarioResponses,
+    AcceptCaptureScenarioErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/api/v1/captures/{capture_id}/scenario/accept",
     ...options,
   });
 

@@ -21,6 +21,7 @@ from hibi.modules.captures.router import _get_capture_service
 from hibi.modules.captures.types import (
     Capture,
     CapturePage,
+    CaptureScenario,
     CreateCaptureCommand,
     CreateCaptureResult,
     ListCapturesQuery,
@@ -244,6 +245,7 @@ def test_get_own_capture_returns_200() -> None:
     body = response.json()["data"]
     assert body["id"] == str(CAPTURE_ID)
     assert body["clarificationText"] is None
+    assert body["scenario"] is None
 
 
 def test_get_own_capture_returns_clarification_text() -> None:
@@ -252,6 +254,33 @@ def test_get_own_capture_returns_clarification_text() -> None:
     response = _client(fake).get(f"/api/v1/captures/{CAPTURE_ID}")
     assert response.status_code == 200
     assert response.json()["data"]["clarificationText"] == "それはいつ買いますか？"  # noqa: RUF001
+
+
+def test_get_own_capture_returns_scenario() -> None:
+    fake = FakeCaptureService()
+    fake.captures[CAPTURE_ID] = _capture(
+        status="completed",
+        scenario=CaptureScenario(
+            route="expense",
+            status="proposed",
+            title="ランチ",
+            amount=1200,
+            remind_text=None,
+            policy_version="capture-scenario-v1",
+        ),
+    )
+
+    response = _client(fake).get(f"/api/v1/captures/{CAPTURE_ID}")
+
+    assert response.status_code == 200
+    assert response.json()["data"]["scenario"] == {
+        "route": "expense",
+        "status": "proposed",
+        "title": "ランチ",
+        "amount": 1200,
+        "remindText": None,
+        "policyVersion": "capture-scenario-v1",
+    }
 
 
 @pytest.mark.parametrize("method", ["get", "patch", "delete"])
