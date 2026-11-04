@@ -6,7 +6,11 @@ from sqlalchemy import func, select, tuple_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hibi.modules.captures.models import CaptureModel, CaptureScenarioModel, OutboxModel
-from hibi.modules.captures.policies import ScenarioProposal
+from hibi.modules.captures.policies import (
+    CAPTURE_SCENARIO_STATUS_ACCEPTED,
+    CAPTURE_SCENARIO_STATUS_PROPOSED,
+    ScenarioProposal,
+)
 from hibi.modules.captures.types import (
     CAPTURE_STATUS_COMPLETED,
     CAPTURE_STATUS_FAILED,
@@ -52,6 +56,16 @@ class CaptureRepository:
         if row is None:
             return None
         return _to_capture(row)
+
+    async def get_capture_scenario(
+        self, user_id: UUID, *, capture_id: UUID
+    ) -> CaptureScenarioModel | None:
+        stmt = select(CaptureScenarioModel).where(
+            CaptureScenarioModel.capture_id == capture_id,
+            CaptureScenarioModel.user_id == user_id,
+        )
+        result = await self._session.execute(stmt)
+        return result.scalar_one_or_none()
 
     async def list_for_user(
         self,
@@ -270,6 +284,19 @@ class CaptureRepository:
             await self._session.flush()
 
         return _to_capture(row)
+
+    async def accept_capture_scenario(self, user_id: UUID, *, capture_id: UUID) -> bool:
+        stmt = (
+            update(CaptureScenarioModel)
+            .where(
+                CaptureScenarioModel.user_id == user_id,
+                CaptureScenarioModel.capture_id == capture_id,
+                CaptureScenarioModel.status == CAPTURE_SCENARIO_STATUS_PROPOSED,
+            )
+            .values(status=CAPTURE_SCENARIO_STATUS_ACCEPTED, updated_at=func.now())
+            .returning(CaptureScenarioModel)
+        )
+        return await self._session.scalar(stmt) is not None
 
 
 def _to_capture(row: CaptureModel) -> Capture:

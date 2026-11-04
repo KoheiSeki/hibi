@@ -17,6 +17,7 @@ from hibi.modules.captures.errors import (
     IdempotencyKeyInvalidError,
     IdempotencyKeyRequiredError,
     MalformedCursorError,
+    ScenarioNotAcceptableError,
 )
 from hibi.modules.captures.service import CaptureService
 from hibi.modules.captures.types import (
@@ -52,6 +53,7 @@ class FakeCaptureRepository:
         self._raise_on_create: IntegrityError | None = None
         self._row_after_conflict: Capture | None = None
         self.retry_outbox_ids: list[UUID] = []
+        self.scenarios: dict[tuple[UUID, UUID], str] = {}
 
     def fail_create_then_return(self, existing: Capture) -> None:
         self._raise_on_create = _integrity_error()
@@ -181,6 +183,18 @@ class FakeCaptureRepository:
             self.retry_outbox_ids.append(outbox_id)
             return retried
         return None
+
+    async def get_capture_scenario(self, user_id: UUID, *, capture_id: UUID) -> object | None:
+        if (user_id, capture_id) not in self.scenarios:
+            return None
+        return object()
+
+    async def accept_capture_scenario(self, user_id: UUID, *, capture_id: UUID) -> bool:
+        key = (user_id, capture_id)
+        if self.scenarios.get(key) != "proposed":
+            return False
+        self.scenarios[key] = "accepted"
+        return True
 
     async def delete_capture(self, user_id: UUID, *, capture_id: UUID) -> bool:
         for index, capture in enumerate(self.captures):
@@ -395,6 +409,54 @@ async def test_retry_capture_hides_foreign_capture_as_not_found() -> None:
 
     with pytest.raises(CaptureNotFoundError):
         await service.retry_capture(uuid4(), created.capture.id)
+
+
+@pytest.mark.asyncio
+async def test_accept_capture_scenario_marks_proposed_scenario_accepted() -> None:
+    service, repo, _session = _service()
+    user_id = uuid4()
+    created = await service.create_capture(_create_command(user_id))
+    repo.captures[0] = replace(created.capture, status="completed")
+    repo.scenarios[(user_id, created.capture.id)] = "proposed"
+
+    accepted = await service.accept_capture_scenario(user_id, created.capture.id)
+
+    assert accepted.status == "completed"
+    assert repo.scenarios[(user_id, created.capture.id)] == "accepted"
+
+
+@pytest.mark.asyncio
+async def test_accept_capture_scenario_hides_missing_scenario_as_not_found() -> None:
+    service, _repo, _session = _service()
+    user_id = uuid4()
+    created = await service.create_capture(_create_command(user_id))
+
+    with pytest.raises(CaptureNotFoundError):
+        await service.accept_capture_scenario(user_id, created.capture.id)
+
+
+@pytest.mark.asyncio
+async def test_accept_capture_scenario_hides_foreign_capture_as_not_found() -> None:
+    service, repo, _session = _service()
+    owner_id = uuid4()
+    created = await service.create_capture(_create_command(owner_id))
+    repo.scenarios[(owner_id, created.capture.id)] = "proposed"
+
+    with pytest.raises(CaptureNotFoundError):
+        await service.accept_capture_scenario(uuid4(), created.capture.id)
+
+    assert repo.scenarios[(owner_id, created.capture.id)] == "proposed"
+
+
+@pytest.mark.asyncio
+async def test_accept_capture_scenario_rejects_already_accepted_scenario() -> None:
+    service, repo, _session = _service()
+    user_id = uuid4()
+    created = await service.create_capture(_create_command(user_id))
+    repo.scenarios[(user_id, created.capture.id)] = "accepted"
+
+    with pytest.raises(ScenarioNotAcceptableError):
+        await service.accept_capture_scenario(user_id, created.capture.id)
 
 
 @pytest.mark.asyncio

@@ -63,3 +63,10 @@ class CaptureNotRetryableError(ApplicationError):
     title = "Capture cannot be retried"
     status = 409
     detail = "Only failed captures can be retried."
+
+
+class ScenarioNotAcceptableError(ApplicationError):
+    problem_type = "scenario-not-acceptable"
+    title = "Scenario cannot be accepted"
+    status = 409
+    detail = "Only a proposed scenario can be accepted."

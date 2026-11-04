@@ -23,6 +23,7 @@ from hibi.modules.captures.errors import (
     IdempotencyKeyInvalidError,
     IdempotencyKeyRequiredError,
     MalformedCursorError,
+    ScenarioNotAcceptableError,
 )
 from hibi.modules.captures.policies import (
     CAPTURE_ROUTE_CLARIFY,
@@ -224,6 +225,23 @@ class CaptureService:
             expected_status=CAPTURE_STATUS_PENDING,
             status=CAPTURE_STATUS_FAILED,
         )
+
+    async def accept_capture_scenario(self, user_id: UUID, capture_id: UUID) -> Capture:
+        is_accepted = await self._repository.accept_capture_scenario(user_id, capture_id=capture_id)
+        if is_accepted:
+            capture = await self._repository.get_by_id(user_id, capture_id=capture_id)
+            if capture is None:
+                raise CaptureNotFoundError(capture_id)
+            return capture
+
+        current = await self._repository.get_by_id(user_id, capture_id=capture_id)
+        scenario = None
+        if current is not None:
+            scenario = await self._repository.get_capture_scenario(user_id, capture_id=capture_id)
+        if current is None or scenario is None:
+            raise CaptureNotFoundError(capture_id)
+
+        raise ScenarioNotAcceptableError()
 
     def _replay_or_conflict(
         self, existing: Capture | None, request_hash: str

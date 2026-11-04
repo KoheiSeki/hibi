@@ -15,6 +15,7 @@ from hibi.modules.captures.errors import (
     IdempotencyKeyConflictError,
     IdempotencyKeyRequiredError,
     MalformedCursorError,
+    ScenarioNotAcceptableError,
 )
 from hibi.modules.captures.router import _get_capture_service
 from hibi.modules.captures.types import (
@@ -63,6 +64,7 @@ class FakeCaptureService:
         self.captures: dict[UUID, Capture] = {}
         self.created = True
         self.create_error: Exception | None = None
+        self.scenarios: dict[UUID, str] = {}
 
     async def create_capture(self, command: CreateCaptureCommand) -> CreateCaptureResult:
         if self.create_error is not None:
@@ -130,6 +132,18 @@ class FakeCaptureService:
         self.captures[capture_id] = retried
         return retried
 
+    async def accept_capture_scenario(self, user_id: UUID, capture_id: UUID) -> Capture:
+        capture = self.captures.get(capture_id)
+        if capture is None or capture.user_id != user_id:
+            raise CaptureNotFoundError(capture_id)
+        scenario_status = self.scenarios.get(capture_id)
+        if scenario_status is None:
+            raise CaptureNotFoundError(capture_id)
+        if scenario_status != "proposed":
+            raise ScenarioNotAcceptableError()
+        self.scenarios[capture_id] = "accepted"
+        return capture
+
 
 def _client(fake: FakeCaptureService, *, authenticated: bool = True) -> TestClient:
     app = create_app()
@@ -155,6 +169,7 @@ def test_capture_endpoints_reject_missing_token() -> None:
         client.patch(path, json={"rawText": "低脂肪乳を買う"}),
         client.delete(path),
         client.post(f"{path}/retry"),
+        client.post(f"{path}/scenario/accept"),
     ]
     for response in requests:
         assert response.status_code == 401
@@ -328,6 +343,51 @@ def test_retry_foreign_capture_is_hidden_as_not_found() -> None:
 
     assert response.status_code == 404
     assert response.json()["type"].endswith("/capture-not-found")
+
+
+def test_accept_proposed_scenario_returns_completed_capture() -> None:
+    fake = FakeCaptureService()
+    fake.captures[CAPTURE_ID] = _capture(status="completed")
+    fake.scenarios[CAPTURE_ID] = "proposed"
+
+    response = _client(fake).post(f"/api/v1/captures/{CAPTURE_ID}/scenario/accept")
+
+    assert response.status_code == 200
+    assert response.json()["data"]["status"] == "completed"
+    assert fake.scenarios[CAPTURE_ID] == "accepted"
+
+
+def test_accept_missing_scenario_returns_404() -> None:
+    fake = FakeCaptureService()
+    fake.captures[CAPTURE_ID] = _capture(status="completed")
+
+    response = _client(fake).post(f"/api/v1/captures/{CAPTURE_ID}/scenario/accept")
+
+    assert response.status_code == 404
+    assert response.json()["type"].endswith("/capture-not-found")
+
+
+def test_accept_foreign_scenario_is_hidden_as_not_found() -> None:
+    fake = FakeCaptureService()
+    fake.captures[CAPTURE_ID] = _capture(user_id=OTHER_ID, status="completed")
+    fake.scenarios[CAPTURE_ID] = "proposed"
+
+    response = _client(fake).post(f"/api/v1/captures/{CAPTURE_ID}/scenario/accept")
+
+    assert response.status_code == 404
+    assert response.json()["type"].endswith("/capture-not-found")
+    assert fake.scenarios[CAPTURE_ID] == "proposed"
+
+
+def test_accept_already_accepted_scenario_returns_409() -> None:
+    fake = FakeCaptureService()
+    fake.captures[CAPTURE_ID] = _capture(status="completed")
+    fake.scenarios[CAPTURE_ID] = "accepted"
+
+    response = _client(fake).post(f"/api/v1/captures/{CAPTURE_ID}/scenario/accept")
+
+    assert response.status_code == 409
+    assert response.json()["type"].endswith("/scenario-not-acceptable")
 
 
 def test_list_captures_rejects_malformed_cursor() -> None:

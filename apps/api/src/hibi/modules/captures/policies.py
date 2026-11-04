@@ -12,6 +12,7 @@ CAPTURE_CATEGORIES = frozenset({"shopping", "reminder", "expense", "note", "chat
 
 CAPTURE_SCENARIO_POLICY_VERSION = "capture-scenario-v1"
 CAPTURE_SCENARIO_STATUS_PROPOSED = "proposed"
+CAPTURE_SCENARIO_STATUS_ACCEPTED = "accepted"
 CAPTURE_SCENARIO_ROUTES = frozenset({"shopping", "reminder", "expense"})
 
 _EXACT_SCENARIOS: dict[tuple[str, str], tuple[str, int | None, str | None]] = {

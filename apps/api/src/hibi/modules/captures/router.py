@@ -72,7 +72,9 @@ async def create_capture(
     )
     result: CreateCaptureResult = await service.create_capture(command)
 
-    response.status_code = status.HTTP_202_ACCEPTED if result.created else status.HTTP_200_OK
+    response.status_code = (
+        status.HTTP_202_ACCEPTED if result.created else status.HTTP_200_OK
+    )
     response.headers["Location"] = f"/api/v1/captures/{result.capture.id}"
     return ApiResponse(data=_to_capture_response(result.capture))
 
@@ -97,6 +99,29 @@ async def retry_capture(
     service: CaptureService = Depends(_get_capture_service),
 ):
     capture = await service.retry_capture(principal.user_id, capture_id)
+    response.headers["Location"] = f"/api/v1/captures/{capture.id}"
+    return ApiResponse(data=_to_capture_response(capture))
+
+
+@router.post(
+    "/{capture_id}/scenario/accept",
+    operation_id="acceptCaptureScenario",
+    response_model=ApiResponse[CaptureResponse],
+    responses=problem_responses(
+        status.HTTP_401_UNAUTHORIZED,
+        status.HTTP_404_NOT_FOUND,
+        status.HTTP_409_CONFLICT,
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+    ),
+)
+async def accept_capture_scenario(
+    capture_id: UUID,
+    response: Response,
+    principal: Principal = Depends(get_principal),
+    service: CaptureService = Depends(_get_capture_service),
+):
+    capture = await service.accept_capture_scenario(principal.user_id, capture_id)
     response.headers["Location"] = f"/api/v1/captures/{capture.id}"
     return ApiResponse(data=_to_capture_response(capture))
 
@@ -202,7 +227,9 @@ def _to_capture_response(capture: Capture) -> CaptureResponse:
         category=capture.category,
         route=capture.route,
         urgency=capture.urgency,
-        confidence=(float(capture.confidence) if capture.confidence is not None else None),
+        confidence=(
+            float(capture.confidence) if capture.confidence is not None else None
+        ),
         policy_version=capture.policy_version,
         question_version=capture.question_version,
         processed_at=capture.processed_at,
