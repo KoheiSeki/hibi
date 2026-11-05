@@ -141,6 +141,8 @@
 
 ## Week 8: 検索
 
+方針は [26-week8-search.md](./26-week8-search.md)。
+
 - pgvector embeddingとRAGを実装する
 - embedding modelとversionを記録する
 - ユーザー条件付きvector検索を実装する
