@@ -1,6 +1,7 @@
 "use server";
 
 import {
+	acceptCaptureScenarioFromApi,
 	createCaptureFromApi,
 	deleteCaptureFromApi,
 	getCaptureFromApi,
@@ -9,6 +10,7 @@ import {
 	updateCaptureFromApi,
 } from "@/lib/api/capture";
 import type {
+	AcceptCaptureScenarioActionState,
 	CaptureFieldErrors,
 	CreateCaptureActionState,
 	DeleteCaptureActionState,
@@ -122,6 +124,29 @@ export async function retryCaptureAction(
 		status: "success",
 		data: result.data,
 		message: "もう一度整えています。",
+	};
+}
+
+export async function acceptCaptureScenarioAction(
+	captureId: string,
+): Promise<AcceptCaptureScenarioActionState> {
+	if (typeof captureId !== "string" || captureId.length === 0) {
+		return {
+			status: "error",
+			message: "追加できませんでした。",
+		};
+	}
+
+	const result = await acceptCaptureScenarioFromApi(captureId);
+	if (!result.ok) {
+		return toActionErrorState(result.error);
+	}
+
+	revalidatePath("/captures");
+	revalidatePath(`/captures/${captureId}`);
+	return {
+		status: "success",
+		data: result.data,
 	};
 }
 

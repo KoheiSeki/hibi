@@ -172,6 +172,52 @@ describe("Capture presentation", () => {
 		expect(failed).toContain("もう一度整える");
 	});
 
+	it("shows a clarification instead of the scenario action", () => {
+		const html = renderToStaticMarkup(
+			<CaptureDetailEditorView
+				defaultValue="牛乳を買う"
+				timeLabel="10月2日 14:02"
+				clarificationText="それはいつ買いますか？"
+				scenarioSummary="買い物の牛乳"
+				acceptButtonProps={{ type: "button" }}
+			/>,
+		);
+
+		expect(html).toContain("それはいつ買いますか？");
+		expect(html).not.toContain("買い物の牛乳");
+		expect(html).not.toContain("追加する");
+	});
+
+	it("shows a proposed scenario summary and accept button", () => {
+		const html = renderToStaticMarkup(
+			<CaptureDetailEditorView
+				defaultValue="ランチ 1200 円"
+				timeLabel="10月2日 14:02"
+				scenarioSummary="ランチ 1,200円"
+				acceptButtonProps={{ type: "button" }}
+			/>,
+		);
+
+		expect(html).toContain("ランチ 1,200円");
+		expect(html).toContain("追加する");
+		expect(html).not.toContain("追加しました");
+	});
+
+	it("shows an accepted scenario without the accept button", () => {
+		const html = renderToStaticMarkup(
+			<CaptureDetailEditorView
+				defaultValue="牛乳を買う"
+				timeLabel="10月2日 14:02"
+				scenarioSummary="牛乳"
+				scenarioAccepted
+			/>,
+		);
+
+		expect(html).toContain("牛乳");
+		expect(html).toContain("追加しました");
+		expect(html).not.toContain("追加する");
+	});
+
 	it("shows a delete failure beside the delete button", () => {
 		const html = renderToStaticMarkup(
 			<CaptureDetailEditorView

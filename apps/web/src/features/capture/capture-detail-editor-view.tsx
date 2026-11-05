@@ -17,10 +17,16 @@ type CaptureDetailEditorViewProps = {
 	deleteButtonProps?: Omit<ComponentProps<typeof Button>, "children">;
 	pollingRetryButtonProps?: Omit<ComponentProps<typeof Button>, "children">;
 	retryButtonProps?: Omit<ComponentProps<typeof Button>, "children">;
+	acceptButtonProps?: Omit<ComponentProps<typeof Button>, "children">;
+	clarificationText?: string | null;
+	scenarioSummary?: string;
+	scenarioAccepted?: boolean;
 	editingDisabled?: boolean;
 	updatePending?: boolean;
 	deletePending?: boolean;
 	retryPending?: boolean;
+	acceptPending?: boolean;
+	acceptError?: string;
 };
 
 export function CaptureDetailEditorView({
@@ -36,10 +42,16 @@ export function CaptureDetailEditorView({
 	deleteButtonProps,
 	pollingRetryButtonProps,
 	retryButtonProps,
+	acceptButtonProps,
+	clarificationText,
+	scenarioSummary,
+	scenarioAccepted = false,
 	editingDisabled = false,
 	updatePending = false,
 	deletePending = false,
 	retryPending = false,
+	acceptPending = false,
+	acceptError,
 }: CaptureDetailEditorViewProps) {
 	const errorId = fieldError ? "capture-detail-raw-text-error" : undefined;
 	const deleteErrorId = errorMessage
@@ -129,6 +141,35 @@ export function CaptureDetailEditorView({
 
 				{message ? (
 					<div className="text-sm text-[#5A6A62]">{message}</div>
+				) : null}
+
+				{clarificationText ? (
+					<p className="text-sm leading-6 text-[#5A6A62]">{clarificationText}</p>
+				) : scenarioSummary ? (
+					<div>
+						<p className="text-sm leading-6 text-[#5A6A62]">{scenarioSummary}</p>
+						{scenarioAccepted ? (
+							<p className="mt-2 text-sm leading-6 text-[#5A6A62]">追加しました</p>
+						) : null}
+						{acceptButtonProps ? (
+							<>
+								{acceptError ? (
+									<p className="mt-2 text-sm text-destructive" role="alert">
+										{acceptError}
+									</p>
+								) : null}
+								<Button
+									{...acceptButtonProps}
+									type="button"
+									variant="outline"
+									disabled={acceptPending}
+									className="mt-3 h-10 rounded-full border-[#D5E3D9] bg-[#F7FBF8] px-5 text-[#1E6B43]"
+								>
+									{acceptPending ? "追加しています" : "追加する"}
+								</Button>
+							</>
+						) : null}
+					</div>
 				) : null}
 
 				<Button

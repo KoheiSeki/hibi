@@ -3,6 +3,7 @@ import "server-only";
 import {
 	type ApiResponseWithMetaListCaptureResponseCursorMeta,
 	type CaptureResponse,
+	acceptCaptureScenario,
 	createCapture,
 	deleteCapture,
 	getCapture,
@@ -116,6 +117,24 @@ export async function retryCaptureFromApi(
 	}
 
 	const result = await retryCapture({
+		baseUrl: context.baseUrl,
+		auth: context.accessToken,
+		path: {
+			capture_id: captureId,
+		},
+	});
+	return normalizeGeneratedResult(result);
+}
+
+export async function acceptCaptureScenarioFromApi(
+	captureId: string,
+): Promise<ApiResult<CaptureResponse>> {
+	const context = await getServerApiContext();
+	if (!context.ok) {
+		return context;
+	}
+
+	const result = await acceptCaptureScenario({
 		baseUrl: context.baseUrl,
 		auth: context.accessToken,
 		path: {

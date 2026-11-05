@@ -1,8 +1,10 @@
 "use client";
 
+import type { CaptureResponse, ScenarioResponse } from "@hibi/api-client";
 import { useActionState, useCallback, useState, useTransition } from "react";
 
 import {
+	acceptCaptureScenarioAction,
 	deleteCaptureAction,
 	retryCaptureAction,
 	updateCaptureAction,
@@ -13,6 +15,7 @@ import {
 	captureStatusMessage,
 	isCaptureProcessing,
 } from "./capture-processing-status";
+import { scenarioSummary } from "./scenario-summary";
 import { useCapturePolling } from "./use-capture-polling";
 
 type CaptureDetailEditorProps = {
@@ -20,6 +23,8 @@ type CaptureDetailEditorProps = {
 	defaultValue: string;
 	initialStatus: string;
 	timeLabel: string;
+	initialClarificationText?: string | null;
+	initialScenario?: ScenarioResponse | null;
 };
 
 export function CaptureDetailEditor({
@@ -27,6 +32,8 @@ export function CaptureDetailEditor({
 	defaultValue,
 	initialStatus,
 	timeLabel,
+	initialClarificationText,
+	initialScenario,
 }: CaptureDetailEditorProps) {
 	const [status, setStatus] = useState(initialStatus);
 	const [state, formAction, pending] = useActionState(
@@ -37,18 +44,26 @@ export function CaptureDetailEditor({
 	const [deleteError, setDeleteError] = useState<string>();
 	const [retryPending, startRetryTransition] = useTransition();
 	const [retryError, setRetryError] = useState<string>();
-	const handlePolledCapture = useCallback(
-		(capture: { status: string }) => setStatus(capture.status),
-		[],
+	const [clarificationText, setClarificationText] = useState<
+		string | null | undefined
+	>(initialClarificationText);
+	const [scenario, setScenario] = useState<ScenarioResponse | null | undefined>(
+		initialScenario,
 	);
-	const {
-		error: pollingError,
-		retryPolling,
-	} = useCapturePolling({
+	const handlePolledCapture = useCallback((capture: CaptureResponse) => {
+		setStatus(capture.status);
+		setClarificationText(capture.clarificationText);
+		setScenario(capture.scenario);
+	}, []);
+	const { error: pollingError, retryPolling } = useCapturePolling({
 		captureIds: isCaptureProcessing(status) ? [captureId] : [],
 		onCapture: handlePolledCapture,
 	});
-	const editingDisabled = status === "processing" || status === "completed";
+	const [acceptPending, startAcceptTransition] = useTransition();
+	const [acceptError, setAcceptError] = useState<string>();
+	const completed = status === "completed";
+	const showClarification = completed && Boolean(clarificationText);
+	const visibleScenario = completed && !showClarification ? scenario : null;
 
 	function handleDelete() {
 		if (!window.confirm("この記録を削除しますか？")) {
@@ -63,6 +78,22 @@ export function CaptureDetailEditor({
 			}
 		});
 	}
+
+	function handleAccept() {
+		setAcceptError(undefined);
+		startAcceptTransition(async () => {
+			const result = await acceptCaptureScenarioAction(captureId);
+			if (result.status === "error") {
+				setAcceptError(result.message);
+				return;
+			}
+			if (result.status === "success") {
+				setScenario(result.data.scenario);
+			}
+		});
+	}
+
+	const editingDisabled = status === "processing" || status === "completed";
 
 	function handleRetry() {
 		setRetryError(undefined);
@@ -95,6 +126,18 @@ export function CaptureDetailEditor({
 			retryButtonProps={
 				status === "failed" ? { onClick: handleRetry } : undefined
 			}
+			clarificationText={showClarification ? clarificationText : undefined}
+			scenarioSummary={
+				visibleScenario ? scenarioSummary(visibleScenario) : undefined
+			}
+			scenarioAccepted={visibleScenario?.status === "accepted"}
+			acceptButtonProps={
+				visibleScenario?.status === "proposed"
+					? { onClick: handleAccept }
+					: undefined
+			}
+			acceptPending={acceptPending}
+			acceptError={acceptError}
 			editingDisabled={editingDisabled}
 			updatePending={pending}
 			updateFormProps={{ action: formAction }}

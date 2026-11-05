@@ -40,6 +40,8 @@ export default async function CaptureDetailPage({
 				defaultValue={result.data.rawText}
 				initialStatus={result.data.status}
 				timeLabel={formatJstDateTime(result.data.createdAt)}
+				initialClarificationText={result.data.clarificationText}
+				initialScenario={result.data.scenario}
 			/>
 		</main>
 	);
