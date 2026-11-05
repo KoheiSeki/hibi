@@ -47,9 +47,7 @@ class CaptureRepository:
         scenario_row = await self.get_capture_scenario(user_id, capture_id=capture_id)
         return _to_capture(row, scenario_row)
 
-    async def get_by_idempotency_key(
-        self, user_id: UUID, *, key: str
-    ) -> Capture | None:
+    async def get_by_idempotency_key(self, user_id: UUID, *, key: str) -> Capture | None:
         stmt = select(CaptureModel).where(
             CaptureModel.user_id == user_id, CaptureModel.idempotency_key == key
         )
@@ -83,9 +81,7 @@ class CaptureRepository:
                 tuple_(CaptureModel.created_at, CaptureModel.id)
                 < (start_created_at, start_capture_id)
             )
-        stmt = stmt.order_by(
-            CaptureModel.created_at.desc(), CaptureModel.id.desc()
-        ).limit(limit)
+        stmt = stmt.order_by(CaptureModel.created_at.desc(), CaptureModel.id.desc()).limit(limit)
         result = await self._session.execute(stmt)
         rows = result.scalars().all()
         if not rows:
@@ -97,9 +93,7 @@ class CaptureRepository:
                 CaptureScenarioModel.capture_id.in_([row.id for row in rows]),
             )
         )
-        scenarios = {
-            scenario.capture_id: scenario for scenario in scenario_result.scalars()
-        }
+        scenarios = {scenario.capture_id: scenario for scenario in scenario_result.scalars()}
         return [_to_capture(row, scenarios.get(row.id)) for row in rows]
 
     async def list_pending_outbox_events(self, *, limit: int) -> list[OutboxEvent]:
@@ -149,9 +143,7 @@ class CaptureRepository:
             .where(
                 CaptureModel.id == capture_id,
                 CaptureModel.user_id == user_id,
-                CaptureModel.status.in_(
-                    [CAPTURE_STATUS_PENDING, CAPTURE_STATUS_FAILED]
-                ),
+                CaptureModel.status.in_([CAPTURE_STATUS_PENDING, CAPTURE_STATUS_FAILED]),
             )
             .values(raw_text=raw_text, updated_at=func.now())
             .returning(CaptureModel)
@@ -185,9 +177,7 @@ class CaptureRepository:
     async def update_outbox_published(self, *, outbox_id: UUID) -> bool:
         stmt = (
             update(OutboxModel)
-            .where(
-                OutboxModel.id == outbox_id, OutboxModel.status == OUTBOX_STATUS_PENDING
-            )
+            .where(OutboxModel.id == outbox_id, OutboxModel.status == OUTBOX_STATUS_PENDING)
             .values(status=OUTBOX_STATUS_PUBLISHED, published_at=func.now())
             .returning(OutboxModel.id)
         )
@@ -314,9 +304,7 @@ class CaptureRepository:
         return await self._session.scalar(stmt) is not None
 
 
-def _to_capture(
-    row: CaptureModel, scenario_row: CaptureScenarioModel | None = None
-) -> Capture:
+def _to_capture(row: CaptureModel, scenario_row: CaptureScenarioModel | None = None) -> Capture:
     scenario = None
     if scenario_row is not None:
         scenario = CaptureScenario(
