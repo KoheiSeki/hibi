@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     open_ai_model: str = ""
     open_ai_timeout_seconds: float = 30.0
 
+    open_ai_embedding_api_key: SecretStr = SecretStr("")
+    open_ai_embedding_base_url: str = ""
+    open_ai_embedding_model: str = ""
+
     @property
     def allowed_jwt_algorithms(self) -> frozenset[str]:
         algorithms = frozenset(

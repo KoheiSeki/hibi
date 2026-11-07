@@ -14,6 +14,7 @@ from hibi.ai.classification import (
     ClarificationGenerator,
     normalize_clarification_text,
 )
+from hibi.ai.embedding import Embedding, TextEmbedder
 from hibi.modules.captures.errors import (
     CaptureNotEditableError,
     CaptureNotFoundError,
@@ -57,11 +58,13 @@ class CaptureService:
         repository: CaptureRepository,
         classifier: CaptureClassifier,
         generator: ClarificationGenerator,
+        embedder: TextEmbedder,
     ) -> None:
         self._session = session
         self._repository = repository
         self._classifier = classifier
         self._generator = generator
+        self._embedder = embedder
 
     async def create_capture(self, command: CreateCaptureCommand) -> CreateCaptureResult:
         idempotency_key = command.idempotency_key
@@ -205,6 +208,13 @@ class CaptureService:
 
         scenario = propose_capture_scenario(route=route, raw_text=capture.raw_text)
 
+        existing = await self._repository.has_same_content_embedding(
+            capture.user_id, capture_id=capture_id, text=capture.raw_text.strip()
+        )
+        embedding: Embedding | None = None
+        if existing:
+            embedding = await self._embedder.embed_text(capture.raw_text)
+
         await self._repository.complete_capture_classification(
             capture_id=capture_id,
             processing_generation=capture.processing_generation,
@@ -216,6 +226,7 @@ class CaptureService:
             question_version=normalized_classification.question_version,
             clarification_text=clarification_text,
             scenario=scenario,
+            embedding=embedding,
         )
 
     async def mark_processing_failed(self, capture_id: UUID, processing_generation: int) -> None:

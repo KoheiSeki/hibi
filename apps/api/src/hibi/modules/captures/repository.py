@@ -340,6 +340,16 @@ class CaptureRepository:
         )
         return await self._session.scalar(stmt) is not None
 
+    async def has_same_content_embedding(
+        self, user_id: UUID, *, capture_id: UUID, text: str
+    ) -> bool:
+        stmt = select(CaptureEmbeddingModel).where(
+            CaptureEmbeddingModel.capture_id == capture_id,
+            CaptureEmbeddingModel.user_id == user_id,
+            CaptureEmbeddingModel.content_hash == hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        )
+        return await self._session.scalar(stmt) is not None
+
 
 def _to_capture(row: CaptureModel, scenario_row: CaptureScenarioModel | None = None) -> Capture:
     scenario = None
