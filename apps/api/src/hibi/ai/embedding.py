@@ -13,5 +13,10 @@ class Embedding:
     version: str
 
 
+@dataclass(frozen=True, slots=True)
+class EmbeddingProviderError(Exception):
+    pass
+
+
 class TextEmbedder(Protocol):
     async def embed_text(self, text: str) -> Embedding: ...
