@@ -2,6 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import DateTime, Numeric, func
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -67,5 +68,21 @@ class CaptureScenarioModel(Base):
     amount: Mapped[int | None] = mapped_column()
     remind_text: Mapped[str | None] = mapped_column()
     policy_version: Mapped[str] = mapped_column()
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CaptureEmbeddingModel(Base):
+    __tablename__ = "capture_embeddings"
+    __table_args__ = {"schema": "app"}  # noqa: RUF012
+
+    capture_id: Mapped[UUID] = mapped_column(primary_key=True)
+    user_id: Mapped[UUID] = mapped_column()
+    content_text: Mapped[str] = mapped_column()
+    content_hash: Mapped[str] = mapped_column()
+    embedding: Mapped[list[float]] = mapped_column(Vector(8))
+    embedding_model: Mapped[str] = mapped_column()
+    embedding_dimensions: Mapped[int] = mapped_column()
+    embedding_version: Mapped[str] = mapped_column()
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

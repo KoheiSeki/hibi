@@ -1,3 +1,4 @@
+import hashlib
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -9,9 +10,16 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from hibi.ai.classification import CAPTURE_QUESTION_VERSION
+from hibi.ai.embedding import CAPTURE_EMBED_DIMENSIONS, CAPTURE_EMBED_VERSION, Embedding
+from hibi.ai.fake_embedder import CAPTURE_EMBED_FAKE_MODEL
 from hibi.core.config import get_settings
 from hibi.db.engine import dispose_engine, get_engine
-from hibi.modules.captures.models import CaptureModel, CaptureScenarioModel, OutboxModel
+from hibi.modules.captures.models import (
+    CaptureEmbeddingModel,
+    CaptureModel,
+    CaptureScenarioModel,
+    OutboxModel,
+)
 from hibi.modules.captures.policies import (
     CAPTURE_ROUTE_POLICY_VERSION,
     CAPTURE_SCENARIO_STATUS_PROPOSED,
@@ -411,12 +419,22 @@ async def test_retry_non_failed_capture_does_not_create_outbox(
     assert len(after) == len(before)
 
 
+def _embedding(vector: tuple[float, ...] = (1, 0, 0, 0, 0, 0, 0, 0)) -> Embedding:
+    return Embedding(
+        vector=vector,
+        model=CAPTURE_EMBED_FAKE_MODEL,
+        dimensions=CAPTURE_EMBED_DIMENSIONS,
+        version=CAPTURE_EMBED_VERSION,
+    )
+
+
 async def _complete_classification(
     repo: CaptureRepository,
     capture: Capture,
     *,
     processing_generation: int = 1,
     scenario: ScenarioProposal | None,
+    embedding: Embedding | None = None,
 ) -> Capture | None:
     return await repo.complete_capture_classification(
         capture_id=capture.id,
@@ -429,6 +447,7 @@ async def _complete_classification(
         question_version=CAPTURE_QUESTION_VERSION,
         clarification_text=None,
         scenario=scenario,
+        embedding=embedding,
     )
 
 
@@ -506,3 +525,149 @@ async def test_complete_capture_without_scenario_inserts_no_row(session: AsyncSe
 
     assert completed is not None
     assert stored is None
+
+
+def _content_hash(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+async def _mark_processing(session: AsyncSession, capture_id: UUID) -> None:
+    await session.execute(
+        update(CaptureModel)
+        .where(CaptureModel.id == capture_id)
+        .values(status=CAPTURE_STATUS_PROCESSING)
+    )
+
+
+@pytest.mark.integration
+async def test_complete_capture_inserts_embedding_for_the_owner(session: AsyncSession) -> None:
+    user_id = uuid4()
+    await _insert_auth_user(session, user_id)
+    repo = CaptureRepository(session)
+    capture = await _create_capture(repo, user_id, raw_text="牛乳を買う")
+    await _mark_processing(session, capture.id)
+    embedding = _embedding()
+
+    completed = await _complete_classification(repo, capture, scenario=None, embedding=embedding)
+    stored = await session.get(CaptureEmbeddingModel, capture.id)
+
+    assert completed is not None
+    assert stored is not None
+    assert stored.user_id == user_id
+    assert stored.content_text == "牛乳を買う"
+    assert stored.content_hash == _content_hash("牛乳を買う")
+    assert list(stored.embedding) == list(embedding.vector)
+    assert stored.embedding_model == CAPTURE_EMBED_FAKE_MODEL
+    assert stored.embedding_dimensions == CAPTURE_EMBED_DIMENSIONS
+    assert stored.embedding_version == CAPTURE_EMBED_VERSION
+
+
+@pytest.mark.integration
+async def test_complete_capture_does_not_insert_embedding_for_other_generation(
+    session: AsyncSession,
+) -> None:
+    user_id = uuid4()
+    await _insert_auth_user(session, user_id)
+    repo = CaptureRepository(session)
+    capture = await _create_capture(repo, user_id)
+    await _mark_processing(session, capture.id)
+
+    completed = await _complete_classification(
+        repo,
+        capture,
+        processing_generation=2,
+        scenario=None,
+        embedding=_embedding(),
+    )
+    stored = await session.get(CaptureEmbeddingModel, capture.id)
+
+    assert completed is None
+    assert stored is None
+
+
+@pytest.mark.integration
+async def test_complete_capture_without_embedding_inserts_no_embedding_row(
+    session: AsyncSession,
+) -> None:
+    user_id = uuid4()
+    await _insert_auth_user(session, user_id)
+    repo = CaptureRepository(session)
+    capture = await _create_capture(repo, user_id)
+    await _mark_processing(session, capture.id)
+
+    completed = await _complete_classification(repo, capture, scenario=None)
+    stored = await session.get(CaptureEmbeddingModel, capture.id)
+
+    assert completed is not None
+    assert stored is None
+
+
+@pytest.mark.integration
+async def test_complete_capture_keeps_embedding_when_content_hash_matches(
+    session: AsyncSession,
+) -> None:
+    user_id = uuid4()
+    await _insert_auth_user(session, user_id)
+    repo = CaptureRepository(session)
+    capture = await _create_capture(repo, user_id, raw_text="牛乳を買う")
+    await _mark_processing(session, capture.id)
+    kept = (0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+    session.add(
+        CaptureEmbeddingModel(
+            capture_id=capture.id,
+            user_id=user_id,
+            content_text=capture.raw_text,
+            content_hash=_content_hash(capture.raw_text),
+            embedding=list(kept),
+            embedding_model=CAPTURE_EMBED_FAKE_MODEL,
+            embedding_dimensions=CAPTURE_EMBED_DIMENSIONS,
+            embedding_version=CAPTURE_EMBED_VERSION,
+        )
+    )
+    await session.flush()
+
+    completed = await _complete_classification(
+        repo,
+        capture,
+        scenario=None,
+        embedding=_embedding((1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)),
+    )
+    stored = await session.get(CaptureEmbeddingModel, capture.id)
+
+    assert completed is not None
+    assert stored is not None
+    assert list(stored.embedding) == list(kept)
+
+
+@pytest.mark.integration
+async def test_complete_capture_replaces_embedding_when_content_hash_differs(
+    session: AsyncSession,
+) -> None:
+    user_id = uuid4()
+    await _insert_auth_user(session, user_id)
+    repo = CaptureRepository(session)
+    capture = await _create_capture(repo, user_id, raw_text="牛乳を買う")
+    await _mark_processing(session, capture.id)
+    session.add(
+        CaptureEmbeddingModel(
+            capture_id=capture.id,
+            user_id=user_id,
+            content_text="古い本文",
+            content_hash="b" * 64,
+            embedding=[0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            embedding_model=CAPTURE_EMBED_FAKE_MODEL,
+            embedding_dimensions=CAPTURE_EMBED_DIMENSIONS,
+            embedding_version=CAPTURE_EMBED_VERSION,
+        )
+    )
+    await session.flush()
+    replacement = _embedding()
+
+    completed = await _complete_classification(repo, capture, scenario=None, embedding=replacement)
+    stored = await session.get(CaptureEmbeddingModel, capture.id)
+
+    assert completed is not None
+    assert stored is not None
+    assert stored.content_text == "牛乳を買う"
+    assert stored.content_hash == _content_hash("牛乳を買う")
+    assert list(stored.embedding) == list(replacement.vector)

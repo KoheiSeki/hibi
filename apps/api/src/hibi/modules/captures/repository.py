@@ -1,3 +1,4 @@
+import hashlib
 from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
@@ -5,7 +6,13 @@ from uuid import UUID
 from sqlalchemy import func, select, tuple_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from hibi.modules.captures.models import CaptureModel, CaptureScenarioModel, OutboxModel
+from hibi.ai.embedding import Embedding
+from hibi.modules.captures.models import (
+    CaptureEmbeddingModel,
+    CaptureModel,
+    CaptureScenarioModel,
+    OutboxModel,
+)
 from hibi.modules.captures.policies import (
     CAPTURE_SCENARIO_STATUS_ACCEPTED,
     CAPTURE_SCENARIO_STATUS_PROPOSED,
@@ -244,6 +251,7 @@ class CaptureRepository:
         question_version: str,
         clarification_text: str | None,
         scenario: ScenarioProposal | None = None,
+        embedding: Embedding | None = None,
     ) -> Capture | None:
         stmt = (
             update(CaptureModel)
@@ -286,6 +294,35 @@ class CaptureRepository:
                     updated_at=func.now(),
                 )
             )
+
+        if embedding is not None:
+            content_hash = hashlib.sha256(row.raw_text.encode("utf-8")).hexdigest()
+            existing = await self._session.get(CaptureEmbeddingModel, row.id)
+            if existing is None:
+                self._session.add(
+                    CaptureEmbeddingModel(
+                        capture_id=row.id,
+                        user_id=row.user_id,
+                        content_text=row.raw_text,
+                        content_hash=content_hash,
+                        embedding=list(embedding.vector),
+                        embedding_model=embedding.model,
+                        embedding_dimensions=embedding.dimensions,
+                        embedding_version=embedding.version,
+                        created_at=func.now(),
+                        updated_at=func.now(),
+                    )
+                )
+            elif existing.content_hash != content_hash:
+                existing.content_text = row.raw_text
+                existing.content_hash = content_hash
+                existing.embedding = list(embedding.vector)
+                existing.embedding_model = embedding.model
+                existing.embedding_dimensions = embedding.dimensions
+                existing.embedding_version = embedding.version
+                existing.updated_at = func.now()
+
+        if scenario is not None or embedding is not None:
             await self._session.flush()
 
         return _to_capture(row)

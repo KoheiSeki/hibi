@@ -17,6 +17,7 @@ dependencies = [
   "structlog>=26.1.0",
   "openai>=3.42.1",
   "numpy>=2.5.4",
+  "pgvector>=0.5.1",
 ]
 
 [dependency-groups]
