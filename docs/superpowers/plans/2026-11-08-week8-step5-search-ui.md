@@ -155,7 +155,7 @@
   - `const CAPTURE_SEARCH_MAX_LENGTH = 200`
   - `parseCaptureSearchParams(params: Record<string, string | string[] | undefined>): CaptureSearch | null`
 
-- [ ] **Step 1: Write the failing tests** (`import { parseCaptureSearchParams } from "@/features/capture/capture-search-params"`)
+- [x] **Step 1: Write the failing tests** (`import { parseCaptureSearchParams } from "@/features/capture/capture-search-params"`)
   ```ts
   import { describe, expect, it } from "vitest";
 
@@ -201,12 +201,30 @@
   	});
   });
   ```
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
   Run: `corepack pnpm --filter web exec vitest run tests/capture-search-params.test.ts`
   Expected: FAIL(module not found)
-- [ ] **Step 3: Implement** `parseCaptureSearchParams` in `capture-search-params.ts`
+- [x] **Step 3: Implement** `parseCaptureSearchParams` in `capture-search-params.ts`
   配列なら先頭を取り、`q` は `trim()` してから長さを見る(0 または 200 超は `null`)。`mode` は `"semantic"` のときだけ `semantic`、それ以外は `keyword`。長さは `Array.from(q).length` ではなく `q.length` でよい(API 側も Python の `len` = コードポイント数だが、サロゲートペアを含む 200 文字ちょうどの境界は実用上無視する)。
-- [ ] **Step 4: Run to verify it passes**
+  型・定数・関数に次の JSDoc を付ける(日本語。Python 側の docstring と同じく全角括弧は使わない)。
+  ```ts
+  /** API の `q` の上限。サーバー側の検証(200 文字)と同じ値。 */
+  export const CAPTURE_SEARCH_MAX_LENGTH = 200;
+
+  /**
+   * page の searchParams を、検索 API に渡せる形へ正規化する。
+   *
+   * 値が配列(`?q=a&q=b`)なら先頭を使う。`q` は前後の空白を除き、
+   * 1 文字以上 CAPTURE_SEARCH_MAX_LENGTH 文字以下のときだけ有効とする。
+   * `mode` は `"semantic"` のときだけ semantic、それ以外は keyword に倒す。
+   * 不正な入力でも例外にはしない。
+   *
+   * @param params - `await searchParams` の結果。URL の生の値。
+   * @returns 検索すべきなら `{ q, mode }`。`q` が無い、空白だけ、
+   *   または長すぎるときは `null`(呼び出し側は通常の一覧を出す)。
+   */
+  ```
+- [x] **Step 4: Run to verify it passes**
   Run: `corepack pnpm --filter web exec vitest run tests/capture-search-params.test.ts`
   Expected: PASS
 - [ ] **Step 5: Commit**

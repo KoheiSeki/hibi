@@ -20,21 +20,17 @@ import {
 	normalizeGeneratedResult,
 } from "./request-api";
 import { getServerApiContext } from "./server-context";
+import { CaptureSearch } from "./capture-search";
 
 type ListCapturesParams = {
 	limit?: number;
 	cursor?: string;
 };
 
-export type CaptureSearchMode = NonNullable<
-	SearchCapturesData["query"]["mode"]
->;
-type SearchCapturesParams = { q: string; mode: CaptureSearchMode };
-
 export async function searchCapturesFromApi({
 	q,
 	mode,
-}: SearchCapturesParams): Promise<ApiResult<CaptureResponse[]>> {
+}: CaptureSearch): Promise<ApiResult<CaptureResponse[]>> {
 	const context = await getServerApiContext();
 	if (!context.ok) {
 		return context;
