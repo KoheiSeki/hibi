@@ -16,7 +16,7 @@
 
 - Python は `>=3.14,<3.15`。ruff は `line-length = 100`、lint は `E, F, I, UP, B, ASYNC, RUF`。整形は `ruff format`。
 - pytest の既定は `-m 'not integration'`、`asyncio_mode = "auto"`。通常の pytest は Jev、LLM、embedding API を呼ばない。
-- path は `GET /captures/search` で、**`/{capture_id}` より前に登録する**。後ろに置くと `search` が `capture_id` として UUID パースされ 422 になる。
+- path は `GET /captures/search` で、`/{capture_id}` **より前に登録する**。後ろに置くと `search` が `capture_id` として UUID パースされ 422 になる。
 - `q` は 1 文字以上 200 文字以下。`mode` は `keyword` か `semantic`。未指定は `keyword`。不正は 422 で、retry しない。
 - 成功は 200。要素は既存の Capture 一覧と同じ `CaptureResponse`（`scenario` も載せてよい）。近い順に**最大 20 件**。
 - 0 件は空配列で返す。404 にはしない。
@@ -46,11 +46,13 @@
 DB も network も使わない。repository は fake に差し替え、順位付けは既存の `search.py` に任せる。
 
 **Files:**
+
 - Modify: `apps/api/src/hibi/modules/captures/types.py`
 - Modify: `apps/api/src/hibi/modules/captures/service.py`
 - Test: `apps/api/tests/test_capture_search_service.py`（新規）
 
 **Interfaces:**
+
 - Consumes:
   - `hibi.modules.captures.search.SearchDocument(capture_id, user_id, status, text, embedding=None)`
   - `hibi.modules.captures.search.rank_capture_by_keyword(documents, *, user_id, query) -> list[UUID]`
@@ -67,7 +69,7 @@ DB も network も使わない。repository は fake に差し替え、順位付
     - `list_search_documents(user_id: UUID) -> list[SearchDocument]`
     - `list_captures_by_ids(user_id: UUID, *, capture_ids: Sequence[UUID]) -> list[Capture]`
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 `apps/api/tests/test_capture_search_service.py` を新規作成する。
 
@@ -223,14 +225,15 @@ async def test_semantic_search_finds_the_synonym() -> None:
 
 
 @pytest.mark.asyncio
-async def test_semantic_search_does_not_rank_lunch_first_for_milk() -> None:
+async def test_semantic_search_does_not_return_milk_for_a_lunch_query() -> None:
     repository = FakeSearchRepository(_default_captures())
 
+    # 固定ベクトルの本文で引く。単独の「ランチ」はhashで牛乳と同じ次元に落ちる
     found = await _service(repository).search_captures(
-        _query("ランチ", mode=CAPTURE_SEARCH_MODE_SEMANTIC)
+        _query("ランチ 1200 円", mode=CAPTURE_SEARCH_MODE_SEMANTIC)
     )
 
-    assert found == [] or found[0].id != _MILK_ID
+    assert [capture.id for capture in found] == [_LUNCH_ID]
 
 
 @pytest.mark.asyncio
@@ -285,12 +288,12 @@ async def test_search_returns_an_empty_list_without_candidates() -> None:
     assert repository.document_calls == 1
 ```
 
-- [ ] **Step 2: テストが落ちることを確認する**
+- [x] **Step 2: テストが落ちることを確認する**
 
 Run: `uv run --project apps/api pytest apps/api/tests/test_capture_search_service.py -v`
 Expected: collection error（`ImportError: cannot import name 'CAPTURE_SEARCH_MODE_KEYWORD' from 'hibi.modules.captures.types'`）
 
-- [ ] **Step 3: types に検索の型と定数を足す**
+- [x] **Step 3: types に検索の型と定数を足す**
 
 `apps/api/src/hibi/modules/captures/types.py` の先頭 import を次にする。
 
@@ -317,12 +320,20 @@ CaptureSearchMode = Literal["keyword", "semantic"]
 ```python
 @dataclass(frozen=True, slots=True)
 class SearchCapturesQuery:
+    """Capture検索の入力。
+
+    Attributes:
+        user_id: 検証済みの所有者。検索はこのユーザーの行だけを対象にする。
+        q: 検索語。router が1〜200文字で検証済み。
+        mode: CAPTURE_SEARCH_MODE_KEYWORD か CAPTURE_SEARCH_MODE_SEMANTIC。
+    """
+
     user_id: UUID
     q: str
-    mode: str  # CAPTURE_SEARCH_MODE_KEYWORD か CAPTURE_SEARCH_MODE_SEMANTIC
+    mode: str
 ```
 
-- [ ] **Step 4: service に search_captures を足す**
+- [x] **Step 4: service に search_captures を足す**
 
 `apps/api/src/hibi/modules/captures/service.py` の import に足す。位置は isort の辞書順（`policies` の下、`repository` の上が `search`）。
 
@@ -339,6 +350,19 @@ from hibi.modules.captures.search import (
 
 ```python
     async def search_captures(self, query: SearchCapturesQuery) -> list[Capture]:
+        """所有者の完了済みCaptureを、近い順に最大 CAPTURE_SEARCH_LIMIT 件返す。
+
+        順位付けは search.py に任せる。mode が semantic ならクエリ文だけを
+        embedder でベクトル化し、保存済みの embedding と比べる。本文の
+        embedding は作り直さない。それ以外は TF-IDF のキーワード検索。
+        0件なら空リストを返し、例外にはしない。
+
+        Args:
+            query: 所有者、検索語、検索方式。
+
+        Returns:
+            順位の高い順の Capture。scenario も含む。
+        """
         documents = await self._repository.list_search_documents(query.user_id)
 
         if query.mode == CAPTURE_SEARCH_MODE_SEMANTIC:
@@ -360,12 +384,12 @@ from hibi.modules.captures.search import (
         return [by_id[capture_id] for capture_id in capture_ids if capture_id in by_id]
 ```
 
-- [ ] **Step 5: テストが通ることを確認する**
+- [x] **Step 5: テストが通ることを確認する**
 
 Run: `uv run --project apps/api pytest apps/api/tests/test_capture_search_service.py -v`
 Expected: 全 PASS
 
-- [ ] **Step 6: 整形と lint を通す**
+- [x] **Step 6: 整形と lint を通す**
 
 ```bash
 uv run --project apps/api ruff format apps/api/src apps/api/tests scripts
@@ -374,9 +398,9 @@ uv run --project apps/api ruff check apps/api/src apps/api/tests scripts
 uv run --project apps/api ty check apps/api/src
 ```
 
-Expected: `ruff` は PASS。`ty check` は `list_search_documents` と `list_captures_by_ids` が `CaptureRepository` に無いので **`unresolved-attribute` が 2 件出る**。Task 2 で消える。
+Expected: `ruff` は PASS。`ty check` は `list_search_documents` と `list_captures_by_ids` が `CaptureRepository` に無いので `unresolved-attribute` **が 2 件出る**。Task 2 で消える。
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add apps/api/src/hibi/modules/captures/types.py apps/api/src/hibi/modules/captures/service.py apps/api/tests/test_capture_search_service.py
@@ -390,16 +414,18 @@ git commit -m "feat(captures): rank owner captures for keyword and semantic sear
 所有者の `completed` 行を embedding 付きで読み出し、id 群から Capture を scenario 付きで返す。SQL を触るので integration テストを足す。
 
 **Files:**
+
 - Modify: `apps/api/src/hibi/modules/captures/repository.py`
 - Test: `apps/api/tests/integration/test_capture_repository.py`（末尾に追記）
 
 **Interfaces:**
+
 - Consumes: `CaptureModel`、`CaptureEmbeddingModel`、`CaptureScenarioModel`、`hibi.modules.captures.search.SearchDocument`、`hibi.ai.embedding.Embedding`、`_to_capture`
 - Produces:
   - `CaptureRepository.list_search_documents(user_id: UUID) -> list[SearchDocument]`
   - `CaptureRepository.list_captures_by_ids(user_id: UUID, *, capture_ids: Sequence[UUID]) -> list[Capture]`
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 `apps/api/tests/integration/test_capture_repository.py` の末尾に足す。既存の `session` fixture、`_insert_auth_user`、`_create_capture` ヘルパーをそのまま使う。
 
@@ -415,9 +441,9 @@ async def test_list_search_documents_returns_only_completed_rows_of_the_owner(
     await _insert_auth_user(session, other_id)
     repository = CaptureRepository(session=session)
 
-    completed = await _create_capture(session, owner_id, raw_text="牛乳を買う")
-    pending = await _create_capture(session, owner_id, raw_text="あとで読む記事")
-    other = await _create_capture(session, other_id, raw_text="牛乳を買う")
+    completed = await _create_capture(repository, owner_id, raw_text="牛乳を買う")
+    pending = await _create_capture(repository, owner_id, raw_text="あとで読む記事")
+    other = await _create_capture(repository, other_id, raw_text="牛乳を買う")
     for capture_id in (completed.id, other.id):
         await session.execute(
             update(CaptureModel)
@@ -459,7 +485,7 @@ async def test_list_search_documents_keeps_rows_without_an_embedding(
     await _insert_auth_user(session, owner_id)
     repository = CaptureRepository(session=session)
 
-    capture = await _create_capture(session, owner_id, raw_text="牛乳を買う")
+    capture = await _create_capture(repository, owner_id, raw_text="牛乳を買う")
     await session.execute(
         update(CaptureModel)
         .where(CaptureModel.id == capture.id)
@@ -484,9 +510,9 @@ async def test_list_captures_by_ids_loads_the_scenario_for_the_owner(
     await _insert_auth_user(session, other_id)
     repository = CaptureRepository(session=session)
 
-    first = await _create_capture(session, owner_id, raw_text="牛乳を買う")
-    second = await _create_capture(session, owner_id, raw_text="ランチ 1200 円")
-    other = await _create_capture(session, other_id, raw_text="牛乳を買う")
+    first = await _create_capture(repository, owner_id, raw_text="牛乳を買う")
+    second = await _create_capture(repository, owner_id, raw_text="ランチ 1200 円")
+    other = await _create_capture(repository, other_id, raw_text="牛乳を買う")
     session.add(
         CaptureScenarioModel(
             capture_id=first.id,
@@ -496,7 +522,7 @@ async def test_list_captures_by_ids_loads_the_scenario_for_the_owner(
             title="牛乳",
             amount=None,
             remind_text=None,
-            policy_version=CAPTURE_ROUTE_POLICY_VERSION,
+            policy_version=CAPTURE_SCENARIO_POLICY_VERSION,
         )
     )
     await session.flush()
@@ -524,14 +550,14 @@ async def test_list_captures_by_ids_returns_an_empty_list_without_ids(
     assert await repository.list_captures_by_ids(owner_id, capture_ids=[]) == []
 ```
 
-- [ ] **Step 2: テストが落ちることを確認する**
+- [x] **Step 2: テストが落ちることを確認する**
 
 Supabase Local が必要。起動していなければ `supabase start`。
 
 Run: `uv run --project apps/api pytest apps/api/tests/integration/test_capture_repository.py -m integration -k "search or by_ids" -v`
 Expected: FAIL（`AttributeError: 'CaptureRepository' object has no attribute 'list_search_documents'`）。DB が無い場合は skip されるので、その場合は Step 4 の実装後に `pytest apps/api/tests` が GREEN であることだけで進める。
 
-- [ ] **Step 3: repository の import を直す**
+- [x] **Step 3: repository の import を直す**
 
 `apps/api/src/hibi/modules/captures/repository.py` の先頭に足す。
 
@@ -549,12 +575,24 @@ from uuid import UUID
 from hibi.modules.captures.search import SearchDocument
 ```
 
-- [ ] **Step 4: 読み出しを 2 つ足す**
+- [x] **Step 4: 読み出しを 2 つ足す**
 
 `list_for_user` の下に足す。
 
 ```python
     async def list_search_documents(self, user_id: UUID) -> list[SearchDocument]:
+        """検索の候補を読み出す。所有者の completed 行だけを返す。
+
+        embedding が無い行も候補に残す。outer join を使う。キーワード検索は
+        embedding を使わないので、無い行も当たる必要がある。意味検索は
+        search.py 側で embedding が無い行を除く。
+
+        Args:
+            user_id: 所有者。別ユーザーの行は読まない。
+
+        Returns:
+            新しい順の SearchDocument。
+        """
         stmt = (
             select(CaptureModel, CaptureEmbeddingModel)
             .outerjoin(
@@ -582,31 +620,40 @@ from hibi.modules.captures.search import SearchDocument
     async def list_captures_by_ids(
         self, user_id: UUID, *, capture_ids: Sequence[UUID]
     ) -> list[Capture]:
+        """id の一覧から、所有者の Capture を scenario 付きで読む。
+
+        scenario は outer join で1回のクエリにまとめる。scenario は capture_id が
+        主キーなので、join しても行は増えない。scenario が無い Capture も返す。
+        返す順序は保証しない。SQL の IN は順序を持たない。呼び出し側が
+        順位に合わせて並べ直す。所有者が違う id は黙って落とす。
+
+        Args:
+            user_id: 所有者。
+            capture_ids: 読みたい Capture の id。空なら DB を叩かず空を返す。
+
+        Returns:
+            見つかった Capture。
+        """
         if not capture_ids:
             return []
 
-        stmt = select(CaptureModel).where(
-            CaptureModel.user_id == user_id, CaptureModel.id.in_(capture_ids)
+        stmt = (
+            select(CaptureModel, CaptureScenarioModel)
+            .outerjoin(
+                CaptureScenarioModel,
+                CaptureScenarioModel.capture_id == CaptureModel.id,
+            )
+            .where(CaptureModel.user_id == user_id, CaptureModel.id.in_(capture_ids))
         )
         result = await self._session.execute(stmt)
-        rows = result.scalars().all()
-        if not rows:
-            return []
-
-        scenario_result = await self._session.execute(
-            select(CaptureScenarioModel).where(
-                CaptureScenarioModel.user_id == user_id,
-                CaptureScenarioModel.capture_id.in_([row.id for row in rows]),
-            )
-        )
-        scenarios = {scenario.capture_id: scenario for scenario in scenario_result.scalars()}
-        return [_to_capture(row, scenarios.get(row.id)) for row in rows]
+        return [_to_capture(row, scenario_row) for row, scenario_row in result.all()]
 ```
 
 ファイル末尾の `_to_capture` の下に変換関数を足す。
 
 ```python
 def _to_embedding(row: CaptureEmbeddingModel | None) -> Embedding | None:
+    """embedding の行を値オブジェクトに変換する。行が無ければ None。"""
     if row is None:
         return None
     return Embedding(
@@ -617,12 +664,12 @@ def _to_embedding(row: CaptureEmbeddingModel | None) -> Embedding | None:
     )
 ```
 
-- [ ] **Step 5: テストが通ることを確認する**
+- [x] **Step 5: テストが通ることを確認する**
 
 Run: `uv run --project apps/api pytest apps/api/tests/integration/test_capture_repository.py -m integration -k "search or by_ids" -v`
 Expected: 全 PASS（DB が無ければ skip）
 
-- [ ] **Step 6: 通常の pytest と型を通す**
+- [x] **Step 6: 通常の pytest と型を通す**
 
 ```bash
 uv run --project apps/api ruff format apps/api/src apps/api/tests scripts
@@ -634,7 +681,7 @@ uv run --project apps/api pytest apps/api/tests
 
 Expected: 4 つとも PASS。Task 1 Step 6 で出ていた `unresolved-attribute` 2 件が消えている。
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add apps/api/src/hibi/modules/captures/repository.py apps/api/tests/integration/test_capture_repository.py
@@ -648,14 +695,16 @@ git commit -m "feat(captures): read owner search documents and captures by id"
 `q` と `mode` の検証は FastAPI の `Query` と `Literal` に任せる（`RequestValidationError` が既存の handler で problem+json の 422 になる）。path の登録位置が効くので、`/{capture_id}` の **前** に置く。
 
 **Files:**
+
 - Modify: `apps/api/src/hibi/modules/captures/router.py`
 - Test: `apps/api/tests/test_capture_api.py`
 
 **Interfaces:**
+
 - Consumes: `CaptureService.search_captures(query) -> list[Capture]`（Task 1）、`SearchCapturesQuery`、`CaptureSearchMode`、`CAPTURE_SEARCH_MODE_KEYWORD`、既存の `_to_capture_response`、`ApiResponse[list[CaptureResponse]]`
 - Produces: `GET /api/v1/captures/search`（`operation_id="searchCaptures"`）
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 `apps/api/tests/test_capture_api.py` を 2 箇所直す。
 
@@ -759,12 +808,12 @@ def test_search_path_is_registered_before_the_capture_id_path() -> None:
     assert response.status_code == 200
 ```
 
-- [ ] **Step 2: テストが落ちることを確認する**
+- [x] **Step 2: テストが落ちることを確認する**
 
 Run: `uv run --project apps/api pytest apps/api/tests/test_capture_api.py -k search -v`
 Expected: `404` または `422`（`/search` が未登録、または `/{capture_id}` に吸われる）で FAIL
 
-- [ ] **Step 3: router に endpoint を足す**
+- [x] **Step 3: router に endpoint を足す**
 
 `apps/api/src/hibi/modules/captures/router.py` の import に足す。
 
@@ -782,6 +831,8 @@ from hibi.modules.captures.types import (
 )
 ```
 
+先頭の import に `from typing import Annotated` を足す（`from uuid import UUID` の上）。
+
 `@router.get("/{capture_id}", ...)` のブロックの **直前** に足す。
 
 ```python
@@ -797,21 +848,26 @@ from hibi.modules.captures.types import (
 )
 async def search_captures(
     q: str = Query(min_length=1, max_length=200),
-    mode: CaptureSearchMode = Query(default=CAPTURE_SEARCH_MODE_KEYWORD),
+    mode: Annotated[CaptureSearchMode, Query()] = CAPTURE_SEARCH_MODE_KEYWORD,
     principal: Principal = Depends(get_principal),
     service: CaptureService = Depends(_get_capture_service),
 ):
+    """完了した記録を、自分の分だけ検索する。
+
+    mode=keyword は本文の語の重なり、mode=semantic は意味の近さで選ぶ。
+    近い順に最大20件を返し、見つからなければ空配列を返す。
+    """
     query = SearchCapturesQuery(user_id=principal.user_id, q=q, mode=mode)
     captures = await service.search_captures(query)
     return ApiResponse(data=[_to_capture_response(capture) for capture in captures])
 ```
 
-- [ ] **Step 4: テストが通ることを確認する**
+- [x] **Step 4: テストが通ることを確認する**
 
 Run: `uv run --project apps/api pytest apps/api/tests/test_capture_api.py -v`
 Expected: 全 PASS
 
-- [ ] **Step 5: 全部通すことを確認する**
+- [x] **Step 5: 全部通すことを確認する**
 
 ```bash
 uv run --project apps/api ruff format apps/api/src apps/api/tests scripts
@@ -823,7 +879,7 @@ uv run --project apps/api pytest apps/api/tests
 
 Expected: 4 つとも PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/api/src/hibi/modules/captures/router.py apps/api/tests/test_capture_api.py
@@ -837,20 +893,22 @@ git commit -m "feat(captures): search captures over HTTP for the owner only"
 契約の正本 `contracts/openapi.json` と `packages/api-client` を、同じ変更で更新する。
 
 **Files:**
+
 - Modify: `contracts/openapi.json`（生成物）
 - Modify: `packages/api-client` 配下の生成物
 
 **Interfaces:**
+
 - Consumes: Task 3 の `operation_id="searchCaptures"`
 - Produces: client の `searchCaptures`（web は実装順 5 で使う）
 
-- [ ] **Step 1: 再生成する**
+- [x] **Step 1: 再生成する**
 
 ```bash
 just openapi
 ```
 
-- [ ] **Step 2: 差分が検索分だけか確認する**
+- [x] **Step 2: 差分が検索分だけか確認する**
 
 ```bash
 git status --short contracts packages
@@ -859,7 +917,9 @@ git diff contracts/openapi.json | head -60
 
 Expected: `/api/v1/captures/search` の path と `searchCaptures` の追加だけ。既存 path の差分は出ない。
 
-- [ ] **Step 3: web 側が壊れていないことを確認する**
+router の docstring は FastAPI が `description` として `openapi.json` に出す。`searchCaptures` の `description` に Task 3 の docstring（「完了した記録を、自分の分だけ検索する。…」）が入っていること、client の生成物にもコメントとして入ることを確認する。他の endpoint には description が無いので、検索だけに付くのは意図どおり。
+
+- [x] **Step 3: web 側が壊れていないことを確認する**
 
 ```bash
 corepack pnpm typecheck
@@ -868,14 +928,14 @@ corepack pnpm build
 
 Expected: どちらも PASS（画面は実装順 5 なのでまだ `searchCaptures` を呼ばない）
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add contracts packages
 git commit -m "feat(contracts): regenerate the client for capture search"
 ```
 
-- [ ] **Step 5: check を全部通す**
+- [x] **Step 5: check を全部通す**
 
 ```bash
 just check
@@ -914,7 +974,12 @@ Expected: 全部 PASS
 ## 判断メモ
 
 - **順位付けを Python に残す理由**: 実装順 1 で `search.py` の 2 関数をテスト付きで作った。pgvector の `<=>` に押し下げるとそのテストが使えなくなり、キーワード検索の TF-IDF は SQL では書き直しになる。仕様が「件数が小さい。計測前に足さない」と言っているので、`completed` 行を全部読んで Python で並べる。重くなったら `list_search_documents` の中だけを置き換えれば済む形にしてある。
-- **`list_captures_by_ids` を分けた理由**: `SearchDocument` は順位付けに必要な最小限（本文と embedding）しか持たない。レスポンスには scenario 付きの `Capture` が必要なので、上位 20 件だけ読み直す。全件に scenario を join すると、捨てる 20 件以外のぶんが無駄になる。
-- **空白だけの `q`**: 仕様の「`q` は 1 文字以上」に従い、`Query(min_length=1)` だけで判定する。空白 1 文字は valid な入力として 200 と空配列を返す（tokenize が空になるので 0 件）。`.strip()` を挟んで 422 にはしない。
-- **`mode` の型**: `CaptureSearchMode = Literal["keyword", "semantic"]` を `types.py` に置き、router の annotation に使う。OpenAPI に enum として出るので、client 側も 2 値に絞られる。
+- `list_captures_by_ids` **を分けた理由**: `SearchDocument` は順位付けに必要な最小限（本文と embedding）しか持たない。レスポンスには scenario 付きの `Capture` が必要なので、上位 20 件だけ読み直す。全件に scenario を join すると、捨てる 20 件以外のぶんが無駄になる。
+- **scenario は outer join の 1 クエリ**: `capture_scenarios` は `capture_id` が主キーで Capture と多くて 1 対 1 なので、join しても行が増えない。`list_for_user` は「Capture を取ってから `IN` で scenario を取る」2 回の形だが、そこに揃えない。2 回にする利点が無く、往復と突き合わせの `dict` が余計になる。`list_for_user` は範囲外なので触らない。
+- **空白だけの** `q`: 仕様の「`q` は 1 文字以上」に従い、`Query(min_length=1)` だけで判定する。空白 1 文字は valid な入力として 200 と空配列を返す（tokenize が空になるので 0 件）。`.strip()` を挟んで 422 にはしない。
+- `mode` **の型**: `CaptureSearchMode = Literal["keyword", "semantic"]` を `types.py` に置き、router の annotation に使う。OpenAPI に enum として出るので、client 側も 2 値に絞られる。
 - **順序の正本**: SQL の `IN` は順序を保証しないので、service が ranker の並びで並べ直す。`list_captures_by_ids` には `order_by` を付けない（付けても service が上書きする）。
+- **意味検索のランチのテスト**: fake embedder の固定ベクトルは本文の完全一致でだけ効く。単独の `ランチ` は固定の対象外で、hash で次元 0 に落ちて `牛乳を買う` の固定ベクトルと同一になり、cosine 1.0 で牛乳が 1 位になる（8 バケットの衝突）。service の不具合ではなく fake の性質なので、テストは固定ベクトルを持つ `ランチ 1200 円` で引き、結果が `ランチ 1200 円` の 1 件だけであることを厳密に確かめる。fake の固定ベクトルは仕様どおり 5 本文のままにし、足さない。
+- **docstring の方針**: 公開する入口（`SearchCapturesQuery`、`search_captures` の service / router、repository の 2 メソッド、`_to_embedding`）に付ける。形式は Google スタイル（`Args:` / `Returns:`）、言語は既存のコメントと docs に合わせて日本語。1 行で足りるもの（`_to_embedding`）は 1 行にする。書く内容は「何をするか」より、呼び出し側が知らないと困る性質（順序を保証しない、embedding が無い行も残す、0 件は例外にしない）を優先する。**router の docstring は OpenAPI の** `description` **に出て client にも入る**ので、内部事情（TF-IDF、embedder）ではなく API 利用者向けの文だけにしてある。
+- `mode` **を** `Annotated` **で書く理由**: `mode: CaptureSearchMode = Query(default=...)` は B008 で落ちる。ruff の B008 は注釈が `str` や `int` のような不変型だと既定値の呼び出しを許すが、`CaptureSearchMode` は別の場所で定義した `Literal` の別名で、ruff には不変型と判別できない。`q: str = Query(...)` や既存の `limit: int = Query(...)` が通るのはこのため。`extend-immutable-calls` に `fastapi.Query` を足すと全体の設定が変わるので、`Annotated[CaptureSearchMode, Query()] = CAPTURE_SEARCH_MODE_KEYWORD` と書く。既定値が Query の呼び出しではなく定数になり、FastAPI 公式の推奨形でもある。OpenAPI の出力は変わらない。
+- **全角括弧の扱い**: docstring の全角括弧 `（` `）` は RUF002、コメントでは RUF003 になる。括弧を使わない文に言い換え、`noqa` では黙らせない。全角の `、` `。` は対象外。
