@@ -208,12 +208,13 @@ class CaptureService:
 
         scenario = propose_capture_scenario(route=route, raw_text=capture.raw_text)
 
-        existing = await self._repository.has_same_content_embedding(
-            capture.user_id, capture_id=capture_id, text=capture.raw_text.strip()
-        )
         embedding: Embedding | None = None
-        if existing:
-            embedding = await self._embedder.embed_text(capture.raw_text)
+        if capture.raw_text.strip() != "":
+            has_embedding = await self._repository.has_same_content_embedding(
+                capture.user_id, capture_id=capture_id, text=capture.raw_text.strip()
+            )
+            if not has_embedding:
+                embedding = await self._embedder.embed_text(capture.raw_text)
 
         await self._repository.complete_capture_classification(
             capture_id=capture_id,

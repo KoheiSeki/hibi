@@ -14,8 +14,14 @@ from hibi.ai.classification import (
     Classification,
     ClassificationTimeoutError,
 )
+from hibi.ai.embedding import (
+    CAPTURE_EMBED_DIMENSIONS,
+    CAPTURE_EMBED_VERSION,
+    Embedding,
+)
 from hibi.ai.fake_clarification import FakeClarificationGenerator
 from hibi.ai.fake_classifier import FakeCaptureClassifier
+from hibi.ai.fake_embedder import CAPTURE_EMBED_FAKE_MODEL, FakeTextEmbedder
 from hibi.ai.metrics import llm_call_count, reset_llm_call
 from hibi.modules.captures.policies import (
     CAPTURE_ROUTE_POLICY_VERSION,
@@ -42,13 +48,24 @@ class FakeProcessCaptureRepository:
         *,
         allow_start: bool = True,
         fail_processing: bool = False,
+        has_embedding: bool = False,
     ) -> None:
         self.capture = capture
         self.allow_start = allow_start
         self.fail_processing = fail_processing
+        self.has_embedding = has_embedding
         self.transitions: list[tuple[str, str]] = []
         self.classifications: list[dict[str, object]] = []
         self.scenario: ScenarioProposal | None = None
+        self.embedding: Embedding | None = None
+        self.embedding_lookups: list[tuple[UUID, str]] = []
+
+    async def has_same_content_embedding(
+        self, user_id: UUID, *, capture_id: UUID, text: str
+    ) -> bool:
+        del user_id
+        self.embedding_lookups.append((capture_id, text))
+        return self.has_embedding
 
     async def get_by_capture_id(self, capture_id: UUID) -> Capture | None:
         if self.capture is None or self.capture.id != capture_id:
@@ -89,6 +106,7 @@ class FakeProcessCaptureRepository:
         question_version: str,
         clarification_text: str | None = None,
         scenario: ScenarioProposal | None = None,
+        embedding: Embedding | None = None,
     ) -> Capture | None:
         if self.fail_processing:
             raise RuntimeError("temporary processing failure")
@@ -123,7 +141,17 @@ class FakeProcessCaptureRepository:
             clarification_text=clarification_text,
         )
         self.scenario = scenario
+        self.embedding = embedding
         return self.capture
+
+
+class RecordingEmbedder:
+    def __init__(self) -> None:
+        self.texts: list[str] = []
+
+    async def embed_text(self, text: str) -> Embedding:
+        self.texts.append(text)
+        return await FakeTextEmbedder().embed_text(text)
 
 
 class RecordingClassifier:
@@ -205,12 +233,14 @@ def _service(
     repository: FakeProcessCaptureRepository,
     classifier: RecordingClassifier | ScriptedClassifier | FakeCaptureClassifier | None = None,
     generator: ScriptedGenerator | FakeClarificationGenerator | None = None,
+    embedder: RecordingEmbedder | FakeTextEmbedder | None = None,
 ) -> CaptureService:
     return CaptureService(
         cast(AsyncSession, None),
         cast(CaptureRepository, repository),
         classifier or FakeCaptureClassifier(),
         generator or FakeClarificationGenerator(),
+        embedder or FakeTextEmbedder(),
     )
 
 
@@ -563,3 +593,47 @@ async def test_complete_capture_without_scenario_leaves_it_empty() -> None:
     assert repository.scenario is None
     assert repository.capture is not None
     assert repository.capture.status == CAPTURE_STATUS_COMPLETED
+
+
+@pytest.mark.asyncio
+async def test_process_capture_embeds_the_text_once_when_completed() -> None:
+    capture = _capture()
+    repository = FakeProcessCaptureRepository(capture)
+    embedder = RecordingEmbedder()
+
+    await _service(repository, embedder=embedder).process_capture(capture.id, 1)
+
+    assert embedder.texts == ["牛乳を買う"]
+    assert repository.embedding_lookups == [(capture.id, "牛乳を買う")]
+    assert repository.embedding is not None
+    assert repository.embedding.vector == (1, 0, 0, 0, 0, 0, 0, 0)
+    assert repository.embedding.model == CAPTURE_EMBED_FAKE_MODEL
+    assert repository.embedding.dimensions == CAPTURE_EMBED_DIMENSIONS
+    assert repository.embedding.version == CAPTURE_EMBED_VERSION
+
+
+@pytest.mark.asyncio
+async def test_process_capture_does_not_embed_the_same_content_again() -> None:
+    capture = _capture()
+    repository = FakeProcessCaptureRepository(capture, has_embedding=True)
+    embedder = RecordingEmbedder()
+
+    await _service(repository, embedder=embedder).process_capture(capture.id, 1)
+
+    assert embedder.texts == []
+    assert repository.embedding is None
+    assert repository.capture is not None
+    assert repository.capture.status == CAPTURE_STATUS_COMPLETED
+
+
+@pytest.mark.asyncio
+async def test_process_capture_does_not_embed_blank_text() -> None:
+    capture = _capture(raw_text="   ")
+    repository = FakeProcessCaptureRepository(capture)
+    embedder = RecordingEmbedder()
+
+    await _service(repository, embedder=embedder).process_capture(capture.id, 1)
+
+    assert embedder.texts == []
+    assert repository.embedding_lookups == []
+    assert repository.embedding is None
