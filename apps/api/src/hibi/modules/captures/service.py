@@ -34,7 +34,10 @@ from hibi.modules.captures.policies import (
     propose_capture_scenario,
 )
 from hibi.modules.captures.repository import CaptureRepository
+from hibi.modules.captures.search import rank_capture_by_keyword, rank_captures_by_semantic
 from hibi.modules.captures.types import (
+    CAPTURE_SEARCH_LIMIT,
+    CAPTURE_SEARCH_MODE_SEMANTIC,
     CAPTURE_STATUS_COMPLETED,
     CAPTURE_STATUS_FAILED,
     CAPTURE_STATUS_PENDING,
@@ -44,6 +47,7 @@ from hibi.modules.captures.types import (
     CreateCaptureCommand,
     CreateCaptureResult,
     ListCapturesQuery,
+    SearchCapturesQuery,
     UpdateCaptureCommand,
 )
 
@@ -134,6 +138,40 @@ class CaptureService:
             next_cursor = self._encode_cursor(last.created_at, last.id)
 
         return CapturePage(items=items, next_cursor=next_cursor, has_next_page=has_next_page)
+
+    async def search_captures(self, query: SearchCapturesQuery) -> list[Capture]:
+        """
+        所有者の完了済みCaptureを、近い順に最大 CAPTURE_SEARCH_LIMIT 件返す。
+
+        順位付けは search.py に任せる。mode が semantic ならクエリ文だけを
+        embedder でベクトル化し、保存済みの embedding と比べる。本文の
+        embedding は作り直さない。それ以外は TF-IDF のキーワード検索。
+        0件なら空リストを返し、例外にはしない。
+
+        Args:
+            query: 所有者、検索語、検索方式。
+
+        Returns:
+            順位の高い順の Capture。scenario も含む。
+        """
+
+        documents = await self._repository.list_search_documents(query.user_id)
+
+        if query.mode == CAPTURE_SEARCH_MODE_SEMANTIC:
+            ranked = await rank_captures_by_semantic(
+                documents, user_id=query.user_id, query=query.q, embedder=self._embedder
+            )
+        else:
+            ranked = rank_capture_by_keyword(documents, user_id=query.user_id, query=query.q)
+        capture_ids = ranked[:CAPTURE_SEARCH_LIMIT]
+        if not capture_ids:
+            return []
+
+        captures = await self._repository.list_captures_by_ids(
+            query.user_id, capture_ids=capture_ids
+        )
+        by_id = {capture.id: capture for capture in captures}
+        return [by_id[capture_id] for capture_id in capture_ids if capture_id in by_id]
 
     async def update_capture(self, command: UpdateCaptureCommand) -> Capture:
 

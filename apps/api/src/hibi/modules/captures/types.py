@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 
 CAPTURE_AGGREGATE_TYPE = "capture"
@@ -15,6 +16,12 @@ OUTBOX_STATUS_PENDING = "pending"
 OUTBOX_STATUS_PUBLISHED = "published"
 
 CAPTURE_PROCESSING_MAX_ATTEMPTS = 3
+
+CAPTURE_SEARCH_MODE_KEYWORD = "keyword"
+CAPTURE_SEARCH_MODE_SEMANTIC = "semantic"
+CAPTURE_SEARCH_LIMIT = 20
+
+CaptureSearchMode = Literal["keyword", "semantic"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,6 +71,22 @@ class ListCapturesQuery:
     user_id: UUID
     limit: int | None  # None なら 20
     cursor: str | None  # 不透明。無ければ先頭ページ
+
+
+@dataclass(frozen=True, slots=True)
+class SearchCapturesQuery:
+    """
+    Capture検索の入力。
+
+    Attributes:
+        user_id: 検証済みの所有者。検索はこのユーザーの行だけを対象にする。
+        q: 検索語。router が1〜200文字で検証済み。
+        mode: CAPTURE_SEARCH_MODE_KEYWORD か CAPTURE_SEARCH_MODE_SEMANTIC。
+    """
+
+    user_id: UUID
+    q: str
+    mode: str
 
 
 @dataclass(frozen=True, slots=True)
