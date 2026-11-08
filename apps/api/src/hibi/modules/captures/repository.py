@@ -1,4 +1,5 @@
 import hashlib
+from collections.abc import Sequence
 from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
@@ -18,6 +19,7 @@ from hibi.modules.captures.policies import (
     CAPTURE_SCENARIO_STATUS_PROPOSED,
     ScenarioProposal,
 )
+from hibi.modules.captures.search import SearchDocument
 from hibi.modules.captures.types import (
     CAPTURE_STATUS_COMPLETED,
     CAPTURE_STATUS_FAILED,
@@ -102,6 +104,67 @@ class CaptureRepository:
         )
         scenarios = {scenario.capture_id: scenario for scenario in scenario_result.scalars()}
         return [_to_capture(row, scenarios.get(row.id)) for row in rows]
+
+    async def list_search_documents(self, user_id: UUID) -> list[SearchDocument]:
+        """
+        検索の候補を読み出す。所有者の completed 行だけを返す。
+
+        embedding が無い行も候補に残す。outer join を使う。キーワード検索は
+        embedding を使わないので、無い行も当たる必要がある。意味検索は
+        search.py 側で embedding が無い行を除く。
+
+        Args:
+            user_id: 所有者。別ユーザーの行は読まない。
+
+        Returns:
+            新しい順の SearchDocument。
+        """
+
+        stmt = (
+            select(CaptureModel, CaptureEmbeddingModel)
+            .outerjoin(CaptureEmbeddingModel, CaptureEmbeddingModel.capture_id == CaptureModel.id)
+            .where(CaptureModel.user_id == user_id, CaptureModel.status == CAPTURE_STATUS_COMPLETED)
+            .order_by(CaptureModel.created_at.desc(), CaptureModel.id.desc())
+        )
+        result = await self._session.execute(stmt)
+        return [
+            SearchDocument(
+                capture_id=row.id,
+                user_id=row.user_id,
+                status=row.status,
+                text=row.raw_text,
+                embedding=_to_embedding(embedding_row),
+            )
+            for row, embedding_row in result.all()
+        ]
+
+    async def list_captures_by_ids(
+        self, user_id: UUID, *, capture_ids: Sequence[UUID]
+    ) -> list[Capture]:
+        """
+        id の一覧から、所有者の Capture を scenario 付きで読む。
+
+        返す順序は保証しない。SQL の IN は順序を持たない。呼び出し側が
+        順位に合わせて並べ直す。所有者が違う id は黙って落とす。
+
+        Args:
+            user_id: 所有者。
+            capture_ids: 読みたい Capture の id。空なら DB を叩かず空を返す。
+
+        Returns:
+            見つかった Capture。
+        """
+
+        if not capture_ids:
+            return []
+
+        stmt = (
+            select(CaptureModel, CaptureScenarioModel)
+            .outerjoin(CaptureScenarioModel, CaptureScenarioModel.capture_id == CaptureModel.id)
+            .where(CaptureModel.user_id == user_id, CaptureModel.id.in_(capture_ids))
+        )
+        result = await self._session.execute(stmt)
+        return [_to_capture(row, scenario_row) for row, scenario_row in result.all()]
 
     async def list_pending_outbox_events(self, *, limit: int) -> list[OutboxEvent]:
         stmt = (
@@ -390,4 +453,15 @@ def _to_outbox_event(row: OutboxModel) -> OutboxEvent:
         id=row.id,
         aggregate_id=row.aggregate_id,
         processing_generation=row.processing_generation,
+    )
+
+
+def _to_embedding(row: CaptureEmbeddingModel | None = None) -> Embedding | None:
+    if row is None:
+        return None
+    return Embedding(
+        vector=tuple(row.embedding),
+        model=row.embedding_model,
+        dimensions=row.embedding_dimensions,
+        version=row.embedding_version,
     )

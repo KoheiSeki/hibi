@@ -22,6 +22,7 @@ from hibi.modules.captures.models import (
 )
 from hibi.modules.captures.policies import (
     CAPTURE_ROUTE_POLICY_VERSION,
+    CAPTURE_SCENARIO_POLICY_VERSION,
     CAPTURE_SCENARIO_STATUS_PROPOSED,
     ScenarioProposal,
     propose_capture_scenario,
@@ -671,3 +672,124 @@ async def test_complete_capture_replaces_embedding_when_content_hash_differs(
     assert stored.content_text == "牛乳を買う"
     assert stored.content_hash == _content_hash("牛乳を買う")
     assert list(stored.embedding) == list(replacement.vector)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_list_search_documents_returns_only_completed_rows_of_the_owner(
+    session: AsyncSession,
+) -> None:
+    owner_id = uuid4()
+    other_id = uuid4()
+    await _insert_auth_user(session, owner_id)
+    await _insert_auth_user(session, other_id)
+    repository = CaptureRepository(session=session)
+
+    completed = await _create_capture(repository, owner_id, raw_text="牛乳を買う")
+    pending = await _create_capture(repository, owner_id, raw_text="あとで読む記事")
+    other = await _create_capture(repository, other_id, raw_text="牛乳を買う")
+    for capture_id in (completed.id, other.id):
+        await session.execute(
+            update(CaptureModel)
+            .where(CaptureModel.id == capture_id)
+            .values(status=CAPTURE_STATUS_COMPLETED)
+        )
+    session.add(
+        CaptureEmbeddingModel(
+            capture_id=completed.id,
+            user_id=owner_id,
+            content_text="牛乳を買う",
+            content_hash=hashlib.sha256("牛乳を買う".encode()).hexdigest(),
+            embedding=[1.0] + [0.0] * (CAPTURE_EMBED_DIMENSIONS - 1),
+            embedding_model=CAPTURE_EMBED_FAKE_MODEL,
+            embedding_dimensions=CAPTURE_EMBED_DIMENSIONS,
+            embedding_version=CAPTURE_EMBED_VERSION,
+        )
+    )
+    await session.flush()
+
+    documents = await repository.list_search_documents(owner_id)
+
+    assert [document.capture_id for document in documents] == [completed.id]
+    assert pending.id not in {document.capture_id for document in documents}
+    assert other.id not in {document.capture_id for document in documents}
+    assert documents[0].text == "牛乳を買う"
+    assert documents[0].embedding is not None
+    assert documents[0].embedding.vector[0] == 1.0
+    assert documents[0].embedding.dimensions == CAPTURE_EMBED_DIMENSIONS
+    assert documents[0].embedding.version == CAPTURE_EMBED_VERSION
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_list_search_documents_keeps_rows_without_an_embedding(
+    session: AsyncSession,
+) -> None:
+    owner_id = uuid4()
+    await _insert_auth_user(session, owner_id)
+    repository = CaptureRepository(session=session)
+
+    capture = await _create_capture(repository, owner_id, raw_text="牛乳を買う")
+    await session.execute(
+        update(CaptureModel)
+        .where(CaptureModel.id == capture.id)
+        .values(status=CAPTURE_STATUS_COMPLETED)
+    )
+    await session.flush()
+
+    documents = await repository.list_search_documents(owner_id)
+
+    assert [document.capture_id for document in documents] == [capture.id]
+    assert documents[0].embedding is None
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_list_captures_by_ids_loads_the_scenario_for_the_owner(
+    session: AsyncSession,
+) -> None:
+    owner_id = uuid4()
+    other_id = uuid4()
+    await _insert_auth_user(session, owner_id)
+    await _insert_auth_user(session, other_id)
+    repository = CaptureRepository(session=session)
+
+    first = await _create_capture(repository, owner_id, raw_text="牛乳を買う")
+    second = await _create_capture(repository, owner_id, raw_text="ランチ 1200 円")
+    other = await _create_capture(repository, other_id, raw_text="牛乳を買う")
+    session.add(
+        CaptureScenarioModel(
+            capture_id=first.id,
+            user_id=owner_id,
+            route="shopping",
+            status=CAPTURE_SCENARIO_STATUS_PROPOSED,
+            title="牛乳",
+            amount=None,
+            remind_text=None,
+            policy_version=CAPTURE_SCENARIO_POLICY_VERSION,
+        )
+    )
+    await session.flush()
+
+    captures = await repository.list_captures_by_ids(
+        owner_id, capture_ids=[second.id, first.id, other.id]
+    )
+
+    by_id = {capture.id: capture for capture in captures}
+    assert set(by_id) == {first.id, second.id}
+    first_scenario = by_id[first.id].scenario
+    assert first_scenario is not None
+    assert first_scenario.title == "牛乳"
+    assert by_id[second.id].scenario is None
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_list_captures_by_ids_returns_an_empty_list_without_ids(
+    session: AsyncSession,
+) -> None:
+    owner_id = uuid4()
+    await _insert_auth_user(session, owner_id)
+    repository = CaptureRepository(session=session)
+
+    assert await repository.list_captures_by_ids(owner_id, capture_ids=[]) == []
