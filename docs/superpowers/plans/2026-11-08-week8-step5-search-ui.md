@@ -49,53 +49,88 @@
 ### Task 1: `searchCapturesFromApi`
 
 **Files:**
+
 - Modify: `apps/web/src/lib/api/capture.ts`
 - Test: `apps/web/tests/capture-api.test.ts`
 
 **Interfaces:**
+
 - Consumes: `@hibi/api-client` の `searchCaptures`(`query: { q: string; mode?: "keyword" | "semantic" }`、200 は `{ data: CaptureResponse[] }`)
-- Produces: `searchCapturesFromApi(params: { q: string; mode: "keyword" | "semantic" }): Promise<ApiResult<CaptureResponse[]>>`
+- Produces:
+  - `type CaptureSearchMode = NonNullable<SearchCapturesData["query"]["mode"]>`(= `"keyword" | "semantic"`)。生成済み client の型から導き、web で union を二重定義しない。API の enum が変われば再生成で追従する
+  - `searchCapturesFromApi(params: { q: string; mode: CaptureSearchMode }): Promise<ApiResult<CaptureResponse[]>>`
 
-- [ ] **Step 1: Write the failing tests** in `tests/capture-api.test.ts`
-
-  先にこのファイルの `vi.mock("@hibi/api-client", ...)` に `searchCaptures: searchCapturesMock` を足す(`vi.hoisted` にも `searchCapturesMock` を足す)。足さないと `capture.ts` が import する `searchCaptures` が mock に無く、既存テストまで落ちる。
-
+- [x] **Step 1: Write the failing tests** in `tests/capture-api.test.ts`
+  このブロックはコメントではなく、そのまま貼って動くコード。先にこのファイルの `vi.mock("@hibi/api-client", ...)` に `searchCaptures: searchCapturesMock` を足す(`vi.hoisted` にも `searchCapturesMock` を足す)。足さないと `capture.ts` が import する `searchCaptures` が mock に無く、既存テストまで落ちる。
+  import に `searchCapturesFromApi` を足し、ファイル末尾に追加する。
   ```ts
   describe("searchCapturesFromApi", () => {
-  	it("passes q and mode with the bearer token and unwraps the data array", async () => {
-  		// searchCapturesMock.mockResolvedValue({ data: { data: [capture] } })
-  		// expect(result).toEqual({ ok: true, data: [capture] })
-  		// expect(searchCapturesMock).toHaveBeenCalledWith({
-  		//   baseUrl: "https://api.hibi.example",
-  		//   auth: "access-token",
-  		//   query: { q: "牛乳", mode: "keyword" },
-  		// })
+  	beforeEach(() => {
+  		vi.clearAllMocks();
+  		getServerApiContextMock.mockResolvedValue({
+  			ok: true,
+  			baseUrl: "https://api.hibi.example",
+  			accessToken: "access-token",
+  		});
   	});
 
-  	it("returns the classified error when the API responds with a problem", async () => {
-  		// searchCapturesMock.mockResolvedValue({ error: {...401 problem}, response: new Response(null, { status: 401 }) })
-  		// expect(result.ok).toBe(false)
+  	it("passes q and mode with the bearer token and unwraps the data array", async () => {
+  		const capture = {
+  			id: "capture-1",
+  			rawText: "牛乳を買う",
+  			status: "completed",
+  			createdAt: "2026-10-04T09:00:00Z",
+  			updatedAt: "2026-10-04T09:00:00Z",
+  		};
+  		searchCapturesMock.mockResolvedValue({ data: { data: [capture] } });
+
+  		const result = await searchCapturesFromApi({ q: "牛乳", mode: "keyword" });
+
+  		expect(searchCapturesMock).toHaveBeenCalledWith({
+  			baseUrl: "https://api.hibi.example",
+  			auth: "access-token",
+  			query: { q: "牛乳", mode: "keyword" },
+  		});
+  		expect(result).toEqual({ ok: true, data: [capture] });
+  	});
+
+  	it("does not call the API without an authenticated context", async () => {
+  		getServerApiContextMock.mockResolvedValue({
+  			ok: false,
+  			error: { kind: "unauthenticated", message: "Authentication is required." },
+  		});
+
+  		const result = await searchCapturesFromApi({ q: "牛乳", mode: "semantic" });
+
+  		expect(searchCapturesMock).not.toHaveBeenCalled();
+  		expect(result).toEqual({
+  			ok: false,
+  			error: { kind: "unauthenticated", message: "Authentication is required." },
+  		});
+  	});
+
+  	it("returns a classified error when the API responds with a failure", async () => {
+  		searchCapturesMock.mockResolvedValue({
+  			error: { title: "Service Unavailable", status: 503 },
+  			response: new Response(null, { status: 503 }),
+  		});
+
+  		const result = await searchCapturesFromApi({ q: "牛乳", mode: "keyword" });
+
+  		expect(result.ok).toBe(false);
   	});
   });
   ```
-  失敗ケースの形は、同ファイルの既存の失敗テスト(`getCaptureFromApi` など)に合わせる。
-
-- [ ] **Step 2: Run to verify it fails**
-
+- [x] **Step 2: Run to verify it fails**
   Run: `corepack pnpm --filter web exec vitest run tests/capture-api.test.ts`
   Expected: FAIL(`searchCapturesFromApi` が export されていない)
-
-- [ ] **Step 3: Implement `searchCapturesFromApi`** in `src/lib/api/capture.ts`
-
+- [x] **Step 3: Implement** `searchCapturesFromApi` in `src/lib/api/capture.ts`
   `getCaptureFromApi` と同じ形。`getServerApiContext()` が失敗ならそのまま返し、`searchCaptures({ baseUrl, auth, query: { q, mode } })` を呼び、`normalizeGeneratedResult` を通す(レスポンスは `{ data: [...] }` のエンベロープで meta が無いため、`listCapturesFromApi` の `normalizeGeneratedEnvelopeResult` ではない)。import に `searchCaptures` を足す。
-
-- [ ] **Step 4: Run to verify it passes**
-
+  同じファイルに `export type CaptureSearchMode = NonNullable<SearchCapturesData["query"]["mode"]>` を定義して export し、`searchCapturesFromApi` の `mode` 引数に使う(`SearchCapturesData` は `@hibi/api-client` から `type` import)。
+- [x] **Step 4: Run to verify it passes**
   Run: `corepack pnpm --filter web exec vitest run tests/capture-api.test.ts`
   Expected: PASS
-
 - [ ] **Step 5: Commit**
-
   ```bash
   git add apps/web/src/lib/api/capture.ts apps/web/tests/capture-api.test.ts
   git commit -m "feat(web): add the capture search API wrapper"
@@ -106,57 +141,73 @@
 ### Task 2: 検索パラメータの正規化
 
 **Files:**
+
 - Create: `apps/web/src/features/capture/capture-search-params.ts`
 - Test: `apps/web/tests/capture-search-params.test.ts`
 
 **Interfaces:**
+
+- Consumes: Task 1 の `CaptureSearchMode`。`import type { CaptureSearchMode } from "@/lib/api/capture"` で読む(`capture.ts` は `server-only` だが、`import type` は実行時に消えるので影響しない。型は必ず `import type` で読む)
 - Produces:
-  - `type CaptureSearchMode = "keyword" | "semantic"`
   - `type CaptureSearch = { q: string; mode: CaptureSearchMode }`
   - `const CAPTURE_SEARCH_MAX_LENGTH = 200`
   - `parseCaptureSearchParams(params: Record<string, string | string[] | undefined>): CaptureSearch | null`
 
 - [ ] **Step 1: Write the failing tests** (`import { parseCaptureSearchParams } from "@/features/capture/capture-search-params"`)
-
   ```ts
-  it("returns keyword mode by default", () => {
-  	expect(parseCaptureSearchParams({ q: "牛乳" })).toEqual({ q: "牛乳", mode: "keyword" });
-  });
-  it("trims q and accepts semantic", () => {
-  	expect(parseCaptureSearchParams({ q: "  ミルク ", mode: "semantic" })).toEqual({ q: "ミルク", mode: "semantic" });
-  });
-  it("returns null when q is missing or blank", () => {
-  	expect(parseCaptureSearchParams({})).toBeNull();
-  	expect(parseCaptureSearchParams({ q: "   " })).toBeNull();
-  });
-  it("accepts exactly 200 characters and rejects 201", () => {
-  	expect(parseCaptureSearchParams({ q: "あ".repeat(200) })).not.toBeNull();
-  	expect(parseCaptureSearchParams({ q: "あ".repeat(201) })).toBeNull();
-  });
-  it("falls back to keyword for an unknown mode", () => {
-  	expect(parseCaptureSearchParams({ q: "牛乳", mode: "bogus" })?.mode).toBe("keyword");
-  });
-  it("uses the first value when a parameter is repeated", () => {
-  	expect(parseCaptureSearchParams({ q: ["牛乳", "記事"], mode: ["semantic", "keyword"] })).toEqual({ q: "牛乳", mode: "semantic" });
+  import { describe, expect, it } from "vitest";
+
+  import { parseCaptureSearchParams } from "@/features/capture/capture-search-params";
+
+  describe("parseCaptureSearchParams", () => {
+  	it("returns keyword mode by default", () => {
+  		expect(parseCaptureSearchParams({ q: "牛乳" })).toEqual({
+  			q: "牛乳",
+  			mode: "keyword",
+  		});
+  	});
+
+  	it("trims q and accepts semantic", () => {
+  		expect(
+  			parseCaptureSearchParams({ q: "  ミルク ", mode: "semantic" }),
+  		).toEqual({ q: "ミルク", mode: "semantic" });
+  	});
+
+  	it("returns null when q is missing or blank", () => {
+  		expect(parseCaptureSearchParams({})).toBeNull();
+  		expect(parseCaptureSearchParams({ q: "   " })).toBeNull();
+  	});
+
+  	it("accepts exactly 200 characters and rejects 201", () => {
+  		expect(parseCaptureSearchParams({ q: "あ".repeat(200) })).not.toBeNull();
+  		expect(parseCaptureSearchParams({ q: "あ".repeat(201) })).toBeNull();
+  	});
+
+  	it("falls back to keyword for an unknown mode", () => {
+  		expect(parseCaptureSearchParams({ q: "牛乳", mode: "bogus" })?.mode).toBe(
+  			"keyword",
+  		);
+  	});
+
+  	it("uses the first value when a parameter is repeated", () => {
+  		expect(
+  			parseCaptureSearchParams({
+  				q: ["牛乳", "記事"],
+  				mode: ["semantic", "keyword"],
+  			}),
+  		).toEqual({ q: "牛乳", mode: "semantic" });
+  	});
   });
   ```
-
 - [ ] **Step 2: Run to verify it fails**
-
   Run: `corepack pnpm --filter web exec vitest run tests/capture-search-params.test.ts`
   Expected: FAIL(module not found)
-
-- [ ] **Step 3: Implement `parseCaptureSearchParams`** in `capture-search-params.ts`
-
+- [ ] **Step 3: Implement** `parseCaptureSearchParams` in `capture-search-params.ts`
   配列なら先頭を取り、`q` は `trim()` してから長さを見る(0 または 200 超は `null`)。`mode` は `"semantic"` のときだけ `semantic`、それ以外は `keyword`。長さは `Array.from(q).length` ではなく `q.length` でよい(API 側も Python の `len` = コードポイント数だが、サロゲートペアを含む 200 文字ちょうどの境界は実用上無視する)。
-
 - [ ] **Step 4: Run to verify it passes**
-
   Run: `corepack pnpm --filter web exec vitest run tests/capture-search-params.test.ts`
   Expected: PASS
-
 - [ ] **Step 5: Commit**
-
   ```bash
   git add apps/web/src/features/capture/capture-search-params.ts apps/web/tests/capture-search-params.test.ts
   git commit -m "feat(web): normalize capture search params"
@@ -167,75 +218,174 @@
 ### Task 3: 検索欄と検索結果
 
 **Files:**
+
 - Create: `apps/web/src/features/capture/capture-search-form.tsx`, `capture-search-results-section.tsx`, `capture-search-empty-state.tsx`
 - Test: `apps/web/tests/capture-search-form.test.tsx`, `apps/web/tests/capture-search-results-section.test.tsx`
 
 **Interfaces:**
-- Consumes: Task 1 の `searchCapturesFromApi`、Task 2 の `CaptureSearch` / `CaptureSearchMode` / `CAPTURE_SEARCH_MAX_LENGTH`、既存の `mapCaptureResponsesToListItemViews`、`CaptureList`、`ApiErrorMessage`
+
+- Consumes: Task 1 の `searchCapturesFromApi`、Task 2 の `CaptureSearch` / `CAPTURE_SEARCH_MAX_LENGTH`、Task 1 の `CaptureSearchMode`、既存の `mapCaptureResponsesToListItemViews`、`CaptureList`、`ApiErrorMessage`
 - Produces:
   - `CaptureSearchForm({ defaultQuery, defaultMode }: { defaultQuery: string; defaultMode: CaptureSearchMode }): ReactNode`
   - `CaptureSearchResultsSection({ q, mode }: CaptureSearch): Promise<ReactNode>`
   - `CaptureSearchEmptyState(): ReactNode`
 
 - [ ] **Step 1: Write the failing form tests** (`renderToStaticMarkup(<CaptureSearchForm defaultQuery="" defaultMode="keyword" />)`)
+  ```tsx
+  import { renderToStaticMarkup } from "react-dom/server";
+  import { describe, expect, it } from "vitest";
 
-  ```ts
-  it("renders a GET search form to /captures", () => {
-  	// html contains 'role="search"', 'method="get"', 'action="/captures"'
-  });
-  it("renders the query input limited to 200 characters", () => {
-  	// html contains 'name="q"', 'maxLength="200"', 'aria-label="記録を検索"'
-  });
-  it("offers keyword and semantic modes and checks the default", () => {
-  	// html contains 'キーワード' and '意味', 'value="keyword"' checked, 'value="semantic"' not checked
-  });
-  it("reflects the current search", () => {
-  	// defaultQuery="牛乳", defaultMode="semantic": value="牛乳" and semantic checked
+  import { CaptureSearchForm } from "@/features/capture/capture-search-form";
+
+  describe("CaptureSearchForm", () => {
+  	it("renders a GET search form to /captures", () => {
+  		const html = renderToStaticMarkup(
+  			<CaptureSearchForm defaultQuery="" defaultMode="keyword" />,
+  		);
+
+  		expect(html).toContain('role="search"');
+  		expect(html).toContain('method="get"');
+  		expect(html).toContain('action="/captures"');
+  	});
+
+  	it("renders the query input limited to 200 characters", () => {
+  		const html = renderToStaticMarkup(
+  			<CaptureSearchForm defaultQuery="" defaultMode="keyword" />,
+  		);
+
+  		expect(html).toContain('name="q"');
+  		expect(html).toContain('maxLength="200"');
+  		expect(html).toContain('aria-label="記録を検索"');
+  	});
+
+  	it("offers keyword and semantic modes and checks the default", () => {
+  		const html = renderToStaticMarkup(
+  			<CaptureSearchForm defaultQuery="" defaultMode="keyword" />,
+  		);
+
+  		expect(html).toContain("キーワード");
+  		expect(html).toContain("意味");
+  		expect(html).toMatch(/<input[^>]*value="keyword"[^>]*checked/);
+  		expect(html).not.toMatch(/<input[^>]*value="semantic"[^>]*checked/);
+  	});
+
+  	it("reflects the current search", () => {
+  		const html = renderToStaticMarkup(
+  			<CaptureSearchForm defaultQuery="牛乳" defaultMode="semantic" />,
+  		);
+
+  		expect(html).toContain('value="牛乳"');
+  		expect(html).toMatch(/<input[^>]*value="semantic"[^>]*checked/);
+  	});
   });
   ```
-
+  radio の属性順は React の出力に依存する。正規表現が合わなければ、出力された HTML を見て `[^>]*` の並びだけを直す(検証内容は変えない)。
 - [ ] **Step 2: Write the failing results tests**
-
   mock は `capture-list-section.test.tsx` と同じ形(`vi.mock("server-only")`, `vi.mock("next/navigation", () => ({ redirect: redirectMock }))`, `vi.mock("@/lib/api/capture", () => ({ searchCapturesFromApi: searchCapturesFromApiMock }))`)。
+  ```tsx
+  import { renderToStaticMarkup } from "react-dom/server";
+  import { beforeEach, describe, expect, it, vi } from "vitest";
 
-  ```ts
-  it("renders hits with the same rows as the list and no pager", async () => {
-  	// searchCapturesFromApiMock → { ok: true, data: [{ id: "capture-1", rawText: "牛乳を買う", status: "completed", createdAt: "2026-10-02T05:02:00Z", updatedAt: "2026-10-02T05:02:00Z" }] }
-  	// html contains "牛乳を買う", "14:02", 'href="/captures/capture-1"', 'aria-label="記録の一覧"'
-  	// html does not contain "さらに表示"
-  	// expect(searchCapturesFromApiMock).toHaveBeenCalledWith({ q: "牛乳", mode: "keyword" })
-  });
-  it("renders 見つかりませんでした for an empty result", async () => {
-  	// data: [] → html contains "見つかりませんでした", not 'aria-label="記録の一覧"'
-  });
-  it("redirects to /login when unauthenticated", async () => {
-  	// { ok: false, error: { kind: "unauthenticated" } } → redirectMock toHaveBeenCalledWith("/login")
-  });
-  it("renders the API error message for other failures", async () => {
-  	// 既存 capture-list-section.test.tsx の失敗ケースと同じ error を渡し、同じ表示を assert する
-  	// html does not contain "見つかりませんでした"
+  const { searchCapturesFromApiMock, redirectMock } = vi.hoisted(() => ({
+  	searchCapturesFromApiMock: vi.fn(),
+  	redirectMock: vi.fn(),
+  }));
+
+  vi.mock("server-only", () => ({}));
+  vi.mock("next/navigation", () => ({ redirect: redirectMock }));
+  vi.mock("@/lib/api/capture", () => ({
+  	searchCapturesFromApi: searchCapturesFromApiMock,
+  }));
+
+  import { CaptureSearchResultsSection } from "@/features/capture/capture-search-results-section";
+
+  describe("CaptureSearchResultsSection", () => {
+  	beforeEach(() => {
+  		vi.clearAllMocks();
+  	});
+
+  	it("renders hits with the same rows as the list and no pager", async () => {
+  		searchCapturesFromApiMock.mockResolvedValue({
+  			ok: true,
+  			data: [
+  				{
+  					id: "capture-1",
+  					rawText: "牛乳を買う",
+  					status: "completed",
+  					createdAt: "2026-10-02T05:02:00Z",
+  					updatedAt: "2026-10-02T05:02:00Z",
+  				},
+  			],
+  		});
+
+  		const html = renderToStaticMarkup(
+  			await CaptureSearchResultsSection({ q: "牛乳", mode: "keyword" }),
+  		);
+
+  		expect(searchCapturesFromApiMock).toHaveBeenCalledWith({
+  			q: "牛乳",
+  			mode: "keyword",
+  		});
+  		expect(html).toContain("牛乳を買う");
+  		expect(html).toContain("14:02");
+  		expect(html).toContain('href="/captures/capture-1"');
+  		expect(html).toContain('aria-label="記録の一覧"');
+  		expect(html).not.toContain("さらに表示");
+  	});
+
+  	it("renders 見つかりませんでした for an empty result", async () => {
+  		searchCapturesFromApiMock.mockResolvedValue({ ok: true, data: [] });
+
+  		const html = renderToStaticMarkup(
+  			await CaptureSearchResultsSection({ q: "ミルク", mode: "keyword" }),
+  		);
+
+  		expect(html).toContain("見つかりませんでした");
+  		expect(html).not.toContain('aria-label="記録の一覧"');
+  	});
+
+  	it("redirects to /login when unauthenticated", async () => {
+  		searchCapturesFromApiMock.mockResolvedValue({
+  			ok: false,
+  			error: { kind: "unauthenticated", message: "Authentication is required." },
+  		});
+  		redirectMock.mockImplementation(() => {
+  			throw new Error("NEXT_REDIRECT");
+  		});
+
+  		await expect(
+  			CaptureSearchResultsSection({ q: "牛乳", mode: "keyword" }),
+  		).rejects.toThrow("NEXT_REDIRECT");
+  		expect(redirectMock).toHaveBeenCalledWith("/login");
+  	});
+
+  	it("renders the API error message for other failures", async () => {
+  		searchCapturesFromApiMock.mockResolvedValue({
+  			ok: false,
+  			error: { kind: "network", message: "fetch failed" },
+  		});
+
+  		const html = renderToStaticMarkup(
+  			await CaptureSearchResultsSection({ q: "ミルク", mode: "semantic" }),
+  		);
+
+  		expect(html).toContain("通信に失敗しました");
+  		expect(html).not.toContain("見つかりませんでした");
+  	});
   });
   ```
-  `redirectMock` は例外を投げない mock なので、redirect の後続でクラッシュしないよう、実装は `redirect()` の後に `return` しなくてよい形(`redirect` の戻り値型は `never`)で既存 `CaptureListSection` と同じ構造にする。
-
+  redirect の mock は既存 `capture-list-section.test.tsx` と同じく例外を投げる。実装は `CaptureListSection` と同じ構造にする。
 - [ ] **Step 3: Run to verify they fail**
-
   Run: `corepack pnpm --filter web exec vitest run tests/capture-search-form.test.tsx tests/capture-search-results-section.test.tsx`
   Expected: FAIL(module not found)
-
 - [ ] **Step 4: Implement the three components**
-
   - `CaptureSearchForm`(server component、`"use client"` なし): `<form role="search" method="get" action="/captures">`。`<input type="search" name="q" maxLength={CAPTURE_SEARCH_MAX_LENGTH} defaultValue={defaultQuery} aria-label="記録を検索" placeholder="記録を検索">` は既存 `Input` を使い、枠は Thread `#D5E3D9`、面は Leaf `#F7FBF8`。方式は `<fieldset>` の中に radio 2 つ(`name="mode"`, `value="keyword"` / `"semantic"`, `defaultChecked` は `defaultMode` で決める)。ラベルは「キーワード」「意味」、`<legend className="sr-only">検索方法</legend>`。送信は既存 `Button` で「検索」。
   - `CaptureSearchResultsSection`: `CaptureListSection` と同じ構造。`searchCapturesFromApi({ q, mode })` → 失敗は `unauthenticated` なら `redirect("/login")`、他は `<ApiErrorMessage error={result.error} />`。0 件は `<CaptureSearchEmptyState />`。成功は `<CaptureList items={mapCaptureResponsesToListItemViews(result.data)} />`。
   - `CaptureSearchEmptyState`: `CaptureEmptyState` と同じ節の見た目(苔の点 + 文)で、見出しは「見つかりませんでした」、補助文は「言葉を変えるか、検索方法を切り替えてみてください。」(Dusk 色)。
-
 - [ ] **Step 5: Run to verify they pass**
-
   Run: `corepack pnpm --filter web exec vitest run tests/capture-search-form.test.tsx tests/capture-search-results-section.test.tsx`
   Expected: PASS
-
 - [ ] **Step 6: Commit**
-
   ```bash
   git add apps/web/src/features/capture/capture-search-*.ts* apps/web/tests/capture-search-form.test.tsx apps/web/tests/capture-search-results-section.test.tsx
   git commit -m "feat(web): add the search form and result section"
@@ -246,60 +396,78 @@
 ### Task 4: page への組み込み
 
 **Files:**
+
 - Modify: `apps/web/src/features/capture/capture-page-frame.tsx`, `apps/web/src/app/captures/page.tsx`
 - Test: `apps/web/tests/captures-page.test.tsx`(変更)、`apps/web/tests/capture-views.test.tsx` にフレームのテストがあれば合わせて更新
 
 **Interfaces:**
+
 - Consumes: Task 2 の `parseCaptureSearchParams`、Task 3 の `CaptureSearchForm` / `CaptureSearchResultsSection`
 - Produces:
   - `CapturePageFrame` に `search: ReactNode` を追加(日付 `<header>` の直後、`children` の前)
   - `CapturePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> })`
 
 - [ ] **Step 1: Write the failing page tests** in `tests/captures-page.test.tsx`
-
-  既存の `vi.mock("@/features/capture/capture-list-section", ...)`(`timeline`)に並べて `vi.mock("@/features/capture/capture-search-results-section", () => ({ CaptureSearchResultsSection: ({ q, mode }) => <div>results:{q}:{mode}</div> }))` を足す。既存テストの呼び出しは `CapturePage({ searchParams: Promise.resolve({}) })` に直す。
-
-  ```ts
+  既存の `vi.mock("@/features/capture/capture-list-section", ...)`(`timeline`)に並べて `vi.mock("@/features/capture/capture-search-results-section", () => ({ CaptureSearchResultsSection: ({ q, mode }) => <div>results:{q}:{mode}</div> }))` を足す。既存テストの `CapturePage()` 呼び出しも `CapturePage({ searchParams: Promise.resolve({}) })` に直す。
+  mock の追加は次の形。
+  ```tsx
+  vi.mock("@/features/capture/capture-search-results-section", () => ({
+  	CaptureSearchResultsSection: ({ q, mode }: { q: string; mode: string }) => (
+  		<div>results:{q}:{mode}</div>
+  	),
+  }));
+  ```
+  ```tsx
   it("renders the search form and the timeline when there is no search", async () => {
-  	// html contains 'role="search"', "timeline"; does not contain "results:"
+  	const html = renderToStaticMarkup(
+  		await CapturePage({ searchParams: Promise.resolve({}) }),
+  	);
+
+  	expect(html).toContain('role="search"');
+  	expect(html).toContain("timeline");
+  	expect(html).not.toContain("results:");
   });
+
   it("renders the results instead of the timeline when q is given", async () => {
-  	// searchParams: Promise.resolve({ q: "牛乳", mode: "semantic" })
-  	// html contains "results:牛乳:semantic", 'value="牛乳"'; does not contain "timeline"
+  	const html = renderToStaticMarkup(
+  		await CapturePage({
+  			searchParams: Promise.resolve({ q: "牛乳", mode: "semantic" }),
+  		}),
+  	);
+
+  	expect(html).toContain("results:牛乳:semantic");
+  	expect(html).toContain('value="牛乳"');
+  	expect(html).not.toContain("timeline");
   });
+
   it("falls back to the timeline when q is blank", async () => {
-  	// { q: "  " } → contains "timeline"
+  	const html = renderToStaticMarkup(
+  		await CapturePage({ searchParams: Promise.resolve({ q: "  " }) }),
+  	);
+
+  	expect(html).toContain("timeline");
+  	expect(html).not.toContain("results:");
   });
   ```
-
+  `capture-views.test.tsx` の `keeps the composer in a distinct bottom region` は `CapturePageFrame` に `search={<div>search</div>}` を足し、`expect(html).toContain("search")` を加える。
 - [ ] **Step 2: Run to verify it fails**
-
   Run: `corepack pnpm --filter web exec vitest run tests/captures-page.test.tsx`
   Expected: FAIL
-
 - [ ] **Step 3: Implement**
-
   - `CapturePageFrame`: `search` を必須 prop にし、`<header>` の直下に `<div className="px-5 pb-2 sm:px-8">{search}</div>` を置く(コンポーザ領域は触らない)。
   - `CapturePage`: `await requireUser()` の後に `const search = parseCaptureSearchParams(await searchParams)`。`search` スロットに `<CaptureSearchForm defaultQuery={search?.q ?? ""} defaultMode={search?.mode ?? "keyword"} />`。`children` は、`search` があれば `<Suspense key={`${search.mode}:${search.q}`} fallback={<CaptureSearchPending />}><CaptureSearchResultsSection q={search.q} mode={search.mode} /></Suspense>`、なければ今の `<Suspense fallback={<CaptureListSkeleton />}><CaptureListSection /></Suspense>`。`CaptureSearchPending` は同ファイル内の小さな関数で、`<p role="status">検索しています</p>`(Dusk 色)を返す。`key` を付けるのは、検索語を変えたときに fallback を出し直すため。
-
 - [ ] **Step 4: Run the full web gate**
-
   Run: `corepack pnpm typecheck && corepack pnpm lint && corepack pnpm test && corepack pnpm build`
-  Expected: すべて PASS(既存の `capture-views` などフレームを使うテストが `search` 必須化で落ちたら、その呼び出しに `search={null}` を足す)
-
+  Expected: すべて PASS
 - [ ] **Step 5: Manual check** (`docs/architecture/26-week8-search.md` の手動確認)
-
   API・worker・web を起動し、`牛乳を買う` を記録して `completed` を待つ。
   1. 検索欄に `牛乳` + キーワード → `牛乳を買う` の行が出る。行を押すと詳細へ行く
   2. `ミルク` + キーワード → 「見つかりませんでした」
   3. `ミルク` + 意味 → `牛乳を買う` が出る(fake embedder のとき、本文が完全一致の固定ベクトルだけ)
   4. 空のまま「検索」→ 今までの一覧に戻る
   5. 検索中に「検索しています」が一瞬出る(遅く見えなければ DevTools の Network throttling で確認)
-
   確認後、`git checkout apps/web/next-env.d.ts`(`next build` が書き換える)。
-
 - [ ] **Step 6: Commit**
-
   ```bash
   git add apps/web/src/features/capture/capture-page-frame.tsx apps/web/src/app/captures/page.tsx apps/web/tests
   git commit -m "feat(web): search captures from the list screen"
@@ -310,7 +478,7 @@
 ## 判断メモ
 
 - **URL 駆動にした理由:** Server Action + client state だと、検索中・0 件・エラー・一覧への復帰を `CaptureListPager` の state と両立させる必要がある。URL にすれば page が分岐するだけで、既存の server component とテスト方式(`renderToStaticMarkup`)をそのまま使え、リロードや戻るでも状態が保たれる。
-- **`CaptureListPager` を使わない理由:** 検索結果は最大 20 件でカーソルが無く、`completed` だけなので polling も要らない。
-- **`next/form` ではなく素の `<form>`:** 検索は頻度が低く、全画面遷移で足りる。client 遷移が欲しくなったら `Form` に差し替えるだけで済む。
+- `CaptureListPager` **を使わない理由:** 検索結果は最大 20 件でカーソルが無く、`completed` だけなので polling も要らない。
+- `next/form` **ではなく素の** `<form>`**:** 検索は頻度が低く、全画面遷移で足りる。client 遷移が欲しくなったら `Form` に差し替えるだけで済む。
 - **意味検索の失敗:** embedding API が落ちたときの API 側の応答(5xx か)は未確認。画面側は `ApiErrorMessage` に任せ、検索欄は残るのでキーワードに切り替えて再検索できる。API 側の扱いは別途確認する。
 - **このプランでやらないこと:** 検索結果の `scenario` 表示、結果のページング、日付や route の絞り込み(spec の「やらないこと」)。
