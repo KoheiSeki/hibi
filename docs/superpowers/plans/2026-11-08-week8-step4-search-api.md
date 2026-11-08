@@ -947,19 +947,19 @@ Expected: 全部 PASS
 
 ## 完了条件（この計画のぶん）
 
-- [ ] `GET /api/v1/captures/search?q=牛乳` が `牛乳を買う` を返す
-- [ ] `q=記事` が `あとで読む記事` を返す
-- [ ] `q=ミルク&mode=semantic` が `牛乳を買う` を返し、`mode=keyword` では 0 件
-- [ ] `q=ランチ&mode=semantic` の上位が `牛乳を買う` にならない
-- [ ] 別ユーザーの同じ本文は、どちらの検索にも出ない
-- [ ] `pending`、`processing`、`failed` は検索対象にならない
-- [ ] 0 件は 200 と空配列（404 にしない）
-- [ ] `q` が空、201 文字、`mode` が不正なら 422
-- [ ] 近い順に最大 20 件
-- [ ] 検索は Capture 本文の embedding を作り直さない（クエリ文のベクトル化だけ）
-- [ ] `/search` が `/{capture_id}` より前に登録されている
-- [ ] `contracts/openapi.json` と `packages/api-client` が再生成済み
-- [ ] `just check` が GREEN
+- [x] `GET /api/v1/captures/search?q=牛乳` が `牛乳を買う` を返す
+- [x] `q=記事` が `あとで読む記事` を返す
+- [x] `q=ミルク&mode=semantic` が `牛乳を買う` を返し、`mode=keyword` では 0 件
+- [x] `q=ランチ&mode=semantic` の上位が `牛乳を買う` にならない
+- [x] 別ユーザーの同じ本文は、どちらの検索にも出ない
+- [x] `pending`、`processing`、`failed` は検索対象にならない
+- [x] 0 件は 200 と空配列（404 にしない）
+- [x] `q` が空、201 文字、`mode` が不正なら 422
+- [x] 近い順に最大 20 件
+- [x] 検索は Capture 本文の embedding を作り直さない（クエリ文のベクトル化だけ）
+- [x] `/search` が `/{capture_id}` より前に登録されている
+- [x] `contracts/openapi.json` と `packages/api-client` が再生成済み
+- [x] `just check` が GREEN
 
 ## 先送り（この計画に含めない）
 
