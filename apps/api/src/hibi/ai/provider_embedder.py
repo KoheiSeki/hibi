@@ -25,7 +25,7 @@ class SdkEmbeddingClient:
     async def create_embedding(self, *, text: str, model: str, dimensions: int) -> list[float]:
         client = AsyncOpenAI(
             api_key=get_settings().open_ai_embedding_api_key.get_secret_value(),
-            base_url=get_settings().open_ai_embedding_base_url,
+            base_url=get_settings().open_ai_embedding_base_url or None,
             timeout=get_settings().open_ai_timeout_seconds,
             max_retries=0,
         )
@@ -56,7 +56,7 @@ class ProviderTextEmbedder:
         if len(vector) != CAPTURE_EMBED_DIMENSIONS:
             raise EmbeddingProviderError()
         return Embedding(
-            vector=tuple(value for value in vector),
+            vector=tuple(vector),
             model=model,
             dimensions=CAPTURE_EMBED_DIMENSIONS,
             version=CAPTURE_EMBED_VERSION,

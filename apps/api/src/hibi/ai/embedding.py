@@ -13,7 +13,7 @@ class Embedding:
     version: str
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass
 class EmbeddingProviderError(Exception):
     pass
 

@@ -210,8 +210,9 @@ class CaptureService:
 
         embedding: Embedding | None = None
         if capture.raw_text.strip() != "":
+            # hashの照合はcomplete_capture_classificationと同じraw_textで行う
             has_embedding = await self._repository.has_same_content_embedding(
-                capture.user_id, capture_id=capture_id, text=capture.raw_text.strip()
+                capture.user_id, capture_id=capture_id, text=capture.raw_text
             )
             if not has_embedding:
                 embedding = await self._embedder.embed_text(capture.raw_text)

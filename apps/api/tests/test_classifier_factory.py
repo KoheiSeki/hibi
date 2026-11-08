@@ -58,7 +58,6 @@ def test_build_clarification_generator_uses_llm_when_api_key_is_set(
     assert isinstance(build_clarification_generator(), LlmClarificationGenerator)
 
 
-# ファイル末尾に足す
 def test_build_text_embedder_uses_fake_without_api_key(monkeypatch) -> None:
     monkeypatch.setattr(
         classifier_factory,
