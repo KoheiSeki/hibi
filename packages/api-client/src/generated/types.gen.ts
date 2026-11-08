@@ -51,6 +51,16 @@ export type ApiResponseUserResponse = {
 };
 
 /**
+ * ApiResponse[list[CaptureResponse]]
+ */
+export type ApiResponseListCaptureResponse = {
+  /**
+   * Data
+   */
+  data: Array<CaptureResponse>;
+};
+
+/**
  * CaptureResponse
  */
 export type CaptureResponse = {
@@ -373,6 +383,50 @@ export type CreateCaptureResponses = {
 
 export type CreateCaptureResponse =
   CreateCaptureResponses[keyof CreateCaptureResponses];
+
+export type SearchCapturesData = {
+  body?: never;
+  path?: never;
+  query: {
+    /**
+     * Q
+     */
+    q: string;
+    /**
+     * Mode
+     */
+    mode?: "keyword" | "semantic";
+  };
+  url: "/api/v1/captures/search";
+};
+
+export type SearchCapturesErrors = {
+  /**
+   * Authentication failed.
+   */
+  401: ProblemDetails;
+  /**
+   * Request validation failed.
+   */
+  422: ProblemDetails;
+  /**
+   * An unexpected server error occurred.
+   */
+  500: ProblemDetails;
+};
+
+export type SearchCapturesError =
+  SearchCapturesErrors[keyof SearchCapturesErrors];
+
+export type SearchCapturesResponses = {
+  /**
+   * Successful Response
+   */
+  200: ApiResponseListCaptureResponse;
+};
+
+export type SearchCapturesResponse =
+  SearchCapturesResponses[keyof SearchCapturesResponses];
 
 export type DeleteCaptureData = {
   body?: never;

@@ -39,6 +39,9 @@ import type {
   RetryCaptureData,
   RetryCaptureErrors,
   RetryCaptureResponses,
+  SearchCapturesData,
+  SearchCapturesErrors,
+  SearchCapturesResponses,
   UpdateCaptureData,
   UpdateCaptureErrors,
   UpdateCaptureResponses,
@@ -96,6 +99,27 @@ export const createCapture = <ThrowOnError extends boolean = false>(
       "Content-Type": "application/json",
       ...options.headers,
     },
+  });
+
+/**
+ * Search Captures
+ *
+ * 完了した記録を、自分の分だけ検索する。
+ *
+ * mode=keyword は本文の語の重なり、mode=semantic は意味の近さで選ぶ。
+ * 近い順に最大20件を返し、見つからなければ空配列を返す。
+ */
+export const searchCaptures = <ThrowOnError extends boolean = false>(
+  options: Options<SearchCapturesData, ThrowOnError>,
+): RequestResult<SearchCapturesResponses, SearchCapturesErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    SearchCapturesResponses,
+    SearchCapturesErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/api/v1/captures/search",
+    ...options,
   });
 
 /**

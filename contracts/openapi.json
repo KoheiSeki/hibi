@@ -81,6 +81,22 @@
         "title": "ApiResponse[UserResponse]",
         "type": "object"
       },
+      "ApiResponse_list_CaptureResponse__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/CaptureResponse"
+            },
+            "title": "Data",
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiResponse[list[CaptureResponse]]",
+        "type": "object"
+      },
       "CaptureResponse": {
         "properties": {
           "category": {
@@ -682,6 +698,90 @@
           }
         ],
         "summary": "Create Capture",
+        "tags": [
+          "captures"
+        ]
+      }
+    },
+    "/api/v1/captures/search": {
+      "get": {
+        "description": "\u5b8c\u4e86\u3057\u305f\u8a18\u9332\u3092\u3001\u81ea\u5206\u306e\u5206\u3060\u3051\u691c\u7d22\u3059\u308b\u3002\n\nmode=keyword \u306f\u672c\u6587\u306e\u8a9e\u306e\u91cd\u306a\u308a\u3001mode=semantic \u306f\u610f\u5473\u306e\u8fd1\u3055\u3067\u9078\u3076\u3002\n\u8fd1\u3044\u9806\u306b\u6700\u592720\u4ef6\u3092\u8fd4\u3057\u3001\u898b\u3064\u304b\u3089\u306a\u3051\u308c\u3070\u7a7a\u914d\u5217\u3092\u8fd4\u3059\u3002",
+        "operationId": "searchCaptures",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "mode",
+            "required": false,
+            "schema": {
+              "default": "keyword",
+              "enum": [
+                "keyword",
+                "semantic"
+              ],
+              "title": "Mode",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_list_CaptureResponse__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "An unexpected server error occurred."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Search Captures",
         "tags": [
           "captures"
         ]

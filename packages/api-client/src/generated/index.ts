@@ -12,6 +12,7 @@ export {
   listCaptures,
   type Options,
   retryCapture,
+  searchCaptures,
   updateCapture,
 } from "./sdk.gen";
 export type {
@@ -23,6 +24,7 @@ export type {
   ApiResponseCaptureResponse,
   ApiResponseEchoResponse,
   ApiResponseHealthResponse,
+  ApiResponseListCaptureResponse,
   ApiResponseProtectedResourceResponse,
   ApiResponseUserResponse,
   ApiResponseWithMetaListCaptureResponseCursorMeta,
@@ -82,6 +84,11 @@ export type {
   RetryCaptureResponse,
   RetryCaptureResponses,
   ScenarioResponse,
+  SearchCapturesData,
+  SearchCapturesError,
+  SearchCapturesErrors,
+  SearchCapturesResponse,
+  SearchCapturesResponses,
   UpdateCaptureData,
   UpdateCaptureError,
   UpdateCaptureErrors,
