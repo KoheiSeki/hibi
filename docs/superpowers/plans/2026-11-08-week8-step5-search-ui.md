@@ -227,7 +227,7 @@
 - [x] **Step 4: Run to verify it passes**
   Run: `corepack pnpm --filter web exec vitest run tests/capture-search-params.test.ts`
   Expected: PASS
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
   ```bash
   git add apps/web/src/features/capture/capture-search-params.ts apps/web/tests/capture-search-params.test.ts
   git commit -m "feat(web): normalize capture search params"
@@ -250,7 +250,7 @@
   - `CaptureSearchResultsSection({ q, mode }: CaptureSearch): Promise<ReactNode>`
   - `CaptureSearchEmptyState(): ReactNode`
 
-- [ ] **Step 1: Write the failing form tests** (`renderToStaticMarkup(<CaptureSearchForm defaultQuery="" defaultMode="keyword" />)`)
+- [x] **Step 1: Write the failing form tests** (`renderToStaticMarkup(<CaptureSearchForm defaultQuery="" defaultMode="keyword" />)`)
   ```tsx
   import { renderToStaticMarkup } from "react-dom/server";
   import { describe, expect, it } from "vitest";
@@ -300,7 +300,7 @@
   });
   ```
   radio の属性順は React の出力に依存する。正規表現が合わなければ、出力された HTML を見て `[^>]*` の並びだけを直す(検証内容は変えない)。
-- [ ] **Step 2: Write the failing results tests**
+- [x] **Step 2: Write the failing results tests**
   mock は `capture-list-section.test.tsx` と同じ形(`vi.mock("server-only")`, `vi.mock("next/navigation", () => ({ redirect: redirectMock }))`, `vi.mock("@/lib/api/capture", () => ({ searchCapturesFromApi: searchCapturesFromApiMock }))`)。
   ```tsx
   import { renderToStaticMarkup } from "react-dom/server";
@@ -395,17 +395,17 @@
   });
   ```
   redirect の mock は既存 `capture-list-section.test.tsx` と同じく例外を投げる。実装は `CaptureListSection` と同じ構造にする。
-- [ ] **Step 3: Run to verify they fail**
+- [x] **Step 3: Run to verify they fail**
   Run: `corepack pnpm --filter web exec vitest run tests/capture-search-form.test.tsx tests/capture-search-results-section.test.tsx`
   Expected: FAIL(module not found)
-- [ ] **Step 4: Implement the three components**
+- [x] **Step 4: Implement the three components**
   - `CaptureSearchForm`(server component、`"use client"` なし): `<form role="search" method="get" action="/captures">`。`<input type="search" name="q" maxLength={CAPTURE_SEARCH_MAX_LENGTH} defaultValue={defaultQuery} aria-label="記録を検索" placeholder="記録を検索">` は既存 `Input` を使い、枠は Thread `#D5E3D9`、面は Leaf `#F7FBF8`。方式は `<fieldset>` の中に radio 2 つ(`name="mode"`, `value="keyword"` / `"semantic"`, `defaultChecked` は `defaultMode` で決める)。ラベルは「キーワード」「意味」、`<legend className="sr-only">検索方法</legend>`。送信は既存 `Button` で「検索」。
   - `CaptureSearchResultsSection`: `CaptureListSection` と同じ構造。`searchCapturesFromApi({ q, mode })` → 失敗は `unauthenticated` なら `redirect("/login")`、他は `<ApiErrorMessage error={result.error} />`。0 件は `<CaptureSearchEmptyState />`。成功は `<CaptureList items={mapCaptureResponsesToListItemViews(result.data)} />`。
   - `CaptureSearchEmptyState`: `CaptureEmptyState` と同じ節の見た目(苔の点 + 文)で、見出しは「見つかりませんでした」、補助文は「言葉を変えるか、検索方法を切り替えてみてください。」(Dusk 色)。
-- [ ] **Step 5: Run to verify they pass**
+- [x] **Step 5: Run to verify they pass**
   Run: `corepack pnpm --filter web exec vitest run tests/capture-search-form.test.tsx tests/capture-search-results-section.test.tsx`
   Expected: PASS
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
   ```bash
   git add apps/web/src/features/capture/capture-search-*.ts* apps/web/tests/capture-search-form.test.tsx apps/web/tests/capture-search-results-section.test.tsx
   git commit -m "feat(web): add the search form and result section"

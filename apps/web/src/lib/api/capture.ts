@@ -3,7 +3,6 @@ import "server-only";
 import {
 	type ApiResponseWithMetaListCaptureResponseCursorMeta,
 	type CaptureResponse,
-	SearchCapturesData,
 	acceptCaptureScenario,
 	createCapture,
 	deleteCapture,
