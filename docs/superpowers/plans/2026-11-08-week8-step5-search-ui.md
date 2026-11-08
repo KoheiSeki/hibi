@@ -36,6 +36,7 @@
 
 | ファイル | 責務 |
 | --- | --- |
+| `apps/web/src/lib/api/capture-search-mode.ts` (新規) | `CaptureSearchMode`。生成済み client の型から導く。`server-only` なし |
 | `apps/web/src/lib/api/capture.ts` (変更) | `searchCapturesFromApi` を足す |
 | `apps/web/src/features/capture/capture-search-params.ts` (新規) | `searchParams` を `{ q, mode } \| null` に正規化する純粋関数 |
 | `apps/web/src/features/capture/capture-search-form.tsx` (新規) | 検索欄。GET の `<form>`。状態を持たない |
@@ -50,6 +51,7 @@
 
 **Files:**
 
+- Create: `apps/web/src/lib/api/capture-search-mode.ts`
 - Modify: `apps/web/src/lib/api/capture.ts`
 - Test: `apps/web/tests/capture-api.test.ts`
 
@@ -57,7 +59,7 @@
 
 - Consumes: `@hibi/api-client` の `searchCaptures`(`query: { q: string; mode?: "keyword" | "semantic" }`、200 は `{ data: CaptureResponse[] }`)
 - Produces:
-  - `type CaptureSearchMode = NonNullable<SearchCapturesData["query"]["mode"]>`(= `"keyword" | "semantic"`)。生成済み client の型から導き、web で union を二重定義しない。API の enum が変われば再生成で追従する
+  - `type CaptureSearchMode = NonNullable<SearchCapturesData["query"]["mode"]>`(= `"keyword" | "semantic"`)を `@/lib/api/capture-search-mode` から export する。生成済み client の型から導き、web で union を二重定義しない。API の enum が変われば再生成で追従する。`server-only` を付けないので、どの層からも通常の `import` で読める
   - `searchCapturesFromApi(params: { q: string; mode: CaptureSearchMode }): Promise<ApiResult<CaptureResponse[]>>`
 
 - [x] **Step 1: Write the failing tests** in `tests/capture-api.test.ts`
@@ -126,11 +128,11 @@
   Expected: FAIL(`searchCapturesFromApi` が export されていない)
 - [x] **Step 3: Implement** `searchCapturesFromApi` in `src/lib/api/capture.ts`
   `getCaptureFromApi` と同じ形。`getServerApiContext()` が失敗ならそのまま返し、`searchCaptures({ baseUrl, auth, query: { q, mode } })` を呼び、`normalizeGeneratedResult` を通す(レスポンスは `{ data: [...] }` のエンベロープで meta が無いため、`listCapturesFromApi` の `normalizeGeneratedEnvelopeResult` ではない)。import に `searchCaptures` を足す。
-  同じファイルに `export type CaptureSearchMode = NonNullable<SearchCapturesData["query"]["mode"]>` を定義して export し、`searchCapturesFromApi` の `mode` 引数に使う(`SearchCapturesData` は `@hibi/api-client` から `type` import)。
+  `capture-search-mode.ts` を新規に作り、`import type { SearchCapturesData } from "@hibi/api-client"` のうえで `export type CaptureSearchMode = NonNullable<SearchCapturesData["query"]["mode"]>` を定義する。`capture.ts` はそこから import して `searchCapturesFromApi` の `mode` 引数に使う。型を `capture.ts` に置かないのは、`capture.ts` が `server-only` で、型を読む側(params、form、results)に `import type` の縛りを持ち込むため。
 - [x] **Step 4: Run to verify it passes**
   Run: `corepack pnpm --filter web exec vitest run tests/capture-api.test.ts`
   Expected: PASS
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
   ```bash
   git add apps/web/src/lib/api/capture.ts apps/web/tests/capture-api.test.ts
   git commit -m "feat(web): add the capture search API wrapper"
@@ -147,7 +149,7 @@
 
 **Interfaces:**
 
-- Consumes: Task 1 の `CaptureSearchMode`。`import type { CaptureSearchMode } from "@/lib/api/capture"` で読む(`capture.ts` は `server-only` だが、`import type` は実行時に消えるので影響しない。型は必ず `import type` で読む)
+- Consumes: Task 1 の `CaptureSearchMode`(`@/lib/api/capture-search-mode`)
 - Produces:
   - `type CaptureSearch = { q: string; mode: CaptureSearchMode }`
   - `const CAPTURE_SEARCH_MAX_LENGTH = 200`
@@ -224,7 +226,7 @@
 
 **Interfaces:**
 
-- Consumes: Task 1 の `searchCapturesFromApi`、Task 2 の `CaptureSearch` / `CAPTURE_SEARCH_MAX_LENGTH`、Task 1 の `CaptureSearchMode`、既存の `mapCaptureResponsesToListItemViews`、`CaptureList`、`ApiErrorMessage`
+- Consumes: Task 1 の `searchCapturesFromApi`、Task 2 の `CaptureSearch` / `CAPTURE_SEARCH_MAX_LENGTH`、Task 1 の `CaptureSearchMode`(`@/lib/api/capture-search-mode`)、既存の `mapCaptureResponsesToListItemViews`、`CaptureList`、`ApiErrorMessage`
 - Produces:
   - `CaptureSearchForm({ defaultQuery, defaultMode }: { defaultQuery: string; defaultMode: CaptureSearchMode }): ReactNode`
   - `CaptureSearchResultsSection({ q, mode }: CaptureSearch): Promise<ReactNode>`
