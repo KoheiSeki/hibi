@@ -25,6 +25,7 @@ from hibi.modules.captures.types import (
     CreateCaptureCommand,
     CreateCaptureResult,
     ListCapturesQuery,
+    SearchCapturesQuery,
     UpdateCaptureCommand,
 )
 
@@ -66,6 +67,7 @@ class FakeCaptureService:
         self.created = True
         self.create_error: Exception | None = None
         self.scenarios: dict[UUID, str] = {}
+        self.search_calls: list[tuple[str, str]] = []
 
     async def create_capture(self, command: CreateCaptureCommand) -> CreateCaptureResult:
         if self.create_error is not None:
@@ -91,6 +93,14 @@ class FakeCaptureService:
             raise MalformedCursorError()
         items = [capture for capture in self.captures.values() if capture.user_id == query.user_id]
         return CapturePage(items=items, next_cursor=None, has_next_page=False)
+
+    async def search_captures(self, query: SearchCapturesQuery) -> list[Capture]:
+        self.search_calls.append((query.q, query.mode))
+        return [
+            capture
+            for capture in self.captures.values()
+            if capture.user_id == query.user_id and query.q in capture.raw_text
+        ]
 
     async def update_capture(self, command: UpdateCaptureCommand) -> Capture:
         capture = self.captures.get(command.capture_id)
@@ -425,3 +435,82 @@ def test_list_captures_rejects_malformed_cursor() -> None:
     )
     assert response.status_code == 400
     assert response.json()["type"].endswith("/malformed-cursor")
+
+
+def test_search_captures_returns_matching_captures() -> None:
+    fake = FakeCaptureService()
+    fake.captures[CAPTURE_ID] = _capture(status="completed")
+
+    response = _client(fake).get("/api/v1/captures/search", params={"q": "牛乳"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [item["id"] for item in body["data"]] == [str(CAPTURE_ID)]
+    assert fake.search_calls == [("牛乳", "keyword")]
+
+
+def test_search_captures_passes_the_requested_mode() -> None:
+    fake = FakeCaptureService()
+
+    response = _client(fake).get(
+        "/api/v1/captures/search", params={"q": "ミルク", "mode": "semantic"}
+    )
+
+    assert response.status_code == 200
+    assert fake.search_calls == [("ミルク", "semantic")]
+
+
+def test_search_captures_returns_an_empty_array_without_hits() -> None:
+    fake = FakeCaptureService()
+    fake.captures[CAPTURE_ID] = _capture(status="completed")
+
+    response = _client(fake).get("/api/v1/captures/search", params={"q": "記事"})
+
+    assert response.status_code == 200
+    assert response.json()["data"] == []
+
+
+def test_search_captures_does_not_return_other_owners() -> None:
+    fake = FakeCaptureService()
+    fake.captures[CAPTURE_ID] = _capture(status="completed", user_id=OTHER_ID)
+
+    response = _client(fake).get("/api/v1/captures/search", params={"q": "牛乳"})
+
+    assert response.status_code == 200
+    assert response.json()["data"] == []
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {},
+        {"q": ""},
+        {"q": "あ" * 201},
+        {"q": "牛乳", "mode": "bogus"},
+    ],
+    ids=["missing_q", "blank_q", "too_long_q", "bad_mode"],
+)
+def test_search_captures_rejects_invalid_query(params: dict[str, str]) -> None:
+    fake = FakeCaptureService()
+
+    response = _client(fake).get("/api/v1/captures/search", params=params)
+
+    assert response.status_code == 422
+    assert fake.search_calls == []
+
+
+def test_search_captures_requires_a_token() -> None:
+    response = _client(FakeCaptureService(), authenticated=False).get(
+        "/api/v1/captures/search", params={"q": "牛乳"}
+    )
+
+    assert response.status_code == 401
+
+
+def test_search_path_is_registered_before_the_capture_id_path() -> None:
+    fake = FakeCaptureService()
+
+    response = _client(fake).get("/api/v1/captures/search", params={"q": "牛乳"})
+
+    # /{capture_id}が先に当たると"search"のUUIDパースで422になる
+    assert response.status_code == 200

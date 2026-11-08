@@ -1,3 +1,4 @@
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Query, Response, status
@@ -22,11 +23,14 @@ from hibi.modules.captures.schemas import (
 )
 from hibi.modules.captures.service import CaptureService
 from hibi.modules.captures.types import (
+    CAPTURE_SEARCH_MODE_KEYWORD,
     Capture,
     CaptureScenario,
+    CaptureSearchMode,
     CreateCaptureCommand,
     CreateCaptureResult,
     ListCapturesQuery,
+    SearchCapturesQuery,
     UpdateCaptureCommand,
 )
 
@@ -126,6 +130,34 @@ async def accept_capture_scenario(
     capture = await service.accept_capture_scenario(principal.user_id, capture_id)
     response.headers["Location"] = f"/api/v1/captures/{capture.id}"
     return ApiResponse(data=_to_capture_response(capture))
+
+
+@router.get(
+    "/search",
+    operation_id="searchCaptures",
+    response_model=ApiResponse[list[CaptureResponse]],
+    responses=problem_responses(
+        status.HTTP_401_UNAUTHORIZED,
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+    ),
+)
+async def search_captures(
+    q: str = Query(min_length=1, max_length=200),
+    mode: Annotated[CaptureSearchMode, Query()] = CAPTURE_SEARCH_MODE_KEYWORD,
+    principal: Principal = Depends(get_principal),
+    service: CaptureService = Depends(_get_capture_service),
+):
+    """
+    完了した記録を、自分の分だけ検索する。
+
+    mode=keyword は本文の語の重なり、mode=semantic は意味の近さで選ぶ。
+    近い順に最大20件を返し、見つからなければ空配列を返す。
+    """
+
+    query = SearchCapturesQuery(user_id=principal.user_id, q=q, mode=mode)
+    captures = await service.search_captures(query)
+    return ApiResponse(data=[_to_capture_response(capture) for capture in captures])
 
 
 @router.get(
