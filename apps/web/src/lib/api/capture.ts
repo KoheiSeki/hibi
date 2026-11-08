@@ -3,12 +3,14 @@ import "server-only";
 import {
 	type ApiResponseWithMetaListCaptureResponseCursorMeta,
 	type CaptureResponse,
+	SearchCapturesData,
 	acceptCaptureScenario,
 	createCapture,
 	deleteCapture,
 	getCapture,
 	listCaptures,
 	retryCapture,
+	searchCaptures,
 	updateCapture,
 } from "@hibi/api-client";
 import {
@@ -23,6 +25,31 @@ type ListCapturesParams = {
 	limit?: number;
 	cursor?: string;
 };
+
+export type CaptureSearchMode = NonNullable<
+	SearchCapturesData["query"]["mode"]
+>;
+type SearchCapturesParams = { q: string; mode: CaptureSearchMode };
+
+export async function searchCapturesFromApi({
+	q,
+	mode,
+}: SearchCapturesParams): Promise<ApiResult<CaptureResponse[]>> {
+	const context = await getServerApiContext();
+	if (!context.ok) {
+		return context;
+	}
+
+	const result = await searchCaptures({
+		baseUrl: context.baseUrl,
+		auth: context.accessToken,
+		query: {
+			q,
+			mode,
+		},
+	});
+	return normalizeGeneratedResult(result);
+}
 
 export async function getCaptureFromApi(
 	captureId: string,

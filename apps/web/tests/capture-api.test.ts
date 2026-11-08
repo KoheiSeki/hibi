@@ -7,6 +7,7 @@ const {
 	getServerApiContextMock,
 	retryCaptureMock,
 	updateCaptureMock,
+	searchCapturesMock,
 } = vi.hoisted(() => ({
 	createCaptureMock: vi.fn(),
 	deleteCaptureMock: vi.fn(),
@@ -14,6 +15,7 @@ const {
 	getServerApiContextMock: vi.fn(),
 	retryCaptureMock: vi.fn(),
 	updateCaptureMock: vi.fn(),
+	searchCapturesMock: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -24,6 +26,7 @@ vi.mock("@hibi/api-client", () => ({
 	listCaptures: vi.fn(),
 	retryCapture: retryCaptureMock,
 	updateCapture: updateCaptureMock,
+	searchCaptures: searchCapturesMock,
 }));
 vi.mock("@/lib/api/server-context", () => ({
 	getServerApiContext: getServerApiContextMock,
@@ -34,6 +37,7 @@ import {
 	deleteCaptureFromApi,
 	getCaptureFromApi,
 	retryCaptureFromApi,
+	searchCapturesFromApi,
 	updateCaptureFromApi,
 } from "@/lib/api/capture";
 
@@ -326,5 +330,68 @@ describe("deleteCaptureFromApi", () => {
 				message: "Authentication is required.",
 			},
 		});
+	});
+});
+
+describe("searchCapturesFromApi", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		getServerApiContextMock.mockResolvedValue({
+			ok: true,
+			baseUrl: "https://api.hibi.example",
+			accessToken: "access-token",
+		});
+	});
+
+	it("passes q and mode with the bearer token and unwraps the data array", async () => {
+		const capture = {
+			id: "capture-1",
+			rawText: "牛乳を買う",
+			status: "completed",
+			createdAt: "2026-10-04T09:00:00Z",
+			updatedAt: "2026-10-04T09:00:00Z",
+		};
+		searchCapturesMock.mockResolvedValue({ data: { data: [capture] } });
+
+		const result = await searchCapturesFromApi({ q: "牛乳", mode: "keyword" });
+
+		expect(searchCapturesMock).toHaveBeenCalledWith({
+			baseUrl: "https://api.hibi.example",
+			auth: "access-token",
+			query: { q: "牛乳", mode: "keyword" },
+		});
+		expect(result).toEqual({ ok: true, data: [capture] });
+	});
+
+	it("does not call the API without an authenticated context", async () => {
+		getServerApiContextMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "unauthenticated",
+				message: "Authentication is required.",
+			},
+		});
+
+		const result = await searchCapturesFromApi({ q: "牛乳", mode: "semantic" });
+
+		expect(searchCapturesMock).not.toHaveBeenCalled();
+		expect(result).toEqual({
+			ok: false,
+			error: {
+				kind: "unauthenticated",
+				message: "Authentication is required.",
+			},
+		});
+	});
+
+	it("returns a classified error when the API responds with a failure", async () => {
+		searchCapturesMock.mockResolvedValue({
+			error: { title: "Service Unavailable", status: 503 },
+			response: new Response(null, { status: 503 }),
+		});
+
+		const result = await searchCapturesFromApi({ q: "牛乳", mode: "keyword" });
+
+		expect(result.ok).toBe(false);
 	});
 });
