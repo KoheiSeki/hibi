@@ -42,6 +42,7 @@ async def test_process_capture_job_commits_successful_processing(
             repository: object,
             classifier: object,
             generator: object,
+            embedder: object,
         ) -> None:
             pass
 
@@ -77,6 +78,7 @@ async def test_process_capture_job_rolls_back_and_schedules_retry(
             repository: object,
             classifier: object,
             generator: object,
+            embedder: object,
         ) -> None:
             pass
 
@@ -124,8 +126,9 @@ async def test_process_capture_job_commits_failed_status_in_separate_transaction
             repository: object,
             classifier: object,
             generator: object,
+            embedder: object,
         ) -> None:
-            del classifier
+            del classifier, embedder
             self._session = session
 
         async def process_capture(self, capture_id: UUID, processing_generation: int) -> None:

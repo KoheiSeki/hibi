@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 
 from hibi.ai.fake_clarification import FakeClarificationGenerator
 from hibi.ai.fake_classifier import FakeCaptureClassifier
+from hibi.ai.fake_embedder import FakeTextEmbedder
 from hibi.modules.captures.errors import (
     CaptureNotEditableError,
     CaptureNotFoundError,
@@ -210,7 +211,13 @@ def _service(
     repository = repo or FakeCaptureRepository()
     session = FakeSession()
     return (
-        CaptureService(session, repository, FakeCaptureClassifier(), FakeClarificationGenerator()),
+        CaptureService(
+            session,
+            repository,
+            FakeCaptureClassifier(),
+            FakeClarificationGenerator(),
+            FakeTextEmbedder(),
+        ),
         repository,
         session,
     )  # type: ignore[arg-type]

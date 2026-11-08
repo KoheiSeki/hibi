@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from hibi.ai.classifier_factory import (
     build_capture_classifier,
     build_clarification_generator,
+    build_text_embedder,
 )
 from hibi.api.dependencies import get_principal
 from hibi.api.openapi import problem_responses
@@ -41,6 +42,7 @@ def _get_capture_service(
         repository=repository,
         classifier=build_capture_classifier(),
         generator=build_clarification_generator(),
+        embedder=build_text_embedder(),
     )
 
 
