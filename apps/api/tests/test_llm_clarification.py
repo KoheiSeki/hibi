@@ -42,6 +42,7 @@ class FakeAsyncOpenAI:
         del kwargs
         self._result = result
         self._error = error
+        self.create_kwargs: dict[str, object] = {}
 
     @property
     def chat(self) -> FakeAsyncOpenAI:
@@ -52,7 +53,7 @@ class FakeAsyncOpenAI:
         return self
 
     async def create(self, **kwargs: object) -> object:
-        del kwargs
+        self.create_kwargs = kwargs
         if self._error is not None:
             raise self._error
         message = SimpleNamespace(content=self._result)
@@ -163,3 +164,17 @@ async def test_sdk_client_returns_message_content(monkeypatch: pytest.MonkeyPatc
     assert await SdkClarificationClient().complete_json(text="牛乳", category="shopping") == (
         '{"question":"いつですか"}'
     )
+
+
+@pytest.mark.asyncio
+async def test_sdk_client_prompt_mentions_json_for_json_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = FakeAsyncOpenAI(result='{"question":"いつですか"}')
+    monkeypatch.setattr("hibi.ai.llm_clarification.AsyncOpenAI", lambda **kwargs: fake)
+
+    await SdkClarificationClient().complete_json(text="牛乳", category="shopping")
+
+    assert fake.create_kwargs["response_format"] == {"type": "json_object"}
+    messages = list(fake.create_kwargs["messages"])  # type: ignore[call-overload]
+    assert any("json" in str(message["content"]).lower() for message in messages)

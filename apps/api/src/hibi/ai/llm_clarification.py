@@ -38,7 +38,7 @@ class SdkClarificationClient:
                 "role": "system",
                 "content": (
                     "聞き返しを1つだけ作る。"
-                    '返答は {"question":"..."} だけにする。'
+                    '返答は {"question":"..."} の形の JSON だけにする。'
                     "question は500文字以内にする。"
                 ),
             },
