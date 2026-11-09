@@ -487,7 +487,7 @@
   4. 空のまま「検索」→ 今までの一覧に戻る
   5. 検索中に「検索しています」が一瞬出る(遅く見えなければ DevTools の Network throttling で確認)
   確認後、`git checkout apps/web/next-env.d.ts`(`next build` が書き換える)。
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
   ```bash
   git add apps/web/src/features/capture/capture-page-frame.tsx apps/web/src/app/captures/page.tsx apps/web/tests
   git commit -m "feat(web): search captures from the list screen"
