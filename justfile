@@ -5,7 +5,10 @@ install:
     uv sync --project apps/api --frozen --python 3.14
 
 dev-api:
-    uv run --project apps/api uvicorn hibi.api.main:app --reload --port 8000
+    cd apps/api && uv run uvicorn hibi.api.main:app --reload --port 8000
+
+dev-worker:
+    cd apps/api && uv run arq hibi.jobs.main.WorkerSettings
 
 dev-web:
     corepack pnpm dev:web
