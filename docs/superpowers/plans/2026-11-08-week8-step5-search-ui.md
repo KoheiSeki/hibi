@@ -427,7 +427,7 @@
   - `CapturePageFrame` に `search: ReactNode` を追加(日付 `<header>` の直後、`children` の前)
   - `CapturePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> })`
 
-- [ ] **Step 1: Write the failing page tests** in `tests/captures-page.test.tsx`
+- [x] **Step 1: Write the failing page tests** in `tests/captures-page.test.tsx`
   既存の `vi.mock("@/features/capture/capture-list-section", ...)`(`timeline`)に並べて `vi.mock("@/features/capture/capture-search-results-section", () => ({ CaptureSearchResultsSection: ({ q, mode }) => <div>results:{q}:{mode}</div> }))` を足す。既存テストの `CapturePage()` 呼び出しも `CapturePage({ searchParams: Promise.resolve({}) })` に直す。
   mock の追加は次の形。
   ```tsx
@@ -470,16 +470,16 @@
   });
   ```
   `capture-views.test.tsx` の `keeps the composer in a distinct bottom region` は `CapturePageFrame` に `search={<div>search</div>}` を足し、`expect(html).toContain("search")` を加える。
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
   Run: `corepack pnpm --filter web exec vitest run tests/captures-page.test.tsx`
   Expected: FAIL
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
   - `CapturePageFrame`: `search` を必須 prop にし、`<header>` の直下に `<div className="px-5 pb-2 sm:px-8">{search}</div>` を置く(コンポーザ領域は触らない)。
   - `CapturePage`: `await requireUser()` の後に `const search = parseCaptureSearchParams(await searchParams)`。`search` スロットに `<CaptureSearchForm defaultQuery={search?.q ?? ""} defaultMode={search?.mode ?? "keyword"} />`。`children` は、`search` があれば `<Suspense key={`${search.mode}:${search.q}`} fallback={<CaptureSearchPending />}><CaptureSearchResultsSection q={search.q} mode={search.mode} /></Suspense>`、なければ今の `<Suspense fallback={<CaptureListSkeleton />}><CaptureListSection /></Suspense>`。`CaptureSearchPending` は同ファイル内の小さな関数で、`<p role="status">検索しています</p>`(Dusk 色)を返す。`key` を付けるのは、検索語を変えたときに fallback を出し直すため。
-- [ ] **Step 4: Run the full web gate**
+- [x] **Step 4: Run the full web gate**
   Run: `corepack pnpm typecheck && corepack pnpm lint && corepack pnpm test && corepack pnpm build`
   Expected: すべて PASS
-- [ ] **Step 5: Manual check** (`docs/architecture/26-week8-search.md` の手動確認)
+- [x] **Step 5: Manual check** (`docs/architecture/26-week8-search.md` の手動確認)
   API・worker・web を起動し、`牛乳を買う` を記録して `completed` を待つ。
   1. 検索欄に `牛乳` + キーワード → `牛乳を買う` の行が出る。行を押すと詳細へ行く
   2. `ミルク` + キーワード → 「見つかりませんでした」
