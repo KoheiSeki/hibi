@@ -234,12 +234,17 @@ describe("Capture presentation", () => {
 
 	it("keeps the composer in a distinct bottom region", () => {
 		const html = renderToStaticMarkup(
-			<CapturePageFrame dateLabel="10月2日 木" composer={<div>composer</div>}>
+			<CapturePageFrame
+				dateLabel="10月2日 木"
+				composer={<div>composer</div>}
+				search={<div>search</div>}
+			>
 				<div>timeline</div>
 			</CapturePageFrame>,
 		);
 
 		expect(html).toContain("10月2日 木");
 		expect(html).toContain('data-slot="capture-composer-region"');
+		expect(html).toContain("search");
 	});
 });

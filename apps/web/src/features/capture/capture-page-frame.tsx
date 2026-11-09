@@ -4,12 +4,14 @@ type CapturePageFrameProps = {
   dateLabel: string;
   children: ReactNode;
   composer: ReactNode;
+  search: ReactNode;
 };
 
 export function CapturePageFrame({
   dateLabel,
   children,
   composer,
+  search,
 }: CapturePageFrameProps) {
   return (
     <section className="mx-auto flex min-h-[calc(100svh-3.5rem)] w-full max-w-2xl flex-col">
@@ -18,6 +20,8 @@ export function CapturePageFrame({
           {dateLabel}
         </p>
       </header>
+
+      <div className="px-5 pb-2 sm:px-8">{search}</div>
 
       <div className="flex-1 px-5 pb-40 sm:px-8">{children}</div>
 
