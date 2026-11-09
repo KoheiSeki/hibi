@@ -12,12 +12,15 @@ from hibi.ai.classification import (
     Classification,
     ClassificationTimeoutError,
 )
+from hibi.core.config import get_settings
 
 
 class JevCaptureClassifier:
     async def classify_capture(self, text: str, *, question_version: str) -> Classification:
         async with AsyncTypeSafeClient(
-            model="jev-1.13.0", retry=RetryPolicy(max_retries=0)
+            api_key=get_settings().jev_api_key.get_secret_value(),
+            model="jev-1.13.0",
+            retry=RetryPolicy(max_retries=0),
         ) as client:
             try:
                 result = await client.system_one(
