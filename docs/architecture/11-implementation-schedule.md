@@ -158,6 +158,8 @@
 
 ## Week 9: Today優先度
 
+方針は [27-week9-today-priority.md](./27-week9-today-priority.md)。
+
 - Jev urgencyと決定論的補正から優先度を計算する
 - Today Top N APIを実装する
 - Today画面を実装する
