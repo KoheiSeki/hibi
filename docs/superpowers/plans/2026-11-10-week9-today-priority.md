@@ -50,16 +50,18 @@
 ### Task 1: 期限の抽出と `due_at`(純粋関数)
 
 **Files:**
+
 - Create: `apps/api/src/hibi/modules/captures/due.py`
 - Test: `apps/api/tests/test_capture_due.py`
 
 **Interfaces:**
+
 - Produces:
   - `zone_for(timezone: str) -> ZoneInfo` — 不正な名前は `UTC`
   - `extract_remind_text(raw_text: str) -> str | None` — 本文から日・時の表現を取り出す。無ければ None
   - `parse_due_at(remind_text: str, *, now: datetime, timezone: str) -> datetime | None` — UTC の aware な `datetime`。`now` は aware
 
-- [ ] **Step 1: Write the failing tests** in `tests/test_capture_due.py`
+- [x] **Step 1: Write the failing tests** in `tests/test_capture_due.py`
 
 ```python
 from datetime import UTC, datetime
@@ -121,21 +123,21 @@ def test_parse_due_at_treats_an_unknown_timezone_as_utc() -> None:
     )
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `uv run --project apps/api pytest apps/api/tests/test_capture_due.py -v`
 Expected: FAIL(`ModuleNotFoundError: hibi.modules.captures.due`)
 
-- [ ] **Step 3: Implement `extract_remind_text` and `parse_due_at`** in `due.py`
+- [x] **Step 3: Implement** `extract_remind_text` **and** `parse_due_at` in `due.py`
 
 正規表現 1 本で日・午前午後・時・分/半を捕まえる(例: `(今日|明日|明後日)?\s*の?\s*(午前|午後)?\s*(\d{1,2})\s*時(?:\s*(\d{1,2})\s*分|半)?` と、日だけの `(今日|明日|明後日)`)。`extract_remind_text` は一致した部分文字列を前後の空白なしで返す。`parse_due_at` は `ZoneInfo(timezone)`(失敗したら `UTC`)で `now` の暦日を求め、日の加算は暦日で行い、時刻を足して UTC に直す。範囲外の時・分は None。`ZoneInfo` の失敗を `UTC` に倒す公開関数 `zone_for(timezone: str) -> ZoneInfo` を `due.py` に置き、Task 2 の `today.py` も使う。
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `uv run --project apps/api pytest apps/api/tests/test_capture_due.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api/src/hibi/modules/captures/due.py apps/api/tests/test_capture_due.py
@@ -147,10 +149,12 @@ git commit -m "feat(captures): extract reminder deadlines in the user timezone"
 ### Task 2: 優先度と並び(純粋関数)
 
 **Files:**
+
 - Create: `apps/api/src/hibi/modules/captures/today.py`
 - Test: `apps/api/tests/test_capture_today.py`
 
 **Interfaces:**
+
 - Consumes: Task 1 の `zone_for(timezone: str) -> ZoneInfo`
 - Produces:
   - `TODAY_DEFAULT_LIMIT = 5`, `TODAY_MAX_LIMIT = 20`
@@ -258,7 +262,7 @@ def test_rank_applies_the_limit() -> None:
 Run: `uv run --project apps/api pytest apps/api/tests/test_capture_today.py -v`
 Expected: FAIL(`ModuleNotFoundError: hibi.modules.captures.today`)
 
-- [ ] **Step 3: Implement `today.py`**
+- [ ] **Step 3: Implement** `today.py`
 
 `local_day_end` は `now.astimezone(zone)` の暦日の翌日を `datetime.combine(next_date, time.min, tzinfo=zone)` で作り UTC へ。暦日の加算で行い、24 時間を足さない(夏時間)。`calculate_today_priority` は基準(null は `Decimal("0.5")`)に、期限なし 0、`due_at < now` で `Decimal("0.6")`、それ以外は `Decimal("0.4")` を足す。`rank_today` は `due_at is None or due_at < local_day_end(...)` の行だけを残し、ソートキー `(-priority, due_at is None, due_at, created_at, capture_id)` で並べて `limit` 件の id を返す。定数のボーナス値は `today.py` の module 定数にする。docstring には Spec の「優先度」の表を要約する。
 
@@ -279,11 +283,13 @@ git commit -m "feat(captures): rank today candidates by urgency and deadline"
 ### Task 3: `urgency_score` と `due_at` を保存する
 
 **Files:**
+
 - Create: `supabase/migrations/20261110000000_today_priority.sql`
 - Modify: `apps/api/src/hibi/modules/captures/models.py`, `policies.py`, `repository.py`, `service.py`, `types.py`
 - Test: `apps/api/tests/test_capture_scenario_policy.py`, `apps/api/tests/test_capture_route_policy.py`, `apps/api/tests/test_process_capture_service.py`, `apps/api/tests/integration/test_capture_repository.py`
 
 **Interfaces:**
+
 - Consumes: Task 1 の `extract_remind_text`, `parse_due_at`
 - Produces:
   - `normalize_urgency_score(score: float) -> Decimal | None` — 0 以上 1 以下なら小数 2 桁に丸めた `Decimal`、範囲外は None
@@ -365,7 +371,7 @@ Expected: FAIL(`normalize_urgency_score` が無い、`propose_capture_scenario` 
 - [ ] **Step 3: Implement**
 
 - migration `20261110000000_today_priority.sql`:
-  `alter table app.captures add column urgency_score numeric(3,2)` と `constraint ck_captures__urgency_score check (urgency_score is null or (urgency_score >= 0 and urgency_score <= 1))`。`alter table app.capture_scenarios add column due_at timestamptz, add column done_at timestamptz`。`alter table app.profiles alter column timezone set default 'Asia/Tokyo'` と `update app.profiles set timezone = 'Asia/Tokyo' where timezone = 'UTC'`(Global Constraints の承認済み事項)。
+`alter table app.captures add column urgency_score numeric(3,2)` と `constraint ck_captures__urgency_score check (urgency_score is null or (urgency_score >= 0 and urgency_score <= 1))`。`alter table app.capture_scenarios add column due_at timestamptz, add column done_at timestamptz`。`alter table app.profiles alter column timezone set default 'Asia/Tokyo'` と `update app.profiles set timezone = 'Asia/Tokyo' where timezone = 'UTC'`(Global Constraints の承認済み事項)。
 - `models.py` に 3 列、`types.py` の `CaptureScenario` に 2 列(既定 None)、`policies.py` の `normalize_urgency_score`、`ScenarioProposal.due_at`、`propose_capture_scenario` の新引数。reminder のとき `extract_remind_text(raw_text)`(dataset の完全一致は従来の値を優先)で `remind_text` を決め、`parse_due_at` で `due_at` を決める。
 - `repository.py`: `get_user_timezone`(`app.profiles` を `user_id` で 1 行読む。最小の `ProfileModel(user_id, timezone)` を `models.py` に置く)。`complete_capture_classification` に `urgency_score` を足し、UPDATE の values とシナリオの INSERT に `urgency_score`、`due_at` を入れる。
 - `service.py`: `process_capture` で `normalize_urgency_score(normalized_classification.urgency_score)` を求め、route が `reminder` のときだけ `get_user_timezone` を呼び、`self._clock()` と合わせて `propose_capture_scenario` に渡す。それ以外の route は timezone を読まず `"UTC"` を渡す。コンストラクタに `clock: Callable[[], datetime] = _utc_now` を足す。
@@ -387,10 +393,12 @@ git commit -m "feat(captures): store urgency score and reminder deadlines"
 ### Task 4: Today API と完了 API
 
 **Files:**
+
 - Modify: `apps/api/src/hibi/modules/captures/types.py`, `repository.py`, `service.py`, `router.py`, `schemas.py`
 - Test: `apps/api/tests/test_capture_today_service.py`(新規)、`apps/api/tests/test_capture_api.py`、`apps/api/tests/integration/test_capture_repository.py`
 
 **Interfaces:**
+
 - Consumes: Task 2 の `TodayCandidate`, `rank_today`, `TODAY_DEFAULT_LIMIT`, `TODAY_MAX_LIMIT`、Task 3 の `get_user_timezone`
 - Produces:
   - `TodayCapturesQuery(user_id: UUID, limit: int)`(`types.py`)
@@ -472,9 +480,11 @@ git commit -m "feat(captures): list today captures and complete scenarios over H
 ### Task 5: OpenAPI と client の再生成
 
 **Files:**
+
 - Modify: `contracts/openapi.json`, `packages/api-client/src/generated/*`
 
 **Interfaces:**
+
 - Consumes: Task 4 の `operation_id`
 - Produces: `listTodayCaptures`, `markCaptureScenarioDone`, `unmarkCaptureScenarioDone` と、`ScenarioResponse` の `dueAt` / `doneAt`
 
@@ -500,11 +510,13 @@ git commit -m "feat(contracts): regenerate the client for today and scenario com
 ### Task 6: Today 画面と完了操作
 
 **Files:**
+
 - Modify: `apps/web/src/lib/api/capture.ts`, `apps/web/src/features/capture/actions.ts`, `apps/web/src/features/capture/capture-action-state.ts`, `apps/web/src/app/captures/layout.tsx`, `apps/web/src/features/capture/capture-detail-editor.tsx`
 - Create: `apps/web/src/app/captures/today/page.tsx`, `apps/web/src/features/capture/today-section.tsx`, `today-list.tsx`, `today-empty-state.tsx`
 - Test: `apps/web/tests/capture-api.test.ts`, `capture-actions.test.ts`, `today-section.test.tsx`, `today-list.test.tsx`, `capture-detail-page.test.tsx`
 
 **Interfaces:**
+
 - Consumes: Task 5 の生成関数
 - Produces:
   - `listTodayCapturesFromApi({ limit }?: { limit?: number }): Promise<ApiResult<CaptureResponse[]>>`
@@ -564,6 +576,7 @@ Expected: すべて PASS。`git checkout apps/web/next-env.d.ts`
 - [ ] **Step 5: Manual check**(`docs/architecture/27-week9-today-priority.md` の手動確認)
 
 `just dev-api`、`just dev-worker`、`just dev-web` を起動する。
+
 1. `明日の 9 時に起こして` と `牛乳を買う` を記録し、`completed` になるのを待つ
 2. `/captures/today` に両方が出る。`牛乳を買う`(期限なし)が上、翌日期限の `起こして` は出ない
 3. 「完了にする」で行が消える
@@ -599,9 +612,9 @@ git commit -m "docs: add the week 9 today priority spec and plan"
 
 - **優先度を保存せず読み取り時に計算する理由:** 補正は現在時刻に依存する。保存すると時間とともに古くなり、再計算の job が要る。件数が小さい間は読み取りで足りる。
 - **時刻の絞り込みを SQL に置かない理由:** 日の終わりの判定(夏時間を含む)を純粋関数の 1 か所に置き、テストで固定するため。候補は未完了のシナリオだけで、件数は小さい。
-- **`due_at` を Worker で求める理由:** timezone と「今日」の基準を記録した時点で固定でき、Today の取得が単純になる。プロフィールの timezone を後で変えても過去の `due_at` は変わらない(Spec で許容)。
-- **`urgency` の label を変えない理由:** Week 5 で `normal` 固定と決めた。優先度は score から直接計算するので、label を変えても Today の結果は変わらない。
-- **`/captures/today` にした理由:** `app/captures/layout.tsx` の書体・色・ヘッダーをそのまま使うため。route group への移動は既存のテストの import を変えるので避けた。`today` は静的 segment なので `[captureId]` より先に解決される。
-- **timezone を `CaptureRepository` で読む理由:** プロフィール用の module はまだ無く、`captures` が既に `profiles` を参照している。専用 module は設定 UI を作る週に切り出す。
+- `due_at` **を Worker で求める理由:** timezone と「今日」の基準を記録した時点で固定でき、Today の取得が単純になる。プロフィールの timezone を後で変えても過去の `due_at` は変わらない(Spec で許容)。
+- `urgency` **の label を変えない理由:** Week 5 で `normal` 固定と決めた。優先度は score から直接計算するので、label を変えても Today の結果は変わらない。
+- `/captures/today` **にした理由:** `app/captures/layout.tsx` の書体・色・ヘッダーをそのまま使うため。route group への移動は既存のテストの import を変えるので避けた。`today` は静的 segment なので `[captureId]` より先に解決される。
+- **timezone を** `CaptureRepository` **で読む理由:** プロフィール用の module はまだ無く、`captures` が既に `profiles` を参照している。専用 module は設定 UI を作る週に切り出す。
 - **承認済み(2026-11-10):** `profiles.timezone` の既定を `Asia/Tokyo` にし、既存の `UTC` を書き換える migration(Task 3)。ローカル以外に環境が無い間の措置。
 - **確認済み(2026-11-10):** 期限の無い過去の `reminder` は backfill せず、完了にするまで Today に出続ける。Today の URL は `/captures/today`。
