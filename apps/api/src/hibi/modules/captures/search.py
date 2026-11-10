@@ -22,8 +22,8 @@ class SearchDocument:
 def rank_capture_by_keyword(
     documents: Sequence[SearchDocument], *, user_id: UUID, query: str
 ) -> list[UUID]:
-    query_tokens = tokenize_text(query)
-    if not query_tokens:
+    query_terms = tokenize_text(query)
+    if not query_terms:
         return []
 
     candidates = [
@@ -31,10 +31,10 @@ def rank_capture_by_keyword(
         for document in documents
         if document.user_id == user_id and document.status == CAPTURE_STATUS_COMPLETED
     ]
-    corpus: list[list[str]] = [tokens for _, tokens in candidates]
+    corpus: list[list[str]] = [terms for _, terms in candidates]
     scored = [
-        (capture_id, _tf_idf_score(query_tokens, document_tokens, corpus))
-        for capture_id, document_tokens in candidates
+        (capture_id, _tf_idf_score(query_terms, document_terms, corpus))
+        for capture_id, document_terms in candidates
     ]
     scored.sort(key=lambda item: (-item[1], item[0]))
 
@@ -68,28 +68,26 @@ async def rank_captures_by_semantic(
 
 
 def _tf_idf_score(
-    query_tokens: list[str], document_tokens: list[str], corpus: list[list[str]]
+    query_terms: list[str], document_terms: list[str], corpus: list[list[str]]
 ) -> float:
-    if not document_tokens:
+    if not document_terms:
         return 0.0
 
-    tf_by_token: dict[str, float] = {
-        token: _term_count(token, document_tokens) for token in query_tokens
-    }
+    tf_by_term: dict[str, float] = {term: _term_count(term, document_terms) for term in query_terms}
     score = 0.0
-    for token in query_tokens:
-        idf = log((1 + len(corpus)) / (1 + _document_frequency(token, corpus))) + 1
-        score += tf_by_token[token] * idf
+    for term in query_terms:
+        idf = log((1 + len(corpus)) / (1 + _document_frequency(term, corpus))) + 1
+        score += tf_by_term[term] * idf
 
     return score
 
 
-def _term_count(token: str, document_tokens: list[str]) -> int:
-    return document_tokens.count(token)
+def _term_count(term: str, document_terms: list[str]) -> int:
+    return document_terms.count(term)
 
 
-def _document_frequency(token: str, corpus: list[list[str]]) -> int:
-    return sum(token in document_tokens for document_tokens in corpus)
+def _document_frequency(term: str, corpus: list[list[str]]) -> int:
+    return sum(term in document_terms for document_terms in corpus)
 
 
 def _cosine_similarity(a: list[float], b: list[float]) -> float:
