@@ -38,6 +38,7 @@
 
 | ファイル | 責務 |
 | --- | --- |
+| `apps/api/src/hibi/core/timezone.py` (新規) | `zone_for`。不正な IANA 名を `UTC` に倒す。`due.py` と `today.py` が共有する |
 | `apps/api/src/hibi/modules/captures/due.py` (新規) | `extract_remind_text`, `parse_due_at`。純粋関数 |
 | `apps/api/src/hibi/modules/captures/today.py` (新規) | 優先度、今日の終わり、並び。純粋関数 |
 | `apps/api/src/hibi/modules/captures/policies.py` (変更) | `ScenarioProposal.due_at`、`propose_capture_scenario` の引数、`normalize_urgency_score` |
@@ -57,7 +58,7 @@
 **Interfaces:**
 
 - Produces:
-  - `zone_for(timezone: str) -> ZoneInfo` — 不正な名前は `UTC`
+  - `zone_for(timezone: str) -> ZoneInfo` — 不正な名前は `UTC`(Task 1 では `due.py` に置いた。Task 1b で `hibi.core.timezone` へ移す)
   - `extract_remind_text(raw_text: str) -> str | None` — 本文から日・時の表現を取り出す。無ければ None
   - `parse_due_at(remind_text: str, *, now: datetime, timezone: str) -> datetime | None` — UTC の aware な `datetime`。`now` は aware
 
@@ -135,48 +136,6 @@ Expected: FAIL(`ModuleNotFoundError: hibi.modules.captures.due`)
 
   3 つの関数に、日本語の Google style の docstring を付ける(全角括弧は使わない)。
 
-  ```python
-  def extract_remind_text(raw_text: str) -> str | None:
-      """本文から、日と時刻の表現を 1 つの文字列として取り出す。
-
-      日は `今日`、`明日`、`明後日`。時刻は `午前` か `午後` を任意で付けた `N時` と、
-      任意の `M分` か `半`。時刻が無く日だけでも取り出す。`3時間` のような
-      所要時間は時刻として扱わない。
-
-      Args:
-          raw_text: Capture の本文。
-
-      Returns:
-          一致した部分を前後の空白なしで返す。表現が無ければ None。
-      """
-
-  def parse_due_at(remind_text: str, *, now: datetime, timezone: str) -> datetime | None:
-      """remind_text を、ユーザーの timezone での期限に直す。
-
-      日は now をユーザーの timezone に直した暦日から数えるので、夏時間の日でも
-      同じ時刻になる。時刻が無ければその日の 23 時 59 分。`午後` で時が 12 未満
-      なら 12 時間足す。
-
-      Args:
-          remind_text: `extract_remind_text` が返した時刻の表現。
-          now: 現在時刻。aware な datetime。
-          timezone: ユーザーの IANA 名。不正な名前は UTC として扱う。
-
-      Returns:
-          UTC の aware な datetime。表現が無い、または時と分が範囲外なら None。
-      """
-
-  def zone_for(timezone: str) -> ZoneInfo:
-      """IANA 名から ZoneInfo を返す。
-
-      Args:
-          timezone: IANA の timezone 名。例は `Asia/Tokyo`。
-
-      Returns:
-          名前に対応する ZoneInfo。存在しない名前や不正な名前は UTC。
-      """
-  ```
-
 - [x] **Step 4: Run to verify it passes**
 
 Run: `uv run --project apps/api pytest apps/api/tests/test_capture_due.py -v`
@@ -191,6 +150,62 @@ git commit -m "feat(captures): extract reminder deadlines in the user timezone"
 
 ---
 
+### Task 1b: `zone_for` を `core/timezone.py` へ切り出す
+
+`due.py` と `today.py` の両方が使うため、Task 2 の前に共有の場所へ移す。`today.py` が期限の抽出(`due.py`)に依存する形を避ける。動作は変えない。
+
+**Files:**
+
+- Create: `apps/api/src/hibi/core/timezone.py`
+- Modify: `apps/api/src/hibi/modules/captures/due.py`(`zone_for` を削除し、import に変える)
+- Test: `apps/api/tests/test_timezone.py`(新規)、`apps/api/tests/test_capture_due.py`(不正な timezone 名のケースを移す)
+
+**Interfaces:**
+
+- Produces: `hibi.core.timezone.zone_for(timezone: str) -> ZoneInfo` — 存在しない名前や不正な名前は `UTC`。Task 2 の `today.py` と Task 3 以降が使う
+
+- [ ] **Step 1: Write the failing test** in `tests/test_timezone.py`
+
+```python
+from zoneinfo import ZoneInfo
+
+import pytest
+
+from hibi.core.timezone import zone_for
+
+
+def test_zone_for_returns_the_named_zone() -> None:
+    assert zone_for("Asia/Tokyo") == ZoneInfo("Asia/Tokyo")
+
+
+@pytest.mark.parametrize("name", ["", "Asia", "Asia/", "../etc/passwd", "Not/AZone"])
+def test_zone_for_falls_back_to_utc_for_unknown_or_invalid_names(name: str) -> None:
+    assert zone_for(name) == ZoneInfo("UTC")
+```
+
+- [ ] **Step 2: Run to verify it fails**
+
+Run: `uv run --project apps/api pytest apps/api/tests/test_timezone.py -v`
+Expected: FAIL(`ModuleNotFoundError: hibi.core.timezone`)
+
+- [ ] **Step 3: Move `zone_for`**
+
+`zone_for` を、`due.py` の実装(`ZoneInfoNotFoundError` と `ValueError` を捕まえて `UTC`)と docstring ごと `core/timezone.py` へ移す。`due.py` は `from hibi.core.timezone import zone_for` に変え、自分の定義を消す。`test_capture_due.py` の不正な timezone 名のケースは、`test_timezone.py` と重なるので 1 件だけ残す。
+
+- [ ] **Step 4: Run to verify it passes**
+
+Run: `uv run --project apps/api pytest apps/api/tests/test_timezone.py apps/api/tests/test_capture_due.py -v` と `ruff check`、`ty check apps/api/src`
+Expected: PASS
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add apps/api/src/hibi/core/timezone.py apps/api/src/hibi/modules/captures/due.py apps/api/tests/test_timezone.py apps/api/tests/test_capture_due.py
+git commit -m "refactor(core): share zone_for between the due and today modules"
+```
+
+---
+
 ### Task 2: 優先度と並び(純粋関数)
 
 **Files:**
@@ -200,7 +215,7 @@ git commit -m "feat(captures): extract reminder deadlines in the user timezone"
 
 **Interfaces:**
 
-- Consumes: Task 1 の `zone_for(timezone: str) -> ZoneInfo`
+- Consumes: Task 1b の `hibi.core.timezone.zone_for(timezone: str) -> ZoneInfo`
 - Produces:
   - `TODAY_DEFAULT_LIMIT = 5`, `TODAY_MAX_LIMIT = 20`
   - `@dataclass(frozen=True, slots=True) class TodayCandidate: capture_id: UUID; urgency_score: Decimal | None; due_at: datetime | None; created_at: datetime`
@@ -208,7 +223,7 @@ git commit -m "feat(captures): extract reminder deadlines in the user timezone"
   - `calculate_today_priority(candidate: TodayCandidate, *, now: datetime) -> Decimal`
   - `rank_today(candidates: Sequence[TodayCandidate], *, now: datetime, timezone: str, limit: int) -> list[UUID]`
 
-- [ ] **Step 1: Write the failing tests** in `tests/test_capture_today.py`
+- [x] **Step 1: Write the failing tests** in `tests/test_capture_today.py`
 
 ```python
 from datetime import UTC, datetime
@@ -302,7 +317,7 @@ def test_rank_applies_the_limit() -> None:
     assert len(rank_today(candidates, now=NOW, timezone=JST, limit=3)) == 3
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `uv run --project apps/api pytest apps/api/tests/test_capture_today.py -v`
 Expected: FAIL(`ModuleNotFoundError: hibi.modules.captures.today`)
@@ -311,28 +326,7 @@ Expected: FAIL(`ModuleNotFoundError: hibi.modules.captures.today`)
 
 `local_day_end` は `now.astimezone(zone)` の暦日の翌日を `datetime.combine(next_date, time.min, tzinfo=zone)` で作り UTC へ。暦日の加算で行い、24 時間を足さない(夏時間)。`calculate_today_priority` は基準(null は `Decimal("0.5")`)に、期限なし 0、`due_at < now` で `Decimal("0.6")`、それ以外は `Decimal("0.4")` を足す。`rank_today` は `due_at is None or due_at < local_day_end(...)` の行だけを残し、ソートキー `(-priority, due_at is None, due_at, created_at, capture_id)` で並べて `limit` 件の id を返す。定数のボーナス値は `today.py` の module 定数にする。docstring には Spec の「優先度」の表を要約する。
 
-  公開関数 `local_day_end`・`calculate_today_priority`・`rank_today` に、日本語の Google style の docstring を付ける(全角括弧は使わない)。`rank_today` の例を示す。
-
-  ```python
-  def rank_today(
-      candidates: Sequence[TodayCandidate], *, now: datetime, timezone: str, limit: int
-  ) -> list[UUID]:
-      """今日やることを、優先度の高い順に最大 limit 件の capture_id で返す。
-
-      期限が今日の終わり(ユーザーの暦日の翌日 0 時)以降の行は対象外。
-      並びは優先度の降順、期限の昇順(期限なしは最後)、作成日時の昇順、
-      capture_id の昇順で、入力の順序に依存しない。
-
-      Args:
-          candidates: 未完了のシナリオを持つ候補。
-          now: 現在時刻。aware な datetime。
-          timezone: ユーザーの IANA 名。不正な名前は UTC として扱う。
-          limit: 返す最大件数。
-
-      Returns:
-          優先度の高い順の capture_id。対象が無ければ空のリスト。
-      """
-  ```
+  `TodayCandidate`・`local_day_end`・`calculate_today_priority`・`rank_today` に、日本語の Google style の docstring を付ける(全角括弧は使わない)。`TodayCandidate` は `Attributes:` に 4 フィールドを書く。`local_day_end` は「翌日 0 時、暦日で数えるので夏時間の日は 23 時間や 25 時間、ちょうどの期限は明日の扱い」。`calculate_today_priority` は「基準と補正の値、今日の終わりを過ぎた期限の除外は `rank_today` が行う」。`rank_today` は「対象外の条件、並び順、入力の順序に依存しないこと」と `Args` / `Returns`。`local_day_end` に時刻の引数は足さない(日の終わりは翌日 0 時に固定で、`now` が暦日を決める)。
 
 - [ ] **Step 4: Run to verify it passes**
 
@@ -342,7 +336,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add apps/api/src/hibi/modules/captures/today.py apps/api/src/hibi/modules/captures/due.py apps/api/tests/test_capture_today.py
+git add apps/api/src/hibi/modules/captures/today.py apps/api/tests/test_capture_today.py
 git commit -m "feat(captures): rank today candidates by urgency and deadline"
 ```
 
@@ -683,6 +677,8 @@ git commit -m "docs: add the week 9 today priority spec and plan"
 - `due_at` **を Worker で求める理由:** timezone と「今日」の基準を記録した時点で固定でき、Today の取得が単純になる。プロフィールの timezone を後で変えても過去の `due_at` は変わらない(Spec で許容)。
 - `urgency` **の label を変えない理由:** Week 5 で `normal` 固定と決めた。優先度は score から直接計算するので、label を変えても Today の結果は変わらない。
 - `/captures/today` **にした理由:** `app/captures/layout.tsx` の書体・色・ヘッダーをそのまま使うため。route group への移動は既存のテストの import を変えるので避けた。`today` は静的 segment なので `[captureId]` より先に解決される。
+- **`zone_for` を `core/timezone.py` に置く理由:** `due.py` と `today.py` が共有し、Week 10 のダイジェスト(ユーザーの timezone と夏時間)も使うため。`today.py` が `due.py` に依存する形を避ける。
+- **`local_day_end` に時刻の引数を足さない理由:** 日の終わりは翌日 0 時に固定で、`now` が暦日を決める。時刻を動かす引数は、方針にない「朝 4 時までは前日」のような仕様を呼び込む。必要になったときに足す。
 - **timezone を** `CaptureRepository` **で読む理由:** プロフィール用の module はまだ無く、`captures` が既に `profiles` を参照している。専用 module は設定 UI を作る週に切り出す。
 - **承認済み(2026-11-10):** `profiles.timezone` の既定を `Asia/Tokyo` にし、既存の `UTC` を書き換える migration(Task 3)。ローカル以外に環境が無い間の措置。
 - **確認済み(2026-11-10):** 期限の無い過去の `reminder` は backfill せず、完了にするまで Today に出続ける。Today の URL は `/captures/today`。
