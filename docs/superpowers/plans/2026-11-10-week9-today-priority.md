@@ -83,6 +83,7 @@ JST = "Asia/Tokyo"
         ("明日までに提出", "明日"),
         ("今日の 9 時 30 分に電話", "今日の 9 時 30 分"),
         ("牛乳を買う", None),
+        ("3時間かかる", None),
     ],
 )
 def test_extract_remind_text(raw_text: str, expected: str | None) -> None:
@@ -130,7 +131,51 @@ Expected: FAIL(`ModuleNotFoundError: hibi.modules.captures.due`)
 
 - [x] **Step 3: Implement** `extract_remind_text` **and** `parse_due_at` in `due.py`
 
-正規表現 1 本で日・午前午後・時・分/半を捕まえる(例: `(今日|明日|明後日)?\s*の?\s*(午前|午後)?\s*(\d{1,2})\s*時(?:\s*(\d{1,2})\s*分|半)?` と、日だけの `(今日|明日|明後日)`)。`extract_remind_text` は一致した部分文字列を前後の空白なしで返す。`parse_due_at` は `ZoneInfo(timezone)`(失敗したら `UTC`)で `now` の暦日を求め、日の加算は暦日で行い、時刻を足して UTC に直す。範囲外の時・分は None。`ZoneInfo` の失敗を `UTC` に倒す公開関数 `zone_for(timezone: str) -> ZoneInfo` を `due.py` に置き、Task 2 の `today.py` も使う。
+正規表現 1 本で日・午前午後・時・分/半を捕まえる(名前付きグループ `day`・`meridiem`・`hour`・`minute`・`half` と、日だけの系統の `day_only`。時の直後が `間` の `3時間` は `(?!間)` で時刻として扱わない)。`extract_remind_text` は一致した部分文字列を前後の空白なしで返す。`parse_due_at` は `ZoneInfo(timezone)`(失敗したら `UTC`)で `now` の暦日を求め、日の加算は暦日で行い、時刻を足して UTC に直す。範囲外の時・分は None。`ZoneInfo` の失敗を `UTC` に倒す公開関数 `zone_for(timezone: str) -> ZoneInfo` を `due.py` に置き、Task 2 の `today.py` も使う。
+
+  3 つの関数に、日本語の Google style の docstring を付ける(全角括弧は使わない)。
+
+  ```python
+  def extract_remind_text(raw_text: str) -> str | None:
+      """本文から、日と時刻の表現を 1 つの文字列として取り出す。
+
+      日は `今日`、`明日`、`明後日`。時刻は `午前` か `午後` を任意で付けた `N時` と、
+      任意の `M分` か `半`。時刻が無く日だけでも取り出す。`3時間` のような
+      所要時間は時刻として扱わない。
+
+      Args:
+          raw_text: Capture の本文。
+
+      Returns:
+          一致した部分を前後の空白なしで返す。表現が無ければ None。
+      """
+
+  def parse_due_at(remind_text: str, *, now: datetime, timezone: str) -> datetime | None:
+      """remind_text を、ユーザーの timezone での期限に直す。
+
+      日は now をユーザーの timezone に直した暦日から数えるので、夏時間の日でも
+      同じ時刻になる。時刻が無ければその日の 23 時 59 分。`午後` で時が 12 未満
+      なら 12 時間足す。
+
+      Args:
+          remind_text: `extract_remind_text` が返した時刻の表現。
+          now: 現在時刻。aware な datetime。
+          timezone: ユーザーの IANA 名。不正な名前は UTC として扱う。
+
+      Returns:
+          UTC の aware な datetime。表現が無い、または時と分が範囲外なら None。
+      """
+
+  def zone_for(timezone: str) -> ZoneInfo:
+      """IANA 名から ZoneInfo を返す。
+
+      Args:
+          timezone: IANA の timezone 名。例は `Asia/Tokyo`。
+
+      Returns:
+          名前に対応する ZoneInfo。存在しない名前や不正な名前は UTC。
+      """
+  ```
 
 - [x] **Step 4: Run to verify it passes**
 
@@ -265,6 +310,29 @@ Expected: FAIL(`ModuleNotFoundError: hibi.modules.captures.today`)
 - [ ] **Step 3: Implement** `today.py`
 
 `local_day_end` は `now.astimezone(zone)` の暦日の翌日を `datetime.combine(next_date, time.min, tzinfo=zone)` で作り UTC へ。暦日の加算で行い、24 時間を足さない(夏時間)。`calculate_today_priority` は基準(null は `Decimal("0.5")`)に、期限なし 0、`due_at < now` で `Decimal("0.6")`、それ以外は `Decimal("0.4")` を足す。`rank_today` は `due_at is None or due_at < local_day_end(...)` の行だけを残し、ソートキー `(-priority, due_at is None, due_at, created_at, capture_id)` で並べて `limit` 件の id を返す。定数のボーナス値は `today.py` の module 定数にする。docstring には Spec の「優先度」の表を要約する。
+
+  公開関数 `local_day_end`・`calculate_today_priority`・`rank_today` に、日本語の Google style の docstring を付ける(全角括弧は使わない)。`rank_today` の例を示す。
+
+  ```python
+  def rank_today(
+      candidates: Sequence[TodayCandidate], *, now: datetime, timezone: str, limit: int
+  ) -> list[UUID]:
+      """今日やることを、優先度の高い順に最大 limit 件の capture_id で返す。
+
+      期限が今日の終わり(ユーザーの暦日の翌日 0 時)以降の行は対象外。
+      並びは優先度の降順、期限の昇順(期限なしは最後)、作成日時の昇順、
+      capture_id の昇順で、入力の順序に依存しない。
+
+      Args:
+          candidates: 未完了のシナリオを持つ候補。
+          now: 現在時刻。aware な datetime。
+          timezone: ユーザーの IANA 名。不正な名前は UTC として扱う。
+          limit: 返す最大件数。
+
+      Returns:
+          優先度の高い順の capture_id。対象が無ければ空のリスト。
+      """
+  ```
 
 - [ ] **Step 4: Run to verify it passes**
 
