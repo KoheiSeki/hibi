@@ -1,6 +1,7 @@
 import re
 from datetime import UTC, datetime, time, timedelta
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+from hibi.core.timezone import zone_for
 
 _DAY = r"今日|明日|明後日"
 _REMIND_PATTERN = re.compile(
@@ -71,19 +72,3 @@ def parse_due_at(remind_text: str, *, now: datetime, timezone: str) -> datetime 
     target_date = now.astimezone(zone).date() + timedelta(days=day_offset)
     local_due = datetime.combine(target_date, time(hour, minute), tzinfo=zone)
     return local_due.astimezone(UTC)
-
-
-def zone_for(timezone: str) -> ZoneInfo:
-    """IANA 名から ZoneInfo を返す。
-
-    Args:
-        timezone: IANA の timezone 名。例は `Asia/Tokyo`。
-
-    Returns:
-        名前に対応する ZoneInfo。存在しない名前や不正な名前は UTC。
-    """
-
-    try:
-        return ZoneInfo(timezone)
-    except ZoneInfoNotFoundError, ValueError:
-        return ZoneInfo("UTC")
