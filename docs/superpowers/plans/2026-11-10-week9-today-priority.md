@@ -164,7 +164,7 @@ git commit -m "feat(captures): extract reminder deadlines in the user timezone"
 
 - Produces: `hibi.core.timezone.zone_for(timezone: str) -> ZoneInfo` — 存在しない名前や不正な名前は `UTC`。Task 2 の `today.py` と Task 3 以降が使う
 
-- [ ] **Step 1: Write the failing test** in `tests/test_timezone.py`
+- [x] **Step 1: Write the failing test** in `tests/test_timezone.py`
 
 ```python
 from zoneinfo import ZoneInfo
@@ -183,21 +183,21 @@ def test_zone_for_falls_back_to_utc_for_unknown_or_invalid_names(name: str) -> N
     assert zone_for(name) == ZoneInfo("UTC")
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `uv run --project apps/api pytest apps/api/tests/test_timezone.py -v`
 Expected: FAIL(`ModuleNotFoundError: hibi.core.timezone`)
 
-- [ ] **Step 3: Move `zone_for`**
+- [x] **Step 3: Move** `zone_for`
 
 `zone_for` を、`due.py` の実装(`ZoneInfoNotFoundError` と `ValueError` を捕まえて `UTC`)と docstring ごと `core/timezone.py` へ移す。`due.py` は `from hibi.core.timezone import zone_for` に変え、自分の定義を消す。`test_capture_due.py` の不正な timezone 名のケースは、`test_timezone.py` と重なるので 1 件だけ残す。
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `uv run --project apps/api pytest apps/api/tests/test_timezone.py apps/api/tests/test_capture_due.py -v` と `ruff check`、`ty check apps/api/src`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api/src/hibi/core/timezone.py apps/api/src/hibi/modules/captures/due.py apps/api/tests/test_timezone.py apps/api/tests/test_capture_due.py
@@ -322,18 +322,18 @@ def test_rank_applies_the_limit() -> None:
 Run: `uv run --project apps/api pytest apps/api/tests/test_capture_today.py -v`
 Expected: FAIL(`ModuleNotFoundError: hibi.modules.captures.today`)
 
-- [ ] **Step 3: Implement** `today.py`
+- [x] **Step 3: Implement** `today.py`
 
 `local_day_end` は `now.astimezone(zone)` の暦日の翌日を `datetime.combine(next_date, time.min, tzinfo=zone)` で作り UTC へ。暦日の加算で行い、24 時間を足さない(夏時間)。`calculate_today_priority` は基準(null は `Decimal("0.5")`)に、期限なし 0、`due_at < now` で `Decimal("0.6")`、それ以外は `Decimal("0.4")` を足す。`rank_today` は `due_at is None or due_at < local_day_end(...)` の行だけを残し、ソートキー `(-priority, due_at is None, due_at, created_at, capture_id)` で並べて `limit` 件の id を返す。定数のボーナス値は `today.py` の module 定数にする。docstring には Spec の「優先度」の表を要約する。
 
   `TodayCandidate`・`local_day_end`・`calculate_today_priority`・`rank_today` に、日本語の Google style の docstring を付ける(全角括弧は使わない)。`TodayCandidate` は `Attributes:` に 4 フィールドを書く。`local_day_end` は「翌日 0 時、暦日で数えるので夏時間の日は 23 時間や 25 時間、ちょうどの期限は明日の扱い」。`calculate_today_priority` は「基準と補正の値、今日の終わりを過ぎた期限の除外は `rank_today` が行う」。`rank_today` は「対象外の条件、並び順、入力の順序に依存しないこと」と `Args` / `Returns`。`local_day_end` に時刻の引数は足さない(日の終わりは翌日 0 時に固定で、`now` が暦日を決める)。
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `uv run --project apps/api pytest apps/api/tests/test_capture_today.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api/src/hibi/modules/captures/today.py apps/api/tests/test_capture_today.py
@@ -677,8 +677,8 @@ git commit -m "docs: add the week 9 today priority spec and plan"
 - `due_at` **を Worker で求める理由:** timezone と「今日」の基準を記録した時点で固定でき、Today の取得が単純になる。プロフィールの timezone を後で変えても過去の `due_at` は変わらない(Spec で許容)。
 - `urgency` **の label を変えない理由:** Week 5 で `normal` 固定と決めた。優先度は score から直接計算するので、label を変えても Today の結果は変わらない。
 - `/captures/today` **にした理由:** `app/captures/layout.tsx` の書体・色・ヘッダーをそのまま使うため。route group への移動は既存のテストの import を変えるので避けた。`today` は静的 segment なので `[captureId]` より先に解決される。
-- **`zone_for` を `core/timezone.py` に置く理由:** `due.py` と `today.py` が共有し、Week 10 のダイジェスト(ユーザーの timezone と夏時間)も使うため。`today.py` が `due.py` に依存する形を避ける。
-- **`local_day_end` に時刻の引数を足さない理由:** 日の終わりは翌日 0 時に固定で、`now` が暦日を決める。時刻を動かす引数は、方針にない「朝 4 時までは前日」のような仕様を呼び込む。必要になったときに足す。
+- `zone_for` **を** `core/timezone.py` **に置く理由:** `due.py` と `today.py` が共有し、Week 10 のダイジェスト(ユーザーの timezone と夏時間)も使うため。`today.py` が `due.py` に依存する形を避ける。
+- `local_day_end` **に時刻の引数を足さない理由:** 日の終わりは翌日 0 時に固定で、`now` が暦日を決める。時刻を動かす引数は、方針にない「朝 4 時までは前日」のような仕様を呼び込む。必要になったときに足す。
 - **timezone を** `CaptureRepository` **で読む理由:** プロフィール用の module はまだ無く、`captures` が既に `profiles` を参照している。専用 module は設定 UI を作る週に切り出す。
 - **承認済み(2026-11-10):** `profiles.timezone` の既定を `Asia/Tokyo` にし、既存の `UTC` を書き換える migration(Task 3)。ローカル以外に環境が無い間の措置。
 - **確認済み(2026-11-10):** 期限の無い過去の `reminder` は backfill せず、完了にするまで Today に出続ける。Today の URL は `/captures/today`。
