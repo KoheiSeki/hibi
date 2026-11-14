@@ -75,8 +75,7 @@ class ListCapturesQuery:
 
 @dataclass(frozen=True, slots=True)
 class SearchCapturesQuery:
-    """
-    Capture検索の入力。
+    """Capture検索の入力。
 
     Attributes:
         user_id: 検証済みの所有者。検索はこのユーザーの行だけを対象にする。

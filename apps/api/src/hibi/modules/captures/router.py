@@ -148,8 +148,7 @@ async def search_captures(
     principal: Principal = Depends(get_principal),
     service: CaptureService = Depends(_get_capture_service),
 ):
-    """
-    完了した記録を、自分の分だけ検索する。
+    """完了した記録を、自分の分だけ検索する。
 
     mode=keyword は本文の語の重なり、mode=semantic は意味の近さで選ぶ。
     近い順に最大20件を返し、見つからなければ空配列を返す。

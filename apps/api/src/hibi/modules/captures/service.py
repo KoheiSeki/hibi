@@ -140,8 +140,7 @@ class CaptureService:
         return CapturePage(items=items, next_cursor=next_cursor, has_next_page=has_next_page)
 
     async def search_captures(self, query: SearchCapturesQuery) -> list[Capture]:
-        """
-        所有者の完了済みCaptureを、近い順に最大 CAPTURE_SEARCH_LIMIT 件返す。
+        """所有者の完了済みCaptureを、近い順に最大 CAPTURE_SEARCH_LIMIT 件返す。
 
         順位付けは search.py に任せる。mode が semantic ならクエリ文だけを
         embedder でベクトル化し、保存済みの embedding と比べる。本文の
