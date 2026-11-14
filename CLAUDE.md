@@ -11,6 +11,7 @@
 - 1 行目は「何をするか」を 1 文で書く。長い説明は 1 行空けて続ける。「なぜそうするか」(例外や境界の扱い、順序の理由)を、実装を読めば分かる内容より優先して書く
 - `Args:` と `Returns:` に型は書かない。型は型注釈に任せる
 - 全角括弧は使わない。ruff の RUF002 と RUF003 が検出する。括弧は半角にするか、言い換える
+- API のスキーマ(`schemas.py` の Pydantic モデル)の docstring も、OpenAPI の `description` になる。`Attributes:` は付けず、API の利用者向けに、値が null になる条件を書く。フィールドは camelCase の名前(`dueAt` など)で書く
 - router 関数の docstring は OpenAPI の `description` になり、生成される TypeScript client にも載る。API の利用者が読む文として書き、`Args:` と `Returns:` は付けない(そのまま API の説明に出てしまう)。ステータスコードとエラーの条件を書く。変更したら `just openapi` で再生成する
 
 ### TypeScript(`apps/web`、`packages`)

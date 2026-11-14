@@ -62,6 +62,13 @@ export type ApiResponseListCaptureResponse = {
 
 /**
  * CaptureResponse
+ *
+ * 記録 1 件。
+ *
+ * status は pending、processing、completed、failed のいずれか。category、route、
+ * urgency、confidence、policyVersion、questionVersion、processedAt は、処理が
+ * 終わるまで null。clarificationText は、route が clarify のときだけ入る。
+ * scenario は、completed で route が shopping、reminder、expense のときだけ入る。
  */
 export type CaptureResponse = {
   /**
@@ -121,6 +128,10 @@ export type CaptureResponse = {
 
 /**
  * CreateCaptureRequest
+ *
+ * 記録の作成の入力。
+ *
+ * rawText は前後の空白を除いて 1 文字以上 2000 文字以下。違反は 422。
  */
 export type CreateCaptureRequest = {
   /**
@@ -237,12 +248,26 @@ export type ProtectedResourceResponse = {
 
 /**
  * ScenarioResponse
+ *
+ * 記録から作った、やることの提案と、その進み具合。
+ *
+ * status が proposed なら提案、accepted ならユーザーが確認済み。doneAt が入って
+ * いれば完了済みで、status とは独立している。amount は支出で金額が取れたときだけ、
+ * remindText と dueAt は予定で時刻を読み取れたときだけ入る。
  */
 export type ScenarioResponse = {
   /**
    * Amount
    */
   amount?: number | null;
+  /**
+   * Doneat
+   */
+  doneAt?: string | null;
+  /**
+   * Dueat
+   */
+  dueAt?: string | null;
   /**
    * Policyversion
    */
@@ -267,6 +292,10 @@ export type ScenarioResponse = {
 
 /**
  * UpdateCaptureRequest
+ *
+ * 記録の本文の更新の入力。
+ *
+ * rawText は作成のときと同じ制約。更新できるのは pending と failed の記録だけ。
  */
 export type UpdateCaptureRequest = {
   /**
