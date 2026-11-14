@@ -2,6 +2,7 @@ import hashlib
 import json
 import re
 from base64 import urlsafe_b64decode, urlsafe_b64encode
+from collections.abc import Callable
 from datetime import UTC, datetime
 from uuid import UUID, uuid7
 
@@ -29,8 +30,10 @@ from hibi.modules.captures.errors import (
 from hibi.modules.captures.policies import (
     CAPTURE_ROUTE_CLARIFY,
     CAPTURE_ROUTE_POLICY_VERSION,
+    CAPTURE_ROUTE_REMINDER,
     decide_capture_route,
     normalize_classification,
+    normalize_urgency_score,
     propose_capture_scenario,
 )
 from hibi.modules.captures.repository import CaptureRepository
@@ -50,9 +53,14 @@ from hibi.modules.captures.types import (
     SearchCapturesQuery,
     UpdateCaptureCommand,
 )
+from hibi.modules.profiles.repository import ProfileRepository
 
 _IDEMPOTENCY_KEY_PATTERN = re.compile(r"^[\x20-\x7E]{8,128}$")
 _MAX_CAPTURE_LENGTH = 2_000
+
+
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
 
 
 class CaptureService:
@@ -63,12 +71,17 @@ class CaptureService:
         classifier: CaptureClassifier,
         generator: ClarificationGenerator,
         embedder: TextEmbedder,
+        profiles: ProfileRepository,
+        *,
+        clock: Callable[[], datetime] = _utc_now,
     ) -> None:
         self._session = session
         self._repository = repository
         self._classifier = classifier
         self._generator = generator
         self._embedder = embedder
+        self._profiles = profiles
+        self._clock = clock
 
     async def create_capture(self, command: CreateCaptureCommand) -> CreateCaptureResult:
         idempotency_key = command.idempotency_key
@@ -173,7 +186,6 @@ class CaptureService:
         return [by_id[capture_id] for capture_id in capture_ids if capture_id in by_id]
 
     async def update_capture(self, command: UpdateCaptureCommand) -> Capture:
-
         stripped_raw_text = self._normalize_raw_text(command.raw_text)
 
         updated = await self._repository.update_capture(
@@ -231,6 +243,7 @@ class CaptureService:
             question_version=CAPTURE_QUESTION_VERSION,
         )
         normalized_classification = normalize_classification(classification)
+        urgency_score = normalize_urgency_score(normalized_classification.urgency_score)
         route = decide_capture_route(
             category=normalized_classification.category,
             confidence=normalized_classification.confidence,
@@ -242,8 +255,15 @@ class CaptureService:
                 category=normalized_classification.category,
             )
             clarification_text = normalize_clarification_text(generated)
+        timezone = (
+            await self._profiles.get_timezone(capture.user_id)
+            if route == CAPTURE_ROUTE_REMINDER
+            else "UTC"
+        )
 
-        scenario = propose_capture_scenario(route=route, raw_text=capture.raw_text)
+        scenario = propose_capture_scenario(
+            route=route, raw_text=capture.raw_text, now=self._clock(), timezone=timezone
+        )
 
         embedding: Embedding | None = None
         if capture.raw_text.strip() != "":
@@ -260,6 +280,7 @@ class CaptureService:
             category=normalized_classification.category,
             route=route,
             urgency="normal",
+            urgency_score=urgency_score,
             confidence=normalized_classification.confidence,
             policy_version=CAPTURE_ROUTE_POLICY_VERSION,
             question_version=normalized_classification.question_version,

@@ -33,6 +33,7 @@ from hibi.modules.captures.types import (
     SearchCapturesQuery,
     UpdateCaptureCommand,
 )
+from hibi.modules.profiles.repository import ProfileRepository
 
 router = APIRouter(prefix="/captures", tags=["captures"])
 
@@ -41,12 +42,14 @@ def _get_capture_service(
     session: AsyncSession = Depends(get_session),
 ) -> CaptureService:
     repository = CaptureRepository(session=session)
+    profile = ProfileRepository(session=session)
     return CaptureService(
         session=session,
         repository=repository,
         classifier=build_capture_classifier(),
         generator=build_clarification_generator(),
         embedder=build_text_embedder(),
+        profiles=profile,
     )
 
 

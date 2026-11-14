@@ -43,6 +43,7 @@ async def test_process_capture_job_commits_successful_processing(
             classifier: object,
             generator: object,
             embedder: object,
+            profiles: object,
         ) -> None:
             pass
 
@@ -51,6 +52,7 @@ async def test_process_capture_job_commits_successful_processing(
 
     monkeypatch.setattr(job_module, "session_scope", lambda: _session_scope(state, session))
     monkeypatch.setattr(job_module, "CaptureRepository", lambda *, session: object())
+    monkeypatch.setattr(job_module, "ProfileRepository", lambda *, session: object())
     monkeypatch.setattr(job_module, "CaptureService", FakeService)
     capture_id = uuid7()
 
@@ -79,6 +81,7 @@ async def test_process_capture_job_rolls_back_and_schedules_retry(
             classifier: object,
             generator: object,
             embedder: object,
+            profiles: object,
         ) -> None:
             pass
 
@@ -87,6 +90,7 @@ async def test_process_capture_job_rolls_back_and_schedules_retry(
 
     monkeypatch.setattr(job_module, "session_scope", lambda: _session_scope(state, session))
     monkeypatch.setattr(job_module, "CaptureRepository", lambda *, session: object())
+    monkeypatch.setattr(job_module, "ProfileRepository", lambda *, session: object())
     monkeypatch.setattr(job_module, "CaptureService", FailingService)
     logged: list[dict[str, Any]] = []
     monkeypatch.setattr(job_module, "log_job_failure", lambda **kwargs: logged.append(kwargs))
@@ -127,6 +131,7 @@ async def test_process_capture_job_commits_failed_status_in_separate_transaction
             classifier: object,
             generator: object,
             embedder: object,
+            profiles: object,
         ) -> None:
             del classifier, embedder
             self._session = session
@@ -142,6 +147,7 @@ async def test_process_capture_job_commits_failed_status_in_separate_transaction
 
     monkeypatch.setattr(job_module, "session_scope", lambda: next(scopes))
     monkeypatch.setattr(job_module, "CaptureRepository", lambda *, session: object())
+    monkeypatch.setattr(job_module, "ProfileRepository", lambda *, session: object())
     monkeypatch.setattr(job_module, "CaptureService", FailingService)
     logged: list[dict[str, Any]] = []
     monkeypatch.setattr(job_module, "log_job_failure", lambda **kwargs: logged.append(kwargs))

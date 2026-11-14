@@ -14,6 +14,7 @@ from hibi.jobs.job_logging import log_job_failure
 from hibi.modules.captures.repository import CaptureRepository
 from hibi.modules.captures.service import CaptureService
 from hibi.modules.captures.types import CAPTURE_PROCESSING_MAX_ATTEMPTS
+from hibi.modules.profiles.repository import ProfileRepository
 
 PROCESS_CAPTURE_JOB_NAME = "process_capture_job"
 
@@ -38,6 +39,7 @@ async def process_capture_job(
                 classifier=build_capture_classifier(),
                 generator=build_clarification_generator(),
                 embedder=build_text_embedder(),
+                profiles=ProfileRepository(session=session),
             )
             await service.process_capture(capture_id, processing_generation)
     except Exception as error:
@@ -52,6 +54,7 @@ async def process_capture_job(
                     classifier=build_capture_classifier(),
                     generator=build_clarification_generator(),
                     embedder=build_text_embedder(),
+                    profiles=ProfileRepository(session=session),
                 )
                 await service.mark_processing_failed(capture_id, processing_generation)
         log_job_failure(
