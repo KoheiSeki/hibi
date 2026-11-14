@@ -184,6 +184,6 @@ def _remind_text(route: str, raw_text: str) -> str | None:
         時刻の表現。reminder でない、または表現が無ければ None。
     """
 
-    if route != "reminder":
+    if route != CAPTURE_ROUTE_REMINDER:
         return None
     return extract_remind_text(raw_text)
