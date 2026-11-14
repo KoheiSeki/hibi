@@ -5,7 +5,11 @@ from pathlib import Path
 import pytest
 
 from hibi.ai.classification import CAPTURE_QUESTION_VERSION, Classification
-from hibi.modules.captures.policies import decide_capture_route, normalize_classification
+from hibi.modules.captures.policies import (
+    decide_capture_route,
+    normalize_classification,
+    normalize_urgency_score,
+)
 
 _DATASET_PATH = (
     Path(__file__).resolve().parents[3] / "docs" / "ai" / "evals" / "capture-route-v1.jsonl"
@@ -70,3 +74,18 @@ def test_normalize_classification_replaces_invalid_schema(overrides: dict[str, o
     assert normalized.confidence == Decimal("0")
     assert normalized.question_version == CAPTURE_QUESTION_VERSION
     assert normalized.urgency_score == 0.5
+
+
+@pytest.mark.parametrize(
+    ("score", "expected"),
+    [
+        (0.0, Decimal("0.00")),
+        (0.5, Decimal("0.50")),
+        (0.666, Decimal("0.67")),
+        (1.0, Decimal("1.00")),
+        (-0.1, None),
+        (1.1, None),
+    ],
+)
+def test_normalize_urgency_score(score: float, expected: Decimal | None) -> None:
+    assert normalize_urgency_score(score) == expected

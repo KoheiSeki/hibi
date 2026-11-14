@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -40,6 +41,12 @@ from hibi.modules.captures.types import (
     Capture,
 )
 
+# 2026-11-10 15:00 JST
+NOW = datetime(2026, 11, 10, 6, 0, tzinfo=UTC)
+
+# urgency_score が渡されなかったことを、範囲外で保存しない None と区別する
+_NOT_PASSED = Decimal("-1")
+
 
 class FakeProcessCaptureRepository:
     def __init__(
@@ -49,11 +56,15 @@ class FakeProcessCaptureRepository:
         allow_start: bool = True,
         fail_processing: bool = False,
         has_embedding: bool = False,
+        timezone: str = "Asia/Tokyo",
     ) -> None:
         self.capture = capture
         self.allow_start = allow_start
         self.fail_processing = fail_processing
         self.has_embedding = has_embedding
+        self.timezone = timezone
+        self.timezone_lookups: list[UUID] = []
+        self.urgency_scores: list[Decimal | None] = []
         self.transitions: list[tuple[str, str]] = []
         self.classifications: list[dict[str, object]] = []
         self.scenario: ScenarioProposal | None = None
@@ -66,6 +77,10 @@ class FakeProcessCaptureRepository:
         del user_id
         self.embedding_lookups.append((capture_id, text))
         return self.has_embedding
+
+    async def get_user_timezone(self, user_id: UUID) -> str:
+        self.timezone_lookups.append(user_id)
+        return self.timezone
 
     async def get_by_capture_id(self, capture_id: UUID) -> Capture | None:
         if self.capture is None or self.capture.id != capture_id:
@@ -105,6 +120,7 @@ class FakeProcessCaptureRepository:
         policy_version: str,
         question_version: str,
         clarification_text: str | None = None,
+        urgency_score: Decimal | None = _NOT_PASSED,
         scenario: ScenarioProposal | None = None,
         embedding: Embedding | None = None,
     ) -> Capture | None:
@@ -140,6 +156,7 @@ class FakeProcessCaptureRepository:
             processed_at=datetime.now(UTC),
             clarification_text=clarification_text,
         )
+        self.urgency_scores.append(urgency_score)
         self.scenario = scenario
         self.embedding = embedding
         return self.capture
@@ -234,13 +251,17 @@ def _service(
     classifier: RecordingClassifier | ScriptedClassifier | FakeCaptureClassifier | None = None,
     generator: ScriptedGenerator | FakeClarificationGenerator | None = None,
     embedder: RecordingEmbedder | FakeTextEmbedder | None = None,
+    *,
+    clock: Callable[[], datetime] | None = None,
 ) -> CaptureService:
+    extra: dict[str, Callable[[], datetime]] = {} if clock is None else {"clock": clock}
     return CaptureService(
         cast(AsyncSession, None),
         cast(CaptureRepository, repository),
         classifier or FakeCaptureClassifier(),
         generator or FakeClarificationGenerator(),
         embedder or FakeTextEmbedder(),
+        **extra,
     )
 
 
@@ -529,7 +550,9 @@ async def test_mark_processing_failed_does_not_overwrite_newer_generation() -> N
 
 
 def _proposal() -> ScenarioProposal:
-    proposal = propose_capture_scenario(route="reminder", raw_text="明日の 9 時に起こして")
+    proposal = propose_capture_scenario(
+        route="reminder", raw_text="明日の 9 時に起こして", now=NOW, timezone="Asia/Tokyo"
+    )
     assert proposal is not None
     return proposal
 
@@ -564,9 +587,11 @@ async def test_complete_capture_stores_proposed_scenario_for_same_generation() -
     completed = await _complete(repository, capture, scenario=proposal)
 
     assert completed is not None
-    assert repository.scenario == proposal
-    assert repository.scenario.status == CAPTURE_SCENARIO_STATUS_PROPOSED
-    assert repository.scenario.policy_version == CAPTURE_SCENARIO_POLICY_VERSION
+    scenario = repository.scenario
+    assert scenario is not None
+    assert scenario == proposal
+    assert scenario.status == CAPTURE_SCENARIO_STATUS_PROPOSED
+    assert scenario.policy_version == CAPTURE_SCENARIO_POLICY_VERSION
 
 
 @pytest.mark.asyncio
@@ -637,3 +662,53 @@ async def test_process_capture_does_not_embed_blank_text() -> None:
     assert embedder.texts == []
     assert repository.embedding_lookups == []
     assert repository.embedding is None
+
+
+@pytest.mark.asyncio
+async def test_reminder_saves_due_at_and_urgency_score() -> None:
+    capture = _capture(raw_text="明日の 9 時に起こして")
+    repository = FakeProcessCaptureRepository(capture, timezone="Asia/Tokyo")
+
+    await _service(repository, clock=lambda: NOW).process_capture(capture.id, 1)
+
+    assert repository.capture is not None
+    assert repository.capture.route == "reminder"
+    assert repository.timezone_lookups == [capture.user_id]
+    assert repository.urgency_scores == [Decimal("0.50")]
+    assert repository.scenario is not None
+    assert repository.scenario.remind_text == "明日の 9 時"
+    assert repository.scenario.due_at == datetime(2026, 11, 11, 0, 0, tzinfo=UTC)
+
+
+@pytest.mark.asyncio
+async def test_non_reminder_does_not_read_the_user_timezone() -> None:
+    capture = _capture(raw_text="牛乳を買う")
+    repository = FakeProcessCaptureRepository(capture)
+
+    await _service(repository, clock=lambda: NOW).process_capture(capture.id, 1)
+
+    assert repository.capture is not None
+    assert repository.capture.route == "shopping"
+    assert repository.timezone_lookups == []
+    assert repository.scenario is not None
+    assert repository.scenario.due_at is None
+
+
+@pytest.mark.asyncio
+async def test_out_of_range_urgency_score_is_saved_as_null() -> None:
+    capture = _capture()
+    repository = FakeProcessCaptureRepository(capture)
+    classifier = ScriptedClassifier(
+        Classification(
+            category="shopping",
+            confidence=Decimal("0.9"),
+            urgency_score=1.5,
+            question_version=CAPTURE_QUESTION_VERSION,
+        )
+    )
+
+    await _service(repository, classifier).process_capture(capture.id, 1)
+
+    assert repository.capture is not None
+    assert repository.capture.status == CAPTURE_STATUS_COMPLETED
+    assert repository.urgency_scores == [None]

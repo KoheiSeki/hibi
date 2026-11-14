@@ -42,6 +42,9 @@ from hibi.modules.captures.types import (
 _HASH_A = "a" * 64
 _HASH_B = "b" * 64
 
+# 2026-11-10 15:00 JST
+_NOW = datetime(2026, 11, 10, 6, 0, tzinfo=UTC)
+
 
 def _database_url() -> str:
     return get_settings().database_url
@@ -436,6 +439,7 @@ async def _complete_classification(
     processing_generation: int = 1,
     scenario: ScenarioProposal | None,
     embedding: Embedding | None = None,
+    urgency_score: Decimal | None = None,
 ) -> Capture | None:
     return await repo.complete_capture_classification(
         capture_id=capture.id,
@@ -447,6 +451,7 @@ async def _complete_classification(
         policy_version=CAPTURE_ROUTE_POLICY_VERSION,
         question_version=CAPTURE_QUESTION_VERSION,
         clarification_text=None,
+        urgency_score=urgency_score,
         scenario=scenario,
         embedding=embedding,
     )
@@ -463,7 +468,9 @@ async def test_complete_capture_inserts_proposed_scenario(session: AsyncSession)
         .where(CaptureModel.id == capture.id)
         .values(status=CAPTURE_STATUS_PROCESSING)
     )
-    proposal = propose_capture_scenario(route="reminder", raw_text=capture.raw_text)
+    proposal = propose_capture_scenario(
+        route="reminder", raw_text=capture.raw_text, now=_NOW, timezone="Asia/Tokyo"
+    )
 
     completed = await _complete_classification(repo, capture, scenario=proposal)
     stored = await session.scalar(
@@ -497,7 +504,9 @@ async def test_complete_capture_does_not_insert_scenario_for_other_generation(
         repo,
         capture,
         processing_generation=2,
-        scenario=propose_capture_scenario(route="shopping", raw_text="牛乳を買う"),
+        scenario=propose_capture_scenario(
+            route="shopping", raw_text="牛乳を買う", now=_NOW, timezone="Asia/Tokyo"
+        ),
     )
     stored = await session.scalar(
         select(CaptureScenarioModel).where(CaptureScenarioModel.capture_id == capture.id)
@@ -526,6 +535,78 @@ async def test_complete_capture_without_scenario_inserts_no_row(session: AsyncSe
 
     assert completed is not None
     assert stored is None
+
+
+@pytest.mark.integration
+async def test_complete_capture_saves_urgency_score_and_due_at(session: AsyncSession) -> None:
+    user_id = uuid4()
+    await _insert_auth_user(session, user_id)
+    repo = CaptureRepository(session)
+    capture = await _create_capture(repo, user_id, raw_text="明日の 9 時に起こして")
+    await _mark_processing(session, capture.id)
+    proposal = propose_capture_scenario(
+        route="reminder", raw_text=capture.raw_text, now=_NOW, timezone="Asia/Tokyo"
+    )
+
+    completed = await _complete_classification(
+        repo, capture, scenario=proposal, urgency_score=Decimal("0.50")
+    )
+    urgency_score = await session.scalar(
+        select(CaptureModel.urgency_score).where(CaptureModel.id == capture.id)
+    )
+    stored = await session.scalar(
+        select(CaptureScenarioModel).where(CaptureScenarioModel.capture_id == capture.id)
+    )
+
+    assert completed is not None
+    assert urgency_score == Decimal("0.50")
+    assert stored is not None
+    assert stored.due_at == datetime(2026, 11, 11, 0, 0, tzinfo=UTC)
+    assert stored.done_at is None
+
+
+@pytest.mark.integration
+async def test_complete_capture_saves_a_null_urgency_score(session: AsyncSession) -> None:
+    user_id = uuid4()
+    await _insert_auth_user(session, user_id)
+    repo = CaptureRepository(session)
+    capture = await _create_capture(repo, user_id)
+    await _mark_processing(session, capture.id)
+
+    completed = await _complete_classification(repo, capture, scenario=None, urgency_score=None)
+    urgency_score = await session.scalar(
+        select(CaptureModel.urgency_score).where(CaptureModel.id == capture.id)
+    )
+
+    assert completed is not None
+    assert urgency_score is None
+
+
+@pytest.mark.integration
+async def test_get_user_timezone_defaults_to_tokyo_and_follows_the_profile(
+    session: AsyncSession,
+) -> None:
+    user_id = uuid4()
+    await _insert_auth_user(session, user_id)
+    repo = CaptureRepository(session)
+
+    assert await repo.get_user_timezone(user_id) == "Asia/Tokyo"
+
+    await session.execute(
+        text("UPDATE app.profiles SET timezone = :timezone WHERE user_id = :user_id"),
+        {"timezone": "America/New_York", "user_id": user_id},
+    )
+
+    assert await repo.get_user_timezone(user_id) == "America/New_York"
+
+
+@pytest.mark.integration
+async def test_get_user_timezone_falls_back_to_utc_without_a_profile(
+    session: AsyncSession,
+) -> None:
+    repo = CaptureRepository(session)
+
+    assert await repo.get_user_timezone(uuid4()) == "UTC"
 
 
 def _content_hash(text: str) -> str:
