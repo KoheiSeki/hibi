@@ -34,10 +34,29 @@ from hibi.modules.captures.types import (
 
 
 class CaptureRepository:
+    """Capture と、それに付くシナリオ、embedding、outbox の永続化。
+
+    API から呼ぶ読み書きは、すべて `user_id` を条件に含める。`user_id` を取らないのは、
+    Worker が `capture_id` と処理世代で操作するメソッドと、outbox の操作だけ。
+    更新は条件付き UPDATE で行い、対象でなければ None か False を返す。例外にはしない。
+    """
+
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
     async def get_by_capture_id(self, capture_id: UUID) -> Capture | None:
+        """所有者を問わず、id で Capture を 1 件読む。
+
+        Worker が job の引数の `capture_id` だけで読むために使う。API からは使わない。
+        シナリオは付けない。
+
+        Args:
+            capture_id: Capture の id。
+
+        Returns:
+            見つかった Capture。無ければ None。
+        """
+
         stmt = select(CaptureModel).where(CaptureModel.id == capture_id)
         result = await self._session.execute(stmt)
         row = result.scalar_one_or_none()
@@ -46,6 +65,16 @@ class CaptureRepository:
         return _to_capture(row)
 
     async def get_by_id(self, user_id: UUID, *, capture_id: UUID) -> Capture | None:
+        """所有者の Capture を、シナリオ付きで 1 件読む。
+
+        Args:
+            user_id: 所有者。別ユーザーの行は読まない。
+            capture_id: Capture の id。
+
+        Returns:
+            見つかった Capture。無い、または別ユーザーの行なら None。
+        """
+
         stmt = select(CaptureModel).where(
             CaptureModel.id == capture_id, CaptureModel.user_id == user_id
         )
@@ -57,6 +86,19 @@ class CaptureRepository:
         return _to_capture(row, scenario_row)
 
     async def get_by_idempotency_key(self, user_id: UUID, *, key: str) -> Capture | None:
+        """冪等キーで、所有者の Capture を 1 件読む。
+
+        作成 API が、同じキーの再送か、本文が違う衝突かを判定するために使う。
+        シナリオは付けない。
+
+        Args:
+            user_id: 所有者。
+            key: 作成時に受け取った冪等キー。
+
+        Returns:
+            見つかった Capture。無ければ None。
+        """
+
         stmt = select(CaptureModel).where(
             CaptureModel.user_id == user_id, CaptureModel.idempotency_key == key
         )
@@ -69,6 +111,18 @@ class CaptureRepository:
     async def get_capture_scenario(
         self, user_id: UUID, *, capture_id: UUID
     ) -> CaptureScenarioModel | None:
+        """所有者の Capture に付くシナリオの行を読む。
+
+        他のメソッドと違い、ドメインの型ではなく ORM のモデルを返す。
+
+        Args:
+            user_id: 所有者。
+            capture_id: Capture の id。
+
+        Returns:
+            シナリオの行。無い、または別ユーザーの行なら None。
+        """
+
         stmt = select(CaptureScenarioModel).where(
             CaptureScenarioModel.capture_id == capture_id,
             CaptureScenarioModel.user_id == user_id,
@@ -84,6 +138,23 @@ class CaptureRepository:
         start_created_at: datetime | None = None,
         start_capture_id: UUID | None = None,
     ) -> list[Capture]:
+        """所有者の Capture を、新しい順に読む。
+
+        並びは `created_at` と `id` の降順で、続きは keyset で読む。次のページの
+        開始位置は、前のページの最後の行の `created_at` と `id` で渡す。2 つが両方
+        揃ったときだけ、その位置より古い行から読む。シナリオは、ページ全体を
+        1 回の追加クエリでまとめて読む。
+
+        Args:
+            user_id: 所有者。
+            limit: 読む最大件数。
+            start_created_at: 開始位置の作成時刻。
+            start_capture_id: 開始位置の id。
+
+        Returns:
+            新しい順の Capture。無ければ空のリスト。
+        """
+
         stmt = select(CaptureModel).where(CaptureModel.user_id == user_id)
         if start_created_at is not None and start_capture_id is not None:
             stmt = stmt.where(
@@ -106,8 +177,7 @@ class CaptureRepository:
         return [_to_capture(row, scenarios.get(row.id)) for row in rows]
 
     async def list_search_documents(self, user_id: UUID) -> list[SearchDocument]:
-        """
-        検索の候補を読み出す。所有者の completed 行だけを返す。
+        """検索の候補を読み出す。所有者の completed 行だけを返す。
 
         embedding が無い行も候補に残す。outer join を使う。キーワード検索は
         embedding を使わないので、無い行も当たる必要がある。意味検索は
@@ -141,8 +211,7 @@ class CaptureRepository:
     async def list_captures_by_ids(
         self, user_id: UUID, *, capture_ids: Sequence[UUID]
     ) -> list[Capture]:
-        """
-        id の一覧から、所有者の Capture を scenario 付きで読む。
+        """id の一覧から、所有者の Capture を scenario 付きで読む。
 
         返す順序は保証しない。SQL の IN は順序を持たない。呼び出し側が
         順位に合わせて並べ直す。所有者が違う id は黙って落とす。
@@ -167,6 +236,19 @@ class CaptureRepository:
         return [_to_capture(row, scenario_row) for row, scenario_row in result.all()]
 
     async def list_pending_outbox_events(self, *, limit: int) -> list[OutboxEvent]:
+        """配送待ちの outbox を、古い順に読む。
+
+        `status` が pending で、`available_at` を過ぎた行が対象。`FOR UPDATE SKIP LOCKED`
+        で読むので、relay が同時に動いても、同じ行を重複して取らない。行のロックは
+        呼び出し側の transaction が終わるまで続く。
+
+        Args:
+            limit: 読む最大件数。
+
+        Returns:
+            `available_at`、`id` の昇順の OutboxEvent。
+        """
+
         stmt = (
             select(OutboxModel)
             .where(
@@ -190,6 +272,24 @@ class CaptureRepository:
         request_hash: str,
         outbox_id: UUID,
     ) -> Capture:
+        """Capture と outbox の行を、同じ transaction で作る。
+
+        Capture は pending で作る。API の応答を待たせずに、Worker の処理を
+        予約するため、2 行を一緒に flush する。同じ所有者と冪等キーの行が既にあれば、
+        flush で IntegrityError になる。呼び出し側が、再送か衝突かを判定する。
+
+        Args:
+            user_id: 所有者。
+            capture_id: 新しい Capture の id。
+            raw_text: 検証済みの本文。
+            idempotency_key: 冪等キー。
+            request_hash: 本文から求めた hash。再送と衝突の判定に使う。
+            outbox_id: 新しい outbox の id。
+
+        Returns:
+            作った Capture。
+        """
+
         capture = CaptureModel(
             id=capture_id,
             user_id=user_id,
@@ -208,6 +308,20 @@ class CaptureRepository:
     async def update_capture(
         self, user_id: UUID, *, capture_id: UUID, raw_text: str
     ) -> Capture | None:
+        """所有者の本文を更新する。pending と failed の行だけが対象。
+
+        更新できる状態を、UPDATE の条件に含める。処理中や完了済みの行は更新しない。
+
+        Args:
+            user_id: 所有者。
+            capture_id: Capture の id。
+            raw_text: 検証済みの新しい本文。
+
+        Returns:
+            更新後の Capture。対象でなければ None。存在しないのか、更新できない
+            状態なのかは区別しないので、呼び出し側が `get_by_id` で判別する。
+        """
+
         stmt = (
             update(CaptureModel)
             .where(
@@ -232,6 +346,21 @@ class CaptureRepository:
         expected_status: str,
         status: str,
     ) -> bool:
+        """処理状態を、期待する状態のときだけ別の状態へ進める。
+
+        `status` と `processing_generation` が両方一致するときだけ更新する。古い世代の
+        job や、別の job が先に進めた行は更新されない。
+
+        Args:
+            capture_id: Capture の id。
+            processing_generation: job の引数の処理世代。
+            expected_status: 更新前に期待する状態。
+            status: 更新後の状態。
+
+        Returns:
+            更新したら True。条件に合う行が無ければ False。
+        """
+
         stmt = (
             update(CaptureModel)
             .where(
@@ -245,6 +374,15 @@ class CaptureRepository:
         return await self._session.scalar(stmt) is not None
 
     async def update_outbox_published(self, *, outbox_id: UUID) -> bool:
+        """pending の outbox を、配送済みにする。
+
+        Args:
+            outbox_id: outbox の id。
+
+        Returns:
+            更新したら True。既に配送済み、または存在しなければ False。
+        """
+
         stmt = (
             update(OutboxModel)
             .where(OutboxModel.id == outbox_id, OutboxModel.status == OUTBOX_STATUS_PENDING)
@@ -254,6 +392,18 @@ class CaptureRepository:
         return await self._session.scalar(stmt) is not None
 
     async def delete_capture(self, user_id: UUID, *, capture_id: UUID) -> bool:
+        """所有者の Capture を削除する。
+
+        外部キーの `on delete cascade` で、outbox、シナリオ、embedding も一緒に消える。
+
+        Args:
+            user_id: 所有者。
+            capture_id: Capture の id。
+
+        Returns:
+            削除したら True。無い、または別ユーザーの行なら False。
+        """
+
         stmt = select(CaptureModel).where(
             CaptureModel.id == capture_id, CaptureModel.user_id == user_id
         )
@@ -269,6 +419,20 @@ class CaptureRepository:
     async def retry_failed_capture(
         self, user_id: UUID, *, capture_id: UUID, outbox_id: UUID
     ) -> Capture | None:
+        """failed の Capture を、次の世代の pending に戻して再処理を予約する。
+
+        `processing_generation` を 1 増やし、その世代の outbox を同じ transaction で
+        足す。古い世代の job は、世代が合わず、何も変えない。
+
+        Args:
+            user_id: 所有者。
+            capture_id: Capture の id。
+            outbox_id: 新しい outbox の id。
+
+        Returns:
+            戻した Capture。failed でない、または所有者が違えば None。
+        """
+
         stmt = (
             update(CaptureModel)
             .where(
@@ -309,6 +473,7 @@ class CaptureRepository:
         category: str,
         route: str,
         urgency: str,
+        urgency_score: Decimal | None,
         confidence: Decimal,
         policy_version: str,
         question_version: str,
@@ -316,6 +481,33 @@ class CaptureRepository:
         scenario: ScenarioProposal | None = None,
         embedding: Embedding | None = None,
     ) -> Capture | None:
+        """処理中の Capture を、分類の結果と一緒に completed にする。
+
+        `status` が processing で、`processing_generation` も一致するときだけ
+        更新する。分類の列、緊急度、聞き返し文を同じ UPDATE で書き、続けて、
+        シナリオと embedding を同じ transaction で書く。
+
+        embedding は、行が無ければ作り、本文の hash が違えば置き換え、同じなら
+        そのまま残す。
+
+        Args:
+            capture_id: Capture の id。
+            processing_generation: job の引数の処理世代。
+            category: 正規化済みの category。
+            route: 確定した route。
+            urgency: 緊急度の label。
+            urgency_score: 保存する緊急度。範囲外なら None。
+            confidence: 分類の確信度。
+            policy_version: route の policy の版。
+            question_version: 分類の質問の版。
+            clarification_text: 聞き返し文。clarify でなければ None。
+            scenario: 保存するシナリオの提案。無ければ None。
+            embedding: 保存する embedding。作らなかったときは None。
+
+        Returns:
+            完了した Capture。シナリオは付かない。対象でなければ None。
+        """
+
         stmt = (
             update(CaptureModel)
             .where(
@@ -328,6 +520,7 @@ class CaptureRepository:
                 category=category,
                 route=route,
                 urgency=urgency,
+                urgency_score=urgency_score,
                 confidence=confidence,
                 policy_version=policy_version,
                 question_version=question_version,
@@ -353,6 +546,7 @@ class CaptureRepository:
                     amount=scenario.amount,
                     remind_text=scenario.remind_text,
                     policy_version=scenario.policy_version,
+                    due_at=scenario.due_at,
                     created_at=func.now(),
                     updated_at=func.now(),
                 )
@@ -391,6 +585,16 @@ class CaptureRepository:
         return _to_capture(row)
 
     async def accept_capture_scenario(self, user_id: UUID, *, capture_id: UUID) -> bool:
+        """所有者の proposed のシナリオを、accepted にする。
+
+        Args:
+            user_id: 所有者。
+            capture_id: Capture の id。
+
+        Returns:
+            更新したら True。無い、別ユーザーの行、または proposed でなければ False。
+        """
+
         stmt = (
             update(CaptureScenarioModel)
             .where(
@@ -406,6 +610,20 @@ class CaptureRepository:
     async def has_same_content_embedding(
         self, user_id: UUID, *, capture_id: UUID, text: str
     ) -> bool:
+        """所有者の embedding が、この本文と同じ内容から作られているか確かめる。
+
+        本文の sha256 を、保存済みの `content_hash` と比べる。同じなら、
+        embedding を作り直す必要がない。
+
+        Args:
+            user_id: 所有者。
+            capture_id: Capture の id。
+            text: 比べる本文。完了更新が hash を求める本文と同じものを渡す。
+
+        Returns:
+            同じ内容の embedding があれば True。
+        """
+
         stmt = select(CaptureEmbeddingModel).where(
             CaptureEmbeddingModel.capture_id == capture_id,
             CaptureEmbeddingModel.user_id == user_id,
@@ -415,6 +633,16 @@ class CaptureRepository:
 
 
 def _to_capture(row: CaptureModel, scenario_row: CaptureScenarioModel | None = None) -> Capture:
+    """ORM の行を、ドメインの Capture に直す。
+
+    Args:
+        row: Capture の行。
+        scenario_row: 付けるシナリオの行。無ければ None。
+
+    Returns:
+        scenario_row があれば、シナリオ付きの Capture。
+    """
+
     scenario = None
     if scenario_row is not None:
         scenario = CaptureScenario(
@@ -424,6 +652,8 @@ def _to_capture(row: CaptureModel, scenario_row: CaptureScenarioModel | None = N
             amount=scenario_row.amount,
             remind_text=scenario_row.remind_text,
             policy_version=scenario_row.policy_version,
+            due_at=scenario_row.due_at,
+            done_at=scenario_row.done_at,
         )
 
     return Capture(
@@ -449,6 +679,15 @@ def _to_capture(row: CaptureModel, scenario_row: CaptureScenarioModel | None = N
 
 
 def _to_outbox_event(row: OutboxModel) -> OutboxEvent:
+    """ORM の outbox の行を、ドメインの OutboxEvent に直す。
+
+    Args:
+        row: outbox の行。
+
+    Returns:
+        配送に必要な項目だけを持つ OutboxEvent。
+    """
+
     return OutboxEvent(
         id=row.id,
         aggregate_id=row.aggregate_id,
@@ -457,6 +696,15 @@ def _to_outbox_event(row: OutboxModel) -> OutboxEvent:
 
 
 def _to_embedding(row: CaptureEmbeddingModel | None = None) -> Embedding | None:
+    """ORM の embedding の行を、ドメインの Embedding に直す。
+
+    Args:
+        row: embedding の行。外部結合で行が無いときは None。
+
+    Returns:
+        Embedding。row が None なら None。
+    """
+
     if row is None:
         return None
     return Embedding(
