@@ -6,7 +6,9 @@ import {
 	deleteCaptureFromApi,
 	getCaptureFromApi,
 	listCapturesFromApi,
+	markCaptureScenarioDoneFromApi,
 	retryCaptureFromApi,
+	unmarkCaptureScenarioDoneFromApi,
 	updateCaptureFromApi,
 } from "@/lib/api/capture";
 import type {
@@ -16,7 +18,9 @@ import type {
 	DeleteCaptureActionState,
 	GetCaptureActionState,
 	ListCapturesActionState,
+	MarkScenarioDoneActionState,
 	RetryCaptureActionState,
+	UnmarkScenarioDoneActionState,
 	UpdateCaptureActionState,
 } from "./capture-action-state";
 import { revalidatePath } from "next/cache";
@@ -194,6 +198,37 @@ export async function updateCaptureAction(
 	};
 }
 
+/**
+ * 記録のシナリオを完了にし、今日やることの一覧と詳細を更新する。
+ *
+ * 一覧の 1 行が消えても画面全体は 404 にせず、失敗は行の近くに出すエラーとして返す。
+ * 未認証のときはログインへ移る。
+ *
+ * @param captureId - 完了にする記録の id。空だとAPIを呼ばずにエラーを返す。
+ * @returns 成功したときは更新後の記録。失敗したときは画面に出すメッセージ。
+ */
+export async function markScenarioDoneAction(
+	captureId: string,
+): Promise<MarkScenarioDoneActionState> {
+	if (typeof captureId !== "string" || captureId.length === 0) {
+		return {
+			status: "error",
+			message: "完了にできませんでした。",
+		};
+	}
+
+	const result = await markCaptureScenarioDoneFromApi(captureId);
+	if (!result.ok) {
+		return toActionErrorState(result.error);
+	}
+	revalidatePath("/captures/today");
+	revalidatePath(`/captures/${captureId}`);
+	return {
+		status: "success",
+		data: result.data,
+	};
+}
+
 export async function deleteCaptureAction(
 	captureId: string,
 ): Promise<DeleteCaptureActionState> {
@@ -217,6 +252,34 @@ export async function deleteCaptureAction(
 	}
 	revalidatePath("/captures");
 	redirect("/captures");
+}
+
+/**
+ * 記録のシナリオを未完了に戻し、今日やることの一覧と詳細を更新する。
+ *
+ * @param captureId - 未完了に戻す記録の id。空だとAPIを呼ばずにエラーを返す。
+ * @returns 成功したときは更新後の記録。失敗したときは画面に出すメッセージ。
+ */
+export async function unmarkScenarioDoneAction(
+	captureId: string,
+): Promise<UnmarkScenarioDoneActionState> {
+	if (typeof captureId !== "string" || captureId.length === 0) {
+		return {
+			status: "error",
+			message: "未完了に戻せませんでした。",
+		};
+	}
+
+	const result = await unmarkCaptureScenarioDoneFromApi(captureId);
+	if (!result.ok) {
+		return toActionErrorState(result.error);
+	}
+	revalidatePath("/captures/today");
+	revalidatePath(`/captures/${captureId}`);
+	return {
+		status: "success",
+		data: result.data,
+	};
 }
 
 function mapCaptureFieldErrors(
