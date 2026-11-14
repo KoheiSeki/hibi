@@ -41,6 +41,15 @@ router = APIRouter(prefix="/captures", tags=["captures"])
 def _get_capture_service(
     session: AsyncSession = Depends(get_session),
 ) -> CaptureService:
+    """リクエストごとに、CaptureService を組み立てる。
+
+    Args:
+        session: リクエストの DB セッション。repository と profiles が共有する。
+
+    Returns:
+        分類器、聞き返しの生成器、embedder を、設定に合わせて選んだ CaptureService。
+    """
+
     repository = CaptureRepository(session=session)
     profile = ProfileRepository(session=session)
     return CaptureService(
@@ -76,6 +85,15 @@ async def create_capture(
     service: CaptureService = Depends(_get_capture_service),
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ):
+    """記録を作り、AI による処理を予約する。
+
+    処理は非同期で、作成直後の status は pending。処理が終わるまで、単体取得で
+    status を確かめる。Idempotency-Key ヘッダーが必須で、同じキーと本文の再送は
+    新しく作らず、既存の記録を 200 で返す。新規は 202。キーが無い、または形式が
+    不正なら 400。同じキーで本文が違えば 409。本文は前後の空白を除いて 1 文字以上
+    2000 文字以下で、違反は 422。
+    """
+
     command = CreateCaptureCommand(
         user_id=principal.user_id,
         raw_text=body.raw_text,
@@ -107,6 +125,12 @@ async def retry_capture(
     principal: Principal = Depends(get_principal),
     service: CaptureService = Depends(_get_capture_service),
 ):
+    """failed の記録を、もう一度処理に回す。
+
+    処理の世代が 1 つ進み、status は pending に戻る。成功は 202。failed 以外の
+    記録は 409。自分の記録でない、または無ければ 404。
+    """
+
     capture = await service.retry_capture(principal.user_id, capture_id)
     response.headers["Location"] = f"/api/v1/captures/{capture.id}"
     return ApiResponse(data=_to_capture_response(capture))
@@ -130,6 +154,13 @@ async def accept_capture_scenario(
     principal: Principal = Depends(get_principal),
     service: CaptureService = Depends(_get_capture_service),
 ):
+    """提案されたシナリオを、確認して accepted にする。
+
+    確認できるのは所有者だけで、proposed のシナリオに限る。成功は 200 で、更新後の
+    記録を返す。自分の記録でない、またはシナリオが無ければ 404。確認済みなど、
+    proposed でないシナリオは 409。
+    """
+
     capture = await service.accept_capture_scenario(principal.user_id, capture_id)
     response.headers["Location"] = f"/api/v1/captures/{capture.id}"
     return ApiResponse(data=_to_capture_response(capture))
@@ -178,6 +209,11 @@ async def get_capture(
     principal: Principal = Depends(get_principal),
     service: CaptureService = Depends(_get_capture_service),
 ):
+    """記録を 1 件取得する。シナリオと聞き返し文があれば、あわせて返す。
+
+    処理中かどうかは status で分かる。自分の記録でない、または無ければ 404。
+    """
+
     capture: Capture = await service.get_capture(principal.user_id, capture_id)
     return ApiResponse(data=_to_capture_response(capture))
 
@@ -199,6 +235,12 @@ async def list_captures(
     principal: Principal = Depends(get_principal),
     service: CaptureService = Depends(_get_capture_service),
 ):
+    """自分の記録を、新しい順に一覧で返す。
+
+    limit は 1 以上 50 以下で、未指定は 20。続きは、前の応答の meta.nextCursor を
+    cursor に渡して取得する。cursor が不正なら 400。
+    """
+
     query = ListCapturesQuery(user_id=principal.user_id, limit=limit, cursor=cursor)
     page = await service.list_captures(query)
 
@@ -226,6 +268,13 @@ async def update_capture(
     principal: Principal = Depends(get_principal),
     service: CaptureService = Depends(_get_capture_service),
 ):
+    """記録の本文を更新する。
+
+    更新できるのは pending と failed の記録だけ。処理中と完了済みは 409。本文は
+    前後の空白を除いて 1 文字以上 2000 文字以下で、違反は 422。自分の記録でない、
+    または無ければ 404。
+    """
+
     command = UpdateCaptureCommand(
         user_id=principal.user_id, capture_id=capture_id, raw_text=body.raw_text
     )
@@ -250,10 +299,25 @@ async def delete_capture(
     principal: Principal = Depends(get_principal),
     service: CaptureService = Depends(_get_capture_service),
 ):
+    """記録を削除する。
+
+    シナリオと embedding も一緒に消える。成功は 204 で本文は無い。自分の記録でない、
+    または無ければ 404。
+    """
+
     await service.delete_capture(principal.user_id, capture_id)
 
 
 def _to_capture_response(capture: Capture) -> CaptureResponse:
+    """ドメインの Capture を、API のレスポンスに直す。
+
+    Args:
+        capture: シナリオ付きでもよい Capture。
+
+    Returns:
+        confidence を float にし、シナリオがあれば ScenarioResponse に直した結果。
+    """
+
     return CaptureResponse(
         id=capture.id,
         raw_text=capture.raw_text,
@@ -273,6 +337,15 @@ def _to_capture_response(capture: Capture) -> CaptureResponse:
 
 
 def _to_scenario_response(scenario: CaptureScenario | None) -> ScenarioResponse | None:
+    """ドメインの CaptureScenario を、API のレスポンスに直す。
+
+    Args:
+        scenario: シナリオ。無ければ None。
+
+    Returns:
+        ScenarioResponse。scenario が None なら None。
+    """
+
     if scenario is None:
         return None
     return ScenarioResponse(

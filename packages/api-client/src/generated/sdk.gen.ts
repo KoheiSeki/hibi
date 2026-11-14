@@ -67,6 +67,11 @@ export type Options<
 
 /**
  * List Captures
+ *
+ * 自分の記録を、新しい順に一覧で返す。
+ *
+ * limit は 1 以上 50 以下で、未指定は 20。続きは、前の応答の meta.nextCursor を
+ * cursor に渡して取得する。cursor が不正なら 400。
  */
 export const listCaptures = <ThrowOnError extends boolean = false>(
   options?: Options<ListCapturesData, ThrowOnError>,
@@ -83,6 +88,14 @@ export const listCaptures = <ThrowOnError extends boolean = false>(
 
 /**
  * Create Capture
+ *
+ * 記録を作り、AI による処理を予約する。
+ *
+ * 処理は非同期で、作成直後の status は pending。処理が終わるまで、単体取得で
+ * status を確かめる。Idempotency-Key ヘッダーが必須で、同じキーと本文の再送は
+ * 新しく作らず、既存の記録を 200 で返す。新規は 202。キーが無い、または形式が
+ * 不正なら 400。同じキーで本文が違えば 409。本文は前後の空白を除いて 1 文字以上
+ * 2000 文字以下で、違反は 422。
  */
 export const createCapture = <ThrowOnError extends boolean = false>(
   options: Options<CreateCaptureData, ThrowOnError>,
@@ -124,6 +137,11 @@ export const searchCaptures = <ThrowOnError extends boolean = false>(
 
 /**
  * Delete Capture
+ *
+ * 記録を削除する。
+ *
+ * シナリオと embedding も一緒に消える。成功は 204 で本文は無い。自分の記録でない、
+ * または無ければ 404。
  */
 export const deleteCapture = <ThrowOnError extends boolean = false>(
   options: Options<DeleteCaptureData, ThrowOnError>,
@@ -140,6 +158,10 @@ export const deleteCapture = <ThrowOnError extends boolean = false>(
 
 /**
  * Get Capture
+ *
+ * 記録を 1 件取得する。シナリオと聞き返し文があれば、あわせて返す。
+ *
+ * 処理中かどうかは status で分かる。自分の記録でない、または無ければ 404。
  */
 export const getCapture = <ThrowOnError extends boolean = false>(
   options: Options<GetCaptureData, ThrowOnError>,
@@ -156,6 +178,12 @@ export const getCapture = <ThrowOnError extends boolean = false>(
 
 /**
  * Update Capture
+ *
+ * 記録の本文を更新する。
+ *
+ * 更新できるのは pending と failed の記録だけ。処理中と完了済みは 409。本文は
+ * 前後の空白を除いて 1 文字以上 2000 文字以下で、違反は 422。自分の記録でない、
+ * または無ければ 404。
  */
 export const updateCapture = <ThrowOnError extends boolean = false>(
   options: Options<UpdateCaptureData, ThrowOnError>,
@@ -176,6 +204,11 @@ export const updateCapture = <ThrowOnError extends boolean = false>(
 
 /**
  * Retry Capture
+ *
+ * failed の記録を、もう一度処理に回す。
+ *
+ * 処理の世代が 1 つ進み、status は pending に戻る。成功は 202。failed 以外の
+ * 記録は 409。自分の記録でない、または無ければ 404。
  */
 export const retryCapture = <ThrowOnError extends boolean = false>(
   options: Options<RetryCaptureData, ThrowOnError>,
@@ -192,6 +225,12 @@ export const retryCapture = <ThrowOnError extends boolean = false>(
 
 /**
  * Accept Capture Scenario
+ *
+ * 提案されたシナリオを、確認して accepted にする。
+ *
+ * 確認できるのは所有者だけで、proposed のシナリオに限る。成功は 200 で、更新後の
+ * 記録を返す。自分の記録でない、またはシナリオが無ければ 404。確認済みなど、
+ * proposed でないシナリオは 409。
  */
 export const acceptCaptureScenario = <ThrowOnError extends boolean = false>(
   options: Options<AcceptCaptureScenarioData, ThrowOnError>,
