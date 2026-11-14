@@ -134,9 +134,13 @@ Expected: FAIL(`ModuleNotFoundError: hibi.modules.captures.due`)
 
 - [x] **Step 3: Implement** `extract_remind_text` **and** `parse_due_at` in `due.py`
 
-正規表現 1 本で日・午前午後・時・分/半を捕まえる(名前付きグループ `day`・`meridiem`・`hour`・`minute`・`half` と、日だけの系統の `day_only`。時の直後が `間` の `3時間` は `(?!間)` で時刻として扱わない)。`extract_remind_text` は一致した部分文字列を前後の空白なしで返す。`parse_due_at` は `ZoneInfo(timezone)`(失敗したら `UTC`)で `now` の暦日を求め、日の加算は暦日で行い、時刻を足して UTC に直す。範囲外の時・分は None。`ZoneInfo` の失敗を `UTC` に倒す公開関数 `zone_for(timezone: str) -> ZoneInfo` を `due.py` に置き、Task 2 の `today.py` も使う。
+**domain**(`modules/captures/due.py`、純粋関数。時計は引数で受ける)
 
-  3 つの関数に、日本語の Google style の docstring を付ける(全角括弧は使わない)。
+- `extract_remind_text(raw_text)`: 本文から、日(`今日`・`明日`・`明後日`)と時刻(`午前`/`午後` 任意の `N時`、`M分` か `半`)の表現を、1 つの文字列として取り出す。日だけでも取り出す。`3時間` のような所要時間は `(?!間)` で除く。無ければ None
+- `parse_due_at(remind_text, *, now, timezone)`: 表現を、ユーザーの暦日と時刻から UTC の期限に直す。日は `now` をユーザーの timezone に直した暦日に足す。時が無ければ 23 時 59 分。`午後` で 12 未満なら 12 を足す。範囲外の時・分は None
+- `_REMIND_PATTERN`: 上の 2 つが共有する正規表現。名前付きグループ `day`・`meridiem`・`hour`・`minute`・`half` と、日だけの系統の `day_only`
+
+docstring は、日本語の Google style。
 
 - [x] **Step 4: Run to verify it passes**
 
@@ -192,7 +196,17 @@ Expected: FAIL(`ModuleNotFoundError: hibi.core.timezone`)
 
 - [x] **Step 3: Move** `zone_for`
 
-`zone_for` を、`due.py` の実装(`ZoneInfoNotFoundError` と `ValueError` を捕まえて `UTC`)と docstring ごと `core/timezone.py` へ移す。`due.py` は `from hibi.core.timezone import zone_for` に変え、自分の定義を消す。`test_capture_due.py` の不正な timezone 名のケースは、`test_timezone.py` と重なるので 1 件だけ残す。
+**core**(`core/timezone.py`)
+
+- `zone_for(timezone)`: IANA 名から `ZoneInfo` を返す。存在しない名前や不正な名前(`ZoneInfoNotFoundError`、`ValueError`)は `UTC`。`due.py` から、実装と docstring ごと移す
+
+**domain**(`modules/captures/due.py`)
+
+- `parse_due_at`: `zone_for` を `from hibi.core.timezone import zone_for` で読む。自分の定義は消す
+
+**test**
+
+- `test_capture_due.py` の不正な timezone 名のケースは、`test_timezone.py` と重なるので 1 件だけ残す
 
 - [x] **Step 4: Run to verify it passes**
 
@@ -219,7 +233,6 @@ git commit -m "refactor(core): share zone_for between the due and today modules"
 
 - Consumes: Task 1b の `hibi.core.timezone.zone_for(timezone: str) -> ZoneInfo`
 - Produces:
-  - `TODAY_DEFAULT_LIMIT = 5`, `TODAY_MAX_LIMIT = 20`
   - `@dataclass(frozen=True, slots=True) class TodayCandidate: capture_id: UUID; urgency_score: Decimal | None; due_at: datetime | None; created_at: datetime`
   - `local_day_end(now: datetime, *, timezone: str) -> datetime` — 翌日 0 時の UTC
   - `calculate_today_priority(candidate: TodayCandidate, *, now: datetime) -> Decimal`
@@ -326,9 +339,16 @@ Expected: FAIL(`ModuleNotFoundError: hibi.modules.captures.today`)
 
 - [x] **Step 3: Implement** `today.py`
 
-`local_day_end` は `now.astimezone(zone)` の暦日の翌日を `datetime.combine(next_date, time.min, tzinfo=zone)` で作り UTC へ。暦日の加算で行い、24 時間を足さない(夏時間)。`calculate_today_priority` は基準(null は `Decimal("0.5")`)に、期限なし 0、`due_at < now` で `Decimal("0.6")`、それ以外は `Decimal("0.4")` を足す。`rank_today` は `due_at is None or due_at < local_day_end(...)` の行だけを残し、ソートキー `(-priority, due_at is None, due_at, created_at, capture_id)` で並べて `limit` 件の id を返す。定数のボーナス値は `today.py` の module 定数にする。docstring には Spec の「優先度」の表を要約する。
+**domain**(`modules/captures/today.py`、純粋関数。時計と timezone は引数で受ける)
 
-  `TodayCandidate`・`local_day_end`・`calculate_today_priority`・`rank_today` に、日本語の Google style の docstring を付ける(全角括弧は使わない)。`TodayCandidate` は `Attributes:` に 4 フィールドを書く。`local_day_end` は「翌日 0 時、暦日で数えるので夏時間の日は 23 時間や 25 時間、ちょうどの期限は明日の扱い」。`calculate_today_priority` は「基準と補正の値、今日の終わりを過ぎた期限の除外は `rank_today` が行う」。`rank_today` は「対象外の条件、並び順、入力の順序に依存しないこと」と `Args` / `Returns`。`local_day_end` に時刻の引数は足さない(日の終わりは翌日 0 時に固定で、`now` が暦日を決める)。
+- `TodayCandidate`(dataclass): `capture_id`、`urgency_score`、`due_at`、`created_at`。Today の順位付けの入力
+- `local_day_end(now, *, timezone)`: ユーザーの暦日の翌日 0 時を、UTC で返す。暦日で数えるので、夏時間の日は 23 時間や 25 時間になる。ちょうどの期限は明日の扱い
+- `calculate_today_priority(candidate, *, now)`: 緊急度(null は 0.5)に、期限の補正を足す。期限なしは補正なし、期限が `now` より前なら +0.6、それ以外は +0.4。計算は `Decimal`
+- `rank_today(candidates, *, now, timezone, limit)`: 期限が今日の終わりより前、または期限なしの候補だけを残し、優先度の高い順に並べて、`limit` 件の `capture_id` を返す
+- `_sort_key(candidate, *, now)`: 並べ替えのキー。優先度の符号反転、期限(期限なしは最後)、`created_at`、`capture_id` の順
+- 定数: `_DEFAULT_URGENCY`(0.5)、`_OVERDUE_BONUS`(0.6)、`_DUE_TODAY_BONUS`(0.4)、`_NO_DEADLINE`(期限なしを最後にする番兵)
+
+docstring は、`TodayCandidate`(`Attributes:` に 4 フィールド)を含む 4 つに、日本語の Google style で付ける。`local_day_end` に時刻の引数は足さない。
 
 - [x] **Step 4: Run to verify it passes**
 
@@ -435,14 +455,40 @@ Expected: FAIL(`normalize_urgency_score` が無い、`propose_capture_scenario` 
 
 - [x] **Step 3: Implement**
 
-- migration `20261114023753_today_priority.sql`:
-`alter table app.captures add column urgency_score numeric(3,2)` と `constraint ck_captures__urgency_score check (urgency_score is null or (urgency_score >= 0 and urgency_score <= 1))`。`alter table app.capture_scenarios add column due_at timestamptz, add column done_at timestamptz`。`alter table app.profiles alter column timezone set default 'Asia/Tokyo'` と `update app.profiles set timezone = 'Asia/Tokyo' where timezone = 'UTC'`(Global Constraints の承認済み事項)。
-- `models.py` に 3 列、`types.py` の `CaptureScenario` に `due_at`・`done_at` の 2 列(既定 None。`Capture` には `urgency_score` を足さない)、`policies.py` の `normalize_urgency_score`、`ScenarioProposal.due_at`、`propose_capture_scenario` の新引数。reminder のとき `extract_remind_text(raw_text)`(dataset の完全一致は従来の値を優先)で `remind_text` を決め、`parse_due_at` で `due_at` を決める。
-- `modules/profiles/models.py`: `ProfileModel`(`__tablename__ = "profiles"`、`schema="app"`、列は `user_id`(主キー)と `timezone` だけ)。`captures/models.py` には置かない。`app.profiles` は foundation の migration が作る Auth 直下のテーブルで、Week 10 のダイジェストや設定 UI も使うため。
-- `modules/profiles/repository.py`: `ProfileRepository(session)` と `get_timezone(user_id)`(`ProfileModel.timezone` を `user_id` で 1 行読み、プロフィールが無ければ `"UTC"`)。docstring は日本語の Google style。
-- `repository.py`(captures):`complete_capture_classification` に `urgency_score` を足し、UPDATE の values とシナリオの INSERT に `urgency_score`、`due_at` を入れる。
-- `service.py`: `process_capture` で `normalize_urgency_score(normalized_classification.urgency_score)` を求め、route が `reminder` のときだけ `self._profiles.get_timezone(user_id)` を呼び、`self._clock()` と合わせて `propose_capture_scenario` に渡す。それ以外の route は timezone を読まず `"UTC"` を渡す。コンストラクタに `profiles: ProfileRepository`(`embedder` の次)と、keyword 専用の `clock: Callable[[], datetime] = _utc_now` を足す。
-- `router.py`(`_get_capture_service`)と `jobs/process_capture_job.py`(2 か所): `profiles=ProfileRepository(session=session)` を渡す。
+**migration**(`supabase/migrations/20261114023753_today_priority.sql`)
+
+- `app.captures.urgency_score`: `numeric(3,2)`、null、または 0 以上 1 以下の check(`ck_captures__urgency_score`)
+- `app.capture_scenarios.due_at`、`done_at`: どちらも `timestamptz`、null 可
+- `app.profiles.timezone`: 既定を `'Asia/Tokyo'` に変え、`'UTC'` の既存行を `'Asia/Tokyo'` に更新する(承認済み)
+
+**model / types**
+
+- `profiles/models.py` の `ProfileModel`: `user_id`(主キー)と `timezone` だけの、読み取り用のモデル
+- `captures/models.py`: `CaptureModel.urgency_score`、`CaptureScenarioModel.due_at`・`done_at`
+- `captures/types.py`: `CaptureScenario.due_at`・`done_at`(既定 None)。`Capture` には `urgency_score` を足さない
+
+**policy**(`captures/policies.py`、純粋関数)
+
+- `normalize_urgency_score(score)`: 0 以上 1 以下なら小数 2 桁の `Decimal`、範囲外(NaN を含む)は None
+- `ScenarioProposal.due_at`: 末尾に既定 None で足す
+- `propose_capture_scenario(*, route, raw_text, now, timezone)`: reminder のときだけ `remind_text` と `due_at` を求める。dataset の完全一致は決まった値を優先する
+- `_remind_text(route, raw_text)`: reminder のときだけ `extract_remind_text` を呼ぶ。`CAPTURE_ROUTE_REMINDER` 定数を足す
+
+**repository**
+
+- `ProfileRepository.get_timezone(user_id)`(`profiles/repository.py`): プロフィールの timezone を読む。無ければ `"UTC"`
+- `CaptureRepository.complete_capture_classification(...)`: `urgency_score` を UPDATE に、`due_at` をシナリオの INSERT に足す
+- `_to_capture`: シナリオに `due_at` と `done_at` を渡す
+
+**service**(`captures/service.py`)
+
+- `CaptureService.__init__`: `profiles: ProfileRepository`(`embedder` の次)と、keyword 専用の `clock: Callable[[], datetime] = _utc_now` を受ける
+- `process_capture(capture_id, processing_generation)`: 緊急度を `normalize_urgency_score` で正規化して保存する。reminder のときだけ `capture.user_id` の timezone を読み、`self._clock()` と合わせて `propose_capture_scenario` に渡す。それ以外の route は `"UTC"` を渡す
+- `_utc_now()`: 現在時刻を UTC の aware な `datetime` で返す
+
+**router / job**
+
+- `_get_capture_service`(`router.py`)と `process_capture_job`(`jobs/process_capture_job.py` の 2 か所): `profiles=ProfileRepository(session=session)` を渡す
 
 - [x] **Step 4: Run to verify they pass**
 
@@ -467,9 +513,10 @@ git commit -m "feat(captures): store urgency score and reminder deadlines"
 
 **Interfaces:**
 
-- Consumes: Task 2 の `TodayCandidate`, `rank_today`, `TODAY_DEFAULT_LIMIT`, `TODAY_MAX_LIMIT`、Task 3 の `ProfileRepository.get_timezone`(`CaptureService` の `profiles`)
+- Consumes: Task 2 の `TodayCandidate`, `rank_today`、Task 3 の `ProfileRepository.get_timezone`(`CaptureService` の `profiles`)
 - Produces:
   - `TodayCapturesQuery(user_id: UUID, limit: int)`(`types.py`)
+  - `TODAY_DEFAULT_LIMIT = 5`, `TODAY_MAX_LIMIT = 20`(`types.py`)。router が `limit` の既定値と上限に使う
   - `CaptureRepository.list_open_scenario_candidates(user_id: UUID) -> list[TodayCandidate]` — `completed` の Capture のうち、シナリオがあり `done_at is null` の行。時刻の絞り込みは SQL でしない
   - `CaptureRepository.set_scenario_done(user_id: UUID, *, capture_id: UUID, done: bool) -> bool` — 行が無ければ False。`done=True` は `done_at = coalesce(done_at, now())`
   - `CaptureService.list_today_captures(query: TodayCapturesQuery) -> list[Capture]`
@@ -529,7 +576,30 @@ Expected: FAIL(`list_today_captures` が無い、`/api/v1/captures/today` が 40
 
 - [x] **Step 3: Implement**
 
-`list_open_scenario_candidates` は `CaptureModel` と `CaptureScenarioModel` の inner join で、`CaptureModel.user_id == user_id`、`status == completed`、`CaptureScenarioModel.done_at.is_(None)` を条件にする。`list_today_captures` は `self._profiles.get_timezone(...)` と `self._clock()` を読み、`rank_today(..., limit=query.limit)` の id を `list_captures_by_ids` で Capture にして、ランキングの順に並べ直す(`search_captures` と同じ形)。`_to_scenario_response` に `due_at`、`done_at` を足す。`/today` ルートは `/search` と同じく `/{capture_id}` より前に置く。`limit` は `Annotated[int, Query(ge=1, le=TODAY_MAX_LIMIT)] = TODAY_DEFAULT_LIMIT` の形にする。docstring の `description` は OpenAPI に出るので、日本語で Spec の「優先度」を要約する。
+**types**(`captures/types.py`)
+
+- `TodayCapturesQuery(user_id, limit)`: Today の一覧の入力
+- `TODAY_DEFAULT_LIMIT`(5)、`TODAY_MAX_LIMIT`(20): router が `limit` の既定値と上限に使う
+
+**repository**(`captures/repository.py`)
+
+- `list_open_scenario_candidates(user_id)`: 所有者の completed の Capture で、シナリオがあり `done_at` が null の行を、`TodayCandidate` の 4 列(`capture_id`、`urgency_score`、`due_at`、`created_at`)だけ読む。期限では絞らない。名前に `today` を付けない
+- `set_scenario_done(user_id, *, capture_id, done)`: `done=True` は `done_at = coalesce(done_at, now())` で最初の時刻を残し、`False` は null に戻す。シナリオの行があれば True、無い、または別ユーザーなら False
+
+**service**(`captures/service.py`)
+
+- `list_today_captures(query)`: 候補を読み、プロフィールの timezone と `clock` で `rank_today` に渡し、順位の id を `list_captures_by_ids` で Capture にして、順位の順に並べ直す。候補が無ければ読まずに `[]`。消えた行は飛ばす
+- `set_capture_scenario_done(user_id, capture_id, *, done)`: `set_scenario_done` が False なら `CaptureNotFoundError`。成功したら `get_by_id` でシナリオ付きの Capture を読み直して返す
+
+**schema / router**(`captures/schemas.py`、`router.py`)
+
+- `ScenarioResponse.due_at`、`done_at`: 応答に `dueAt`、`doneAt` を足す
+- `_to_scenario_response`: 2 項目を詰める
+- `list_today_captures`(`GET /captures/today`、`operation_id="listTodayCaptures"`): `limit` は `Annotated[int, Query(ge=1, le=TODAY_MAX_LIMIT)] = TODAY_DEFAULT_LIMIT`。`/{capture_id}` より前に登録する
+- `mark_capture_scenario_done`(`POST /captures/{capture_id}/scenario/done`、`operation_id="markCaptureScenarioDone"`): 200 で更新後の Capture を返す
+- `unmark_capture_scenario_done`(`DELETE` 同じ path、`operation_id="unmarkCaptureScenarioDone"`): 204 ではなく 200 で返す
+
+router の docstring は OpenAPI の `description` になる。`Args:` と `Returns:` を付けず、ステータスコードとエラーの条件を書く。
 
 - [x] **Step 4: Run to verify they pass**
 
@@ -556,17 +626,17 @@ git commit -m "feat(captures): list today captures and complete scenarios over H
 - Consumes: Task 4 の `operation_id`
 - Produces: `listTodayCaptures`, `markCaptureScenarioDone`, `unmarkCaptureScenarioDone` と、`ScenarioResponse` の `dueAt` / `doneAt`
 
-- [ ] **Step 1: Regenerate**
+- [x] **Step 1: Regenerate**
 
 Run: `just openapi`
 Expected: `packages/api-client/src/generated/sdk.gen.ts` に 3 つの関数が出る。`git diff --stat` が `contracts/openapi.json` と `generated/` だけ
 
-- [ ] **Step 2: Typecheck**
+- [x] **Step 2: Typecheck**
 
 Run: `corepack pnpm typecheck && corepack pnpm build`
 Expected: PASS。`next build` が書き換える `apps/web/next-env.d.ts` は `git checkout` で戻す
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add contracts/openapi.json packages/api-client
@@ -592,7 +662,7 @@ git commit -m "feat(contracts): regenerate the client for today and scenario com
   - `markScenarioDoneAction(captureId: string)` / `unmarkScenarioDoneAction(captureId: string)`: `Promise<ScenarioDoneActionState>`。成功時に `revalidatePath("/captures/today")` と `revalidatePath(`/captures/${captureId}`)`
   - `TodaySection(): Promise<ReactNode>`(server)、`TodayList({ items }: { items: readonly CaptureResponse[] })`(client)、`TodayEmptyState()`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] Step 1: Write the failing tests
 
 `capture-api.test.ts` は、`@hibi/api-client` の mock に `listTodayCaptures`、`markCaptureScenarioDone`、`unmarkCaptureScenarioDone` を足す(足さないと既存テストまで落ちる)。次を加える。
 
@@ -627,14 +697,38 @@ it("renders the API error message for other failures", async () => { /* "通信�
 
 `capture-detail-page.test.tsx`: `scenario.doneAt` があるとき「完了済み」と「未完了に戻す」を出し、無いときは出さない。
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `corepack pnpm --filter web exec vitest run`
 Expected: FAIL(module not found)
 
 - [ ] **Step 3: Implement**
 
-`capture.ts` のラッパーは `getCaptureFromApi` と同じ形(`normalizeGeneratedResult`)。`TodaySection` は `CaptureListSection` と同じ構造で、行の本文は `scenario.title`、期限があれば `formatJstTime(dueAt)` を `<time>` で併記する。`CaptureList` の見た目(糸と節)を再利用するため、`CaptureListItemView` へ寄せる変換が足りなければ `map-capture-to-list-item.ts` に Today 用の変換を足す。`TodayList` は client component で、`useTransition` + `markScenarioDoneAction`、成功した行を state から外す。layout のヘッダーに「今日」のリンク(`/captures/today`)を足す。Today page は `await requireUser()` のあと `TodaySection` を `Suspense`(fallback は既存の `CaptureListSkeleton`)で包む。詳細の完了済み表示は `capture-detail-editor.tsx` の `visibleScenario` の下に足す。
+**API wrapper**(`lib/api/capture.ts`)
+
+- `listTodayCapturesFromApi({ limit }?)`: 生成関数 `listTodayCaptures` を呼び、`CaptureResponse[]` を返す
+- `markCaptureScenarioDoneFromApi(captureId)`、`unmarkCaptureScenarioDoneFromApi(captureId)`: 生成関数を呼び、更新後の `CaptureResponse` を返す
+- どれも `getCaptureFromApi` と同じ形(`getServerApiContext` → 生成関数 → `normalizeGeneratedResult`)
+
+**action**(`features/capture/actions.ts`、`capture-action-state.ts`)
+
+- `markScenarioDoneAction(captureId)`、`unmarkScenarioDoneAction(captureId)`: 空の id はエラー。成功したら `/captures/today` と `/captures/{id}` を revalidate して `{ status: "success", data }`。未認証は `/login` へ redirect
+- `ScenarioDoneActionState`: 上の 2 つの戻り値の型
+
+**component**(`features/capture/`)
+
+- `TodaySection()`(`today-section.tsx`、server): `listTodayCapturesFromApi` を呼ぶ。未認証は `/login`、その他の失敗は `ApiErrorMessage`、0 件は `TodayEmptyState`、それ以外は `TodayList`
+- `TodayList({ items })`(`today-list.tsx`、client): 行ごとに、シナリオの title、期限があれば `formatJstTime(dueAt)` の `<time>`、「完了にする」ボタン。押すと `markScenarioDoneAction` を `useTransition` で呼び、成功した行を state から外す。失敗は `role="alert"`。最後の行がなくなったら空状態
+- `TodayEmptyState()`(`today-empty-state.tsx`): 「今日やることはありません」。`CaptureEmptyState` と同じ節の見た目
+- `CaptureDetailEditorView`(`capture-detail-editor-view.tsx`): `scenarioDone`、`undoDoneButtonProps`、`undoDonePending`、`undoDoneError` を受け、完了済みなら「完了済み」と「未完了に戻す」を出す
+- `CaptureDetailEditor`(`capture-detail-editor.tsx`): `scenario.doneAt` から完了済みを決め、「未完了に戻す」で `unmarkScenarioDoneAction` を呼ぶ
+
+**page / layout**
+
+- `TodayPage()`(`app/captures/today/page.tsx`): `await requireUser()` のあと、`TodaySection` を `Suspense`(fallback は `CaptureListSkeleton`)で包む
+- `CapturesLayout`(`app/captures/layout.tsx`): ヘッダーに「今日」のリンク(`/captures/today`)を足す
+
+新しい export には、日本語の JSDoc を付ける(CLAUDE.md の方針)。
 
 - [ ] **Step 4: Run the web gate**
 
