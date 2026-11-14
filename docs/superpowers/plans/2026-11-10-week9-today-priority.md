@@ -449,7 +449,7 @@ Expected: FAIL(`normalize_urgency_score` が無い、`propose_capture_scenario` 
 Run: `uv run --project apps/api pytest apps/api/tests -m 'not integration' -q` と `supabase db reset` 後に `uv run --project apps/api pytest apps/api/tests/integration/test_capture_repository.py -m integration -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add supabase/migrations apps/api/src apps/api/tests
@@ -470,14 +470,14 @@ git commit -m "feat(captures): store urgency score and reminder deadlines"
 - Consumes: Task 2 の `TodayCandidate`, `rank_today`, `TODAY_DEFAULT_LIMIT`, `TODAY_MAX_LIMIT`、Task 3 の `ProfileRepository.get_timezone`(`CaptureService` の `profiles`)
 - Produces:
   - `TodayCapturesQuery(user_id: UUID, limit: int)`(`types.py`)
-  - `CaptureRepository.list_today_candidates(user_id: UUID) -> list[TodayCandidate]` — `completed` の Capture のうち、シナリオがあり `done_at is null` の行。時刻の絞り込みは SQL でしない
+  - `CaptureRepository.list_open_scenario_candidates(user_id: UUID) -> list[TodayCandidate]` — `completed` の Capture のうち、シナリオがあり `done_at is null` の行。時刻の絞り込みは SQL でしない
   - `CaptureRepository.set_scenario_done(user_id: UUID, *, capture_id: UUID, done: bool) -> bool` — 行が無ければ False。`done=True` は `done_at = coalesce(done_at, now())`
   - `CaptureService.list_today_captures(query: TodayCapturesQuery) -> list[Capture]`
   - `CaptureService.set_capture_scenario_done(user_id: UUID, capture_id: UUID, *, done: bool) -> Capture` — 無ければ `CaptureNotFoundError`
   - `ScenarioResponse` に `dueAt`, `doneAt`
   - `GET /api/v1/captures/today`(`operation_id="listTodayCaptures"`)、`POST` と `DELETE /api/v1/captures/{capture_id}/scenario/done`(`operation_id="markCaptureScenarioDone"` / `"unmarkCaptureScenarioDone"`)
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1:** Write the failing tests
 
 `test_capture_today_service.py`(`FakeSearchRepository` と同じ形の fake repository を使う)。
 
@@ -516,27 +516,27 @@ def test_mark_done_and_unmark_done_return_200_and_404(...) -> None:
 `tests/integration/test_capture_repository.py` に追加する。
 
 ```python
-async def test_list_today_candidates_excludes_other_owners_done_and_unfinished(...) -> None:
+async def test_list_open_scenario_candidates_excludes_other_owners_done_and_unfinished(...) -> None:
     # 自分の completed + 未完了だけが返る。別ユーザー、done_at あり、pending/processing/failed、シナリオ無しは返らない
 async def test_set_scenario_done_is_idempotent_and_keeps_the_first_time(...) -> None:
     # done=True を 2 回呼んでも done_at が変わらない。done=False で null に戻る。別ユーザーは False
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `uv run --project apps/api pytest apps/api/tests/test_capture_today_service.py apps/api/tests/test_capture_api.py -v`
 Expected: FAIL(`list_today_captures` が無い、`/api/v1/captures/today` が 404)
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
-`list_today_candidates` は `CaptureModel` と `CaptureScenarioModel` の inner join で、`CaptureModel.user_id == user_id`、`status == completed`、`CaptureScenarioModel.done_at.is_(None)` を条件にする。`list_today_captures` は `self._profiles.get_timezone(...)` と `self._clock()` を読み、`rank_today(..., limit=query.limit)` の id を `list_captures_by_ids` で Capture にして、ランキングの順に並べ直す(`search_captures` と同じ形)。`_to_scenario_response` に `due_at`、`done_at` を足す。`/today` ルートは `/search` と同じく `/{capture_id}` より前に置く。`limit` は `Annotated[int, Query(ge=1, le=TODAY_MAX_LIMIT)] = TODAY_DEFAULT_LIMIT` の形にする。docstring の `description` は OpenAPI に出るので、日本語で Spec の「優先度」を要約する。
+`list_open_scenario_candidates` は `CaptureModel` と `CaptureScenarioModel` の inner join で、`CaptureModel.user_id == user_id`、`status == completed`、`CaptureScenarioModel.done_at.is_(None)` を条件にする。`list_today_captures` は `self._profiles.get_timezone(...)` と `self._clock()` を読み、`rank_today(..., limit=query.limit)` の id を `list_captures_by_ids` で Capture にして、ランキングの順に並べ直す(`search_captures` と同じ形)。`_to_scenario_response` に `due_at`、`done_at` を足す。`/today` ルートは `/search` と同じく `/{capture_id}` より前に置く。`limit` は `Annotated[int, Query(ge=1, le=TODAY_MAX_LIMIT)] = TODAY_DEFAULT_LIMIT` の形にする。docstring の `description` は OpenAPI に出るので、日本語で Spec の「優先度」を要約する。
 
-- [ ] **Step 4: Run to verify they pass**
+- [x] **Step 4: Run to verify they pass**
 
 Run: `uv run --project apps/api pytest apps/api/tests -m 'not integration' -q`、`ruff check apps/api/src apps/api/tests scripts`、`ty check apps/api/src`、integration は `supabase db reset` 後に実行
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api/src apps/api/tests
@@ -683,6 +683,7 @@ git commit -m "docs: add the week 9 today priority spec and plan"
 - `due_at` **を Worker で求める理由:** timezone と「今日」の基準を記録した時点で固定でき、Today の取得が単純になる。プロフィールの timezone を後で変えても過去の `due_at` は変わらない(Spec で許容)。
 - `urgency` **の label を変えない理由:** Week 5 で `normal` 固定と決めた。優先度は score から直接計算するので、label を変えても Today の結果は変わらない。
 - `/captures/today` **にした理由:** `app/captures/layout.tsx` の書体・色・ヘッダーをそのまま使うため。route group への移動は既存のテストの import を変えるので避けた。`today` は静的 segment なので `[captureId]` より先に解決される。
+- **リポジトリのメソッド名に** `today` **を付けない理由:** `list_open_scenario_candidates` は期限で絞らず、未完了のシナリオをすべて返す。今日の終わりの判定は `rank_today` の 1 か所にあり、`today` が名前に付くのは service の `list_today_captures` と API の `GET /today` だけにする。`TodayCandidate` は `rank_today` の入力を表す型名なので、そのままにする。
 - `zone_for` **を** `core/timezone.py` **に置く理由:** `due.py` と `today.py` が共有し、Week 10 のダイジェスト(ユーザーの timezone と夏時間)も使うため。`today.py` が `due.py` に依存する形を避ける。
 - `local_day_end` **に時刻の引数を足さない理由:** 日の終わりは翌日 0 時に固定で、`now` が暦日を決める。時刻を動かす引数は、方針にない「朝 4 時までは前日」のような仕様を呼び込む。必要になったときに足す。
 - `ProfileModel` **と** `ProfileRepository` **を** `profiles` **module に置く理由:** `app.profiles` は `captures` のテーブルではなく、Week 10 のダイジェストや設定 UI も timezone を使う。`captures` の repository に置くと責務が混ざり、後で移す手間が増える。`profiles` module は構成上すでにあり、今は `service.py` だけ。
