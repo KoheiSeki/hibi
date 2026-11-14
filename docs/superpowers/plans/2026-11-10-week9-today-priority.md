@@ -39,11 +39,12 @@
 | ファイル | 責務 |
 | --- | --- |
 | `apps/api/src/hibi/core/timezone.py` (新規) | `zone_for`。不正な IANA 名を `UTC` に倒す。`due.py` と `today.py` が共有する |
+| `apps/api/src/hibi/modules/profiles/models.py` (新規) | `ProfileModel(user_id, timezone)`。読み取り専用の最小のモデル。書き込みは Auth のトリガーが行う |
 | `apps/api/src/hibi/modules/captures/due.py` (新規) | `extract_remind_text`, `parse_due_at`。純粋関数 |
 | `apps/api/src/hibi/modules/captures/today.py` (新規) | 優先度、今日の終わり、並び。純粋関数 |
 | `apps/api/src/hibi/modules/captures/policies.py` (変更) | `ScenarioProposal.due_at`、`propose_capture_scenario` の引数、`normalize_urgency_score` |
 | `apps/api/src/hibi/modules/captures/service.py` / `repository.py` / `router.py` / `types.py` / `schemas.py` / `models.py` (変更) | 保存、Today、完了 API |
-| `supabase/migrations/20261110000000_today_priority.sql` (新規) | 列の追加と timezone の既定 |
+| `supabase/migrations/20261114023753_today_priority.sql` (新規) | 列の追加と timezone の既定 |
 | `apps/web/src/lib/api/capture.ts`, `apps/web/src/features/capture/*` (変更・新規) | Today 画面と完了操作 |
 
 ---
@@ -346,7 +347,8 @@ git commit -m "feat(captures): rank today candidates by urgency and deadline"
 
 **Files:**
 
-- Create: `supabase/migrations/20261110000000_today_priority.sql`
+- Create: `supabase/migrations/20261114023753_today_priority.sql`
+- Create: `apps/api/src/hibi/modules/profiles/models.py`
 - Modify: `apps/api/src/hibi/modules/captures/models.py`, `policies.py`, `repository.py`, `service.py`, `types.py`
 - Test: `apps/api/tests/test_capture_scenario_policy.py`, `apps/api/tests/test_capture_route_policy.py`, `apps/api/tests/test_process_capture_service.py`, `apps/api/tests/integration/test_capture_repository.py`
 
@@ -362,7 +364,7 @@ git commit -m "feat(captures): rank today candidates by urgency and deadline"
   - `CaptureScenario` に `due_at: datetime | None = None`, `done_at: datetime | None = None`
   - `CaptureService.__init__(..., clock: Callable[[], datetime] = _utc_now)` — 末尾の keyword 引数。既存の呼び出しは壊れない
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `test_capture_route_policy.py` に追加する。
 
@@ -425,17 +427,18 @@ async def test_get_user_timezone_defaults_to_tokyo_and_falls_back_to_utc(...) ->
     # 新規プロフィールは "Asia/Tokyo"。存在しない user_id は "UTC"
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `uv run --project apps/api pytest apps/api/tests/test_capture_route_policy.py apps/api/tests/test_capture_scenario_policy.py apps/api/tests/test_process_capture_service.py -v`
 Expected: FAIL(`normalize_urgency_score` が無い、`propose_capture_scenario` の引数が合わない)
 
 - [ ] **Step 3: Implement**
 
-- migration `20261110000000_today_priority.sql`:
+- migration `20261114023753_today_priority.sql`:
 `alter table app.captures add column urgency_score numeric(3,2)` と `constraint ck_captures__urgency_score check (urgency_score is null or (urgency_score >= 0 and urgency_score <= 1))`。`alter table app.capture_scenarios add column due_at timestamptz, add column done_at timestamptz`。`alter table app.profiles alter column timezone set default 'Asia/Tokyo'` と `update app.profiles set timezone = 'Asia/Tokyo' where timezone = 'UTC'`(Global Constraints の承認済み事項)。
-- `models.py` に 3 列、`types.py` の `CaptureScenario` に 2 列(既定 None)、`policies.py` の `normalize_urgency_score`、`ScenarioProposal.due_at`、`propose_capture_scenario` の新引数。reminder のとき `extract_remind_text(raw_text)`(dataset の完全一致は従来の値を優先)で `remind_text` を決め、`parse_due_at` で `due_at` を決める。
-- `repository.py`: `get_user_timezone`(`app.profiles` を `user_id` で 1 行読む。最小の `ProfileModel(user_id, timezone)` を `models.py` に置く)。`complete_capture_classification` に `urgency_score` を足し、UPDATE の values とシナリオの INSERT に `urgency_score`、`due_at` を入れる。
+- `models.py` に 3 列、`types.py` の `CaptureScenario` に `due_at`・`done_at` の 2 列(既定 None。`Capture` には `urgency_score` を足さない)、`policies.py` の `normalize_urgency_score`、`ScenarioProposal.due_at`、`propose_capture_scenario` の新引数。reminder のとき `extract_remind_text(raw_text)`(dataset の完全一致は従来の値を優先)で `remind_text` を決め、`parse_due_at` で `due_at` を決める。
+- `modules/profiles/models.py`: `ProfileModel`(`__tablename__ = "profiles"`、`schema="app"`、列は `user_id`(主キー)と `timezone` だけ)。`captures/models.py` には置かない。`app.profiles` は foundation の migration が作る Auth 直下のテーブルで、Week 10 のダイジェストや設定 UI も使うため。
+- `repository.py`: `get_user_timezone`(`ProfileModel.timezone` を `user_id` で 1 行読み、プロフィールが無ければ `"UTC"`)。`CaptureRepository` が `profiles` のモデルを import して読む。`CaptureService` の引数は増やさない。`complete_capture_classification` に `urgency_score` を足し、UPDATE の values とシナリオの INSERT に `urgency_score`、`due_at` を入れる。
 - `service.py`: `process_capture` で `normalize_urgency_score(normalized_classification.urgency_score)` を求め、route が `reminder` のときだけ `get_user_timezone` を呼び、`self._clock()` と合わせて `propose_capture_scenario` に渡す。それ以外の route は timezone を読まず `"UTC"` を渡す。コンストラクタに `clock: Callable[[], datetime] = _utc_now` を足す。
 
 - [ ] **Step 4: Run to verify they pass**
@@ -679,6 +682,7 @@ git commit -m "docs: add the week 9 today priority spec and plan"
 - `/captures/today` **にした理由:** `app/captures/layout.tsx` の書体・色・ヘッダーをそのまま使うため。route group への移動は既存のテストの import を変えるので避けた。`today` は静的 segment なので `[captureId]` より先に解決される。
 - `zone_for` **を** `core/timezone.py` **に置く理由:** `due.py` と `today.py` が共有し、Week 10 のダイジェスト(ユーザーの timezone と夏時間)も使うため。`today.py` が `due.py` に依存する形を避ける。
 - `local_day_end` **に時刻の引数を足さない理由:** 日の終わりは翌日 0 時に固定で、`now` が暦日を決める。時刻を動かす引数は、方針にない「朝 4 時までは前日」のような仕様を呼び込む。必要になったときに足す。
-- **timezone を** `CaptureRepository` **で読む理由:** プロフィール用の module はまだ無く、`captures` が既に `profiles` を参照している。専用 module は設定 UI を作る週に切り出す。
+- **`ProfileModel` を `profiles` module に置く理由:** `app.profiles` は `captures` のテーブルではなく、Week 10 のダイジェストや設定 UI も timezone を使う。`captures/models.py` に置くと、`captures` に依存する形になる。`profiles` module は構成上すでにあり、今は `service.py` だけ。
+- **timezone の読み取りだけ `CaptureRepository` が行う理由:** `ProfileRepository` を作ると `CaptureService` の引数が増え、既存のテストの組み立てを全部変える必要がある。読み取り 1 回のために、そこまでしない。`ProfileRepository` は、プロフィールを書く週(設定 UI、timezone の更新)に作る。
 - **承認済み(2026-11-10):** `profiles.timezone` の既定を `Asia/Tokyo` にし、既存の `UTC` を書き換える migration(Task 3)。ローカル以外に環境が無い間の措置。
 - **確認済み(2026-11-10):** 期限の無い過去の `reminder` は backfill せず、完了にするまで Today に出続ける。Today の URL は `/captures/today`。
