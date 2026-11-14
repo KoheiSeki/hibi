@@ -40,6 +40,7 @@
 | --- | --- |
 | `apps/api/src/hibi/core/timezone.py` (新規) | `zone_for`。不正な IANA 名を `UTC` に倒す。`due.py` と `today.py` が共有する |
 | `apps/api/src/hibi/modules/profiles/models.py` (新規) | `ProfileModel(user_id, timezone)`。読み取り専用の最小のモデル。書き込みは Auth のトリガーが行う |
+| `apps/api/src/hibi/modules/profiles/repository.py` (新規) | `ProfileRepository.get_timezone`。プロフィールの永続化。今は timezone の読み取りだけ |
 | `apps/api/src/hibi/modules/captures/due.py` (新規) | `extract_remind_text`, `parse_due_at`。純粋関数 |
 | `apps/api/src/hibi/modules/captures/today.py` (新規) | 優先度、今日の終わり、並び。純粋関数 |
 | `apps/api/src/hibi/modules/captures/policies.py` (変更) | `ScenarioProposal.due_at`、`propose_capture_scenario` の引数、`normalize_urgency_score` |
@@ -348,8 +349,8 @@ git commit -m "feat(captures): rank today candidates by urgency and deadline"
 **Files:**
 
 - Create: `supabase/migrations/20261114023753_today_priority.sql`
-- Create: `apps/api/src/hibi/modules/profiles/models.py`
-- Modify: `apps/api/src/hibi/modules/captures/models.py`, `policies.py`, `repository.py`, `service.py`, `types.py`
+- Create: `apps/api/src/hibi/modules/profiles/models.py`, `apps/api/src/hibi/modules/profiles/repository.py`
+- Modify: `apps/api/src/hibi/modules/captures/models.py`, `policies.py`, `repository.py`, `service.py`, `router.py`, `types.py`、`apps/api/src/hibi/jobs/process_capture_job.py`
 - Test: `apps/api/tests/test_capture_scenario_policy.py`, `apps/api/tests/test_capture_route_policy.py`, `apps/api/tests/test_process_capture_service.py`, `apps/api/tests/integration/test_capture_repository.py`
 
 **Interfaces:**
@@ -359,10 +360,10 @@ git commit -m "feat(captures): rank today candidates by urgency and deadline"
   - `normalize_urgency_score(score: float) -> Decimal | None` — 0 以上 1 以下なら小数 2 桁に丸めた `Decimal`、範囲外は None
   - `ScenarioProposal` に `due_at: datetime | None = None`
   - `propose_capture_scenario(*, route: str, raw_text: str, now: datetime, timezone: str) -> ScenarioProposal | None`
-  - `CaptureRepository.get_user_timezone(user_id: UUID) -> str` — プロフィールが無いとき `"UTC"`
+  - `ProfileRepository(session: AsyncSession)` と `ProfileRepository.get_timezone(user_id: UUID) -> str`(`hibi.modules.profiles.repository`)— プロフィールが無いとき `"UTC"`
   - `CaptureRepository.complete_capture_classification(..., urgency_score: Decimal | None)` — 新しい必須の keyword 引数
   - `CaptureScenario` に `due_at: datetime | None = None`, `done_at: datetime | None = None`
-  - `CaptureService.__init__(..., clock: Callable[[], datetime] = _utc_now)` — 末尾の keyword 引数。既存の呼び出しは壊れない
+  - `CaptureService.__init__(session, repository, classifier, generator, embedder, profiles: ProfileRepository, *, clock: Callable[[], datetime] = _utc_now)` — `profiles` は必須。呼び出し側(`router.py`、`process_capture_job.py` の 2 か所、テストの組み立て 3 か所)が渡す。`clock` は keyword 専用で既定あり
 
 - [x] **Step 1: Write the failing tests**
 
@@ -402,7 +403,7 @@ def test_shopping_and_expense_never_get_a_due_at() -> None:
     assert proposal is not None and proposal.due_at is None
 ```
 
-`test_process_capture_service.py` に追加する。既存の fake repository に `get_user_timezone` を足し(呼び出しを記録、既定 `"Asia/Tokyo"`)、service は `clock=lambda: NOW` で作る。
+`test_process_capture_service.py` に追加する。timezone は `tests/profile_helpers.py` の `FakeProfileRepository`(`timezone`、`lookups` を持つ)で渡し、service は `profiles=...`、`clock=lambda: NOW` で作る。`CaptureService` を組み立てる他のテスト(`test_capture_service.py`、`test_capture_search_service.py`)も、`as_profile_repository(FakeProfileRepository())` を渡す。
 
 ```python
 async def test_reminder_saves_due_at_and_urgency_score() -> None:
@@ -411,7 +412,7 @@ async def test_reminder_saves_due_at_and_urgency_score() -> None:
     # scenario.due_at == datetime(2026, 11, 11, 0, 0, tzinfo=UTC)
 
 async def test_non_reminder_does_not_read_the_user_timezone() -> None:
-    # raw_text="牛乳を買う" → get_user_timezone の呼び出し回数 0、scenario.due_at is None
+    # raw_text="牛乳を買う" → profiles.lookups が空、scenario.due_at is None
 
 async def test_out_of_range_urgency_score_is_saved_as_null() -> None:
     # classifier が urgency_score=1.5 → urgency_score is None で完了する
@@ -423,8 +424,8 @@ async def test_out_of_range_urgency_score_is_saved_as_null() -> None:
 async def test_complete_classification_saves_urgency_score_and_due_at(...) -> None:
     # 完了後に CaptureModel.urgency_score == Decimal("0.50")、CaptureScenarioModel.due_at が一致
 
-async def test_get_user_timezone_defaults_to_tokyo_and_falls_back_to_utc(...) -> None:
-    # 新規プロフィールは "Asia/Tokyo"。存在しない user_id は "UTC"
+async def test_get_timezone_defaults_to_tokyo_and_falls_back_to_utc(...) -> None:
+    # `tests/integration/test_profile_repository.py`。新規プロフィールは "Asia/Tokyo"。更新すれば追従。存在しない user_id は "UTC"
 ```
 
 - [x] **Step 2: Run to verify they fail**
@@ -432,16 +433,18 @@ async def test_get_user_timezone_defaults_to_tokyo_and_falls_back_to_utc(...) ->
 Run: `uv run --project apps/api pytest apps/api/tests/test_capture_route_policy.py apps/api/tests/test_capture_scenario_policy.py apps/api/tests/test_process_capture_service.py -v`
 Expected: FAIL(`normalize_urgency_score` が無い、`propose_capture_scenario` の引数が合わない)
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 - migration `20261114023753_today_priority.sql`:
 `alter table app.captures add column urgency_score numeric(3,2)` と `constraint ck_captures__urgency_score check (urgency_score is null or (urgency_score >= 0 and urgency_score <= 1))`。`alter table app.capture_scenarios add column due_at timestamptz, add column done_at timestamptz`。`alter table app.profiles alter column timezone set default 'Asia/Tokyo'` と `update app.profiles set timezone = 'Asia/Tokyo' where timezone = 'UTC'`(Global Constraints の承認済み事項)。
 - `models.py` に 3 列、`types.py` の `CaptureScenario` に `due_at`・`done_at` の 2 列(既定 None。`Capture` には `urgency_score` を足さない)、`policies.py` の `normalize_urgency_score`、`ScenarioProposal.due_at`、`propose_capture_scenario` の新引数。reminder のとき `extract_remind_text(raw_text)`(dataset の完全一致は従来の値を優先)で `remind_text` を決め、`parse_due_at` で `due_at` を決める。
 - `modules/profiles/models.py`: `ProfileModel`(`__tablename__ = "profiles"`、`schema="app"`、列は `user_id`(主キー)と `timezone` だけ)。`captures/models.py` には置かない。`app.profiles` は foundation の migration が作る Auth 直下のテーブルで、Week 10 のダイジェストや設定 UI も使うため。
-- `repository.py`: `get_user_timezone`(`ProfileModel.timezone` を `user_id` で 1 行読み、プロフィールが無ければ `"UTC"`)。`CaptureRepository` が `profiles` のモデルを import して読む。`CaptureService` の引数は増やさない。`complete_capture_classification` に `urgency_score` を足し、UPDATE の values とシナリオの INSERT に `urgency_score`、`due_at` を入れる。
-- `service.py`: `process_capture` で `normalize_urgency_score(normalized_classification.urgency_score)` を求め、route が `reminder` のときだけ `get_user_timezone` を呼び、`self._clock()` と合わせて `propose_capture_scenario` に渡す。それ以外の route は timezone を読まず `"UTC"` を渡す。コンストラクタに `clock: Callable[[], datetime] = _utc_now` を足す。
+- `modules/profiles/repository.py`: `ProfileRepository(session)` と `get_timezone(user_id)`(`ProfileModel.timezone` を `user_id` で 1 行読み、プロフィールが無ければ `"UTC"`)。docstring は日本語の Google style。
+- `repository.py`(captures):`complete_capture_classification` に `urgency_score` を足し、UPDATE の values とシナリオの INSERT に `urgency_score`、`due_at` を入れる。
+- `service.py`: `process_capture` で `normalize_urgency_score(normalized_classification.urgency_score)` を求め、route が `reminder` のときだけ `self._profiles.get_timezone(user_id)` を呼び、`self._clock()` と合わせて `propose_capture_scenario` に渡す。それ以外の route は timezone を読まず `"UTC"` を渡す。コンストラクタに `profiles: ProfileRepository`(`embedder` の次)と、keyword 専用の `clock: Callable[[], datetime] = _utc_now` を足す。
+- `router.py`(`_get_capture_service`)と `jobs/process_capture_job.py`(2 か所): `profiles=ProfileRepository(session=session)` を渡す。
 
-- [ ] **Step 4: Run to verify they pass**
+- [x] **Step 4: Run to verify they pass**
 
 Run: `uv run --project apps/api pytest apps/api/tests -m 'not integration' -q` と `supabase db reset` 後に `uv run --project apps/api pytest apps/api/tests/integration/test_capture_repository.py -m integration -v`
 Expected: PASS
@@ -464,7 +467,7 @@ git commit -m "feat(captures): store urgency score and reminder deadlines"
 
 **Interfaces:**
 
-- Consumes: Task 2 の `TodayCandidate`, `rank_today`, `TODAY_DEFAULT_LIMIT`, `TODAY_MAX_LIMIT`、Task 3 の `get_user_timezone`
+- Consumes: Task 2 の `TodayCandidate`, `rank_today`, `TODAY_DEFAULT_LIMIT`, `TODAY_MAX_LIMIT`、Task 3 の `ProfileRepository.get_timezone`(`CaptureService` の `profiles`)
 - Produces:
   - `TodayCapturesQuery(user_id: UUID, limit: int)`(`types.py`)
   - `CaptureRepository.list_today_candidates(user_id: UUID) -> list[TodayCandidate]` — `completed` の Capture のうち、シナリオがあり `done_at is null` の行。時刻の絞り込みは SQL でしない
@@ -490,7 +493,7 @@ async def test_today_returns_an_empty_list_without_candidates() -> None:
     # list_captures_by_ids を呼ばず [] を返す
 
 async def test_today_reads_the_timezone_of_the_owner() -> None:
-    # get_user_timezone が query.user_id で呼ばれ、不正な名前でも例外にならない
+    # profiles.get_timezone が query.user_id で呼ばれ、不正な名前でも例外にならない
 
 async def test_set_done_returns_the_capture_or_raises_not_found() -> None: ...
 ```
@@ -526,7 +529,7 @@ Expected: FAIL(`list_today_captures` が無い、`/api/v1/captures/today` が 40
 
 - [ ] **Step 3: Implement**
 
-`list_today_candidates` は `CaptureModel` と `CaptureScenarioModel` の inner join で、`CaptureModel.user_id == user_id`、`status == completed`、`CaptureScenarioModel.done_at.is_(None)` を条件にする。`list_today_captures` は `get_user_timezone` と `self._clock()` を読み、`rank_today(..., limit=query.limit)` の id を `list_captures_by_ids` で Capture にして、ランキングの順に並べ直す(`search_captures` と同じ形)。`_to_scenario_response` に `due_at`、`done_at` を足す。`/today` ルートは `/search` と同じく `/{capture_id}` より前に置く。`limit` は `Annotated[int, Query(ge=1, le=TODAY_MAX_LIMIT)] = TODAY_DEFAULT_LIMIT` の形にする。docstring の `description` は OpenAPI に出るので、日本語で Spec の「優先度」を要約する。
+`list_today_candidates` は `CaptureModel` と `CaptureScenarioModel` の inner join で、`CaptureModel.user_id == user_id`、`status == completed`、`CaptureScenarioModel.done_at.is_(None)` を条件にする。`list_today_captures` は `self._profiles.get_timezone(...)` と `self._clock()` を読み、`rank_today(..., limit=query.limit)` の id を `list_captures_by_ids` で Capture にして、ランキングの順に並べ直す(`search_captures` と同じ形)。`_to_scenario_response` に `due_at`、`done_at` を足す。`/today` ルートは `/search` と同じく `/{capture_id}` より前に置く。`limit` は `Annotated[int, Query(ge=1, le=TODAY_MAX_LIMIT)] = TODAY_DEFAULT_LIMIT` の形にする。docstring の `description` は OpenAPI に出るので、日本語で Spec の「優先度」を要約する。
 
 - [ ] **Step 4: Run to verify they pass**
 
@@ -682,7 +685,7 @@ git commit -m "docs: add the week 9 today priority spec and plan"
 - `/captures/today` **にした理由:** `app/captures/layout.tsx` の書体・色・ヘッダーをそのまま使うため。route group への移動は既存のテストの import を変えるので避けた。`today` は静的 segment なので `[captureId]` より先に解決される。
 - `zone_for` **を** `core/timezone.py` **に置く理由:** `due.py` と `today.py` が共有し、Week 10 のダイジェスト(ユーザーの timezone と夏時間)も使うため。`today.py` が `due.py` に依存する形を避ける。
 - `local_day_end` **に時刻の引数を足さない理由:** 日の終わりは翌日 0 時に固定で、`now` が暦日を決める。時刻を動かす引数は、方針にない「朝 4 時までは前日」のような仕様を呼び込む。必要になったときに足す。
-- **`ProfileModel` を `profiles` module に置く理由:** `app.profiles` は `captures` のテーブルではなく、Week 10 のダイジェストや設定 UI も timezone を使う。`captures/models.py` に置くと、`captures` に依存する形になる。`profiles` module は構成上すでにあり、今は `service.py` だけ。
-- **timezone の読み取りだけ `CaptureRepository` が行う理由:** `ProfileRepository` を作ると `CaptureService` の引数が増え、既存のテストの組み立てを全部変える必要がある。読み取り 1 回のために、そこまでしない。`ProfileRepository` は、プロフィールを書く週(設定 UI、timezone の更新)に作る。
+- `ProfileModel` **と** `ProfileRepository` **を** `profiles` **module に置く理由:** `app.profiles` は `captures` のテーブルではなく、Week 10 のダイジェストや設定 UI も timezone を使う。`captures` の repository に置くと責務が混ざり、後で移す手間が増える。`profiles` module は構成上すでにあり、今は `service.py` だけ。
+- `CaptureService` **に** `profiles` **を足す理由:** 組み立てる箇所は `router.py`、job の 2 か所、テスト 3 か所の計 6 か所で、変更は小さい。当初は「`CaptureRepository` に読み取りを置く」案にしたが、責務の混在と将来の移動を避けるため、切り出す案に変えた。
 - **承認済み(2026-11-10):** `profiles.timezone` の既定を `Asia/Tokyo` にし、既存の `UTC` を書き換える migration(Task 3)。ローカル以外に環境が無い間の措置。
 - **確認済み(2026-11-10):** 期限の無い過去の `reminder` は backfill せず、完了にするまで Today に出続ける。Today の URL は `/captures/today`。
