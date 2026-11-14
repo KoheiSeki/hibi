@@ -10,6 +10,8 @@ const {
 	retryCaptureFromApiMock,
 	updateCaptureFromApiMock,
 	deleteCaptureFromApiMock,
+	markCaptureScenarioDoneFromApiMock,
+	unmarkCaptureScenarioDoneFromApiMock,
 } = vi.hoisted(() => ({
 	createCaptureFromApiMock: vi.fn(),
 	getCaptureFromApiMock: vi.fn(),
@@ -20,6 +22,8 @@ const {
 	retryCaptureFromApiMock: vi.fn(),
 	updateCaptureFromApiMock: vi.fn(),
 	deleteCaptureFromApiMock: vi.fn(),
+	markCaptureScenarioDoneFromApiMock: vi.fn(),
+	unmarkCaptureScenarioDoneFromApiMock: vi.fn(),
 }));
 
 vi.mock("@/lib/api/capture", () => ({
@@ -27,6 +31,8 @@ vi.mock("@/lib/api/capture", () => ({
 	deleteCaptureFromApi: deleteCaptureFromApiMock,
 	getCaptureFromApi: getCaptureFromApiMock,
 	listCapturesFromApi: listCapturesFromApiMock,
+	markCaptureScenarioDoneFromApi: markCaptureScenarioDoneFromApiMock,
+	unmarkCaptureScenarioDoneFromApi: unmarkCaptureScenarioDoneFromApiMock,
 	retryCaptureFromApi: retryCaptureFromApiMock,
 	updateCaptureFromApi: updateCaptureFromApiMock,
 }));
@@ -41,7 +47,9 @@ import {
 	deleteCaptureAction,
 	getCaptureAction,
 	listCapturesAction,
+	markScenarioDoneAction,
 	retryCaptureAction,
+	unmarkScenarioDoneAction,
 	updateCaptureAction,
 } from "@/features/capture/actions";
 import {
@@ -660,6 +668,90 @@ describe("retryCaptureAction", () => {
 		await expect(retryCaptureAction("capture-1")).rejects.toThrow(
 			"NEXT_REDIRECT",
 		);
+		expect(redirectMock).toHaveBeenCalledWith("/login");
+	});
+});
+
+describe.each([
+	{
+		name: "markScenarioDoneAction",
+		action: markScenarioDoneAction,
+		apiMock: markCaptureScenarioDoneFromApiMock,
+		failure: "完了にできませんでした。",
+	},
+	{
+		name: "unmarkScenarioDoneAction",
+		action: unmarkScenarioDoneAction,
+		apiMock: unmarkCaptureScenarioDoneFromApiMock,
+		failure: "未完了に戻せませんでした。",
+	},
+])("$name", ({ action, apiMock, failure }) => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it("returns the capture and revalidates today and the detail", async () => {
+		const capture = {
+			id: "capture-1",
+			rawText: "牛乳を買う",
+			status: "completed",
+			createdAt: "2026-11-10T05:00:00Z",
+			updatedAt: "2026-11-10T05:00:00Z",
+		};
+		apiMock.mockResolvedValue({ ok: true, data: capture });
+
+		const state = await action("capture-1");
+
+		expect(apiMock).toHaveBeenCalledWith("capture-1");
+		expect(revalidatePathMock).toHaveBeenCalledWith("/captures/today");
+		expect(revalidatePathMock).toHaveBeenCalledWith("/captures/capture-1");
+		expect(state).toEqual({ status: "success", data: capture });
+	});
+
+	it("rejects an empty capture ID without calling the API", async () => {
+		const state = await action("");
+
+		expect(apiMock).not.toHaveBeenCalled();
+		expect(state).toEqual({ status: "error", message: failure });
+	});
+
+	it("converts a missing scenario into an action error", async () => {
+		apiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "problem",
+				problem: {
+					type: "https://api.hibi.example/problems/capture-not-found",
+					title: "Capture not found",
+					status: 404,
+					detail: "Capture was not found.",
+					requestId: "request-404",
+				},
+			},
+		});
+
+		const state = await action("capture-1");
+
+		expect(revalidatePathMock).not.toHaveBeenCalled();
+		expect(state).toEqual({
+			status: "error",
+			message: "Capture was not found.（参照 ID: request-404）",
+		});
+	});
+
+	it("redirects unauthenticated failures to login", async () => {
+		apiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "unauthenticated",
+				message: "Authentication is required.",
+			},
+		});
+		redirectMock.mockImplementation(() => {
+			throw new Error("NEXT_REDIRECT");
+		});
+
+		await expect(action("capture-1")).rejects.toThrow("NEXT_REDIRECT");
 		expect(redirectMock).toHaveBeenCalledWith("/login");
 	});
 });

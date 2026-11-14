@@ -218,6 +218,51 @@ describe("Capture presentation", () => {
 		expect(html).not.toContain("追加する");
 	});
 
+	it("shows a done scenario with the undo button", () => {
+		const html = renderToStaticMarkup(
+			<CaptureDetailEditorView
+				defaultValue="牛乳を買う"
+				timeLabel="10月2日 14:02"
+				scenarioSummary="牛乳"
+				scenarioAccepted
+				scenarioDone
+				undoDoneButtonProps={{ type: "button" }}
+			/>,
+		);
+
+		expect(html).toContain("完了済み");
+		expect(html).toContain("未完了に戻す");
+	});
+
+	it("does not show the done label for an open scenario", () => {
+		const html = renderToStaticMarkup(
+			<CaptureDetailEditorView
+				defaultValue="牛乳を買う"
+				timeLabel="10月2日 14:02"
+				scenarioSummary="牛乳"
+				undoDoneButtonProps={{ type: "button" }}
+			/>,
+		);
+
+		expect(html).not.toContain("完了済み");
+		expect(html).not.toContain("未完了に戻す");
+	});
+
+	it("shows an undo failure beside the undo button", () => {
+		const html = renderToStaticMarkup(
+			<CaptureDetailEditorView
+				defaultValue="牛乳を買う"
+				timeLabel="10月2日 14:02"
+				scenarioSummary="牛乳"
+				scenarioDone
+				undoDoneButtonProps={{ type: "button" }}
+				undoDoneError="未完了に戻せませんでした。"
+			/>,
+		);
+
+		expect(html).toContain("未完了に戻せませんでした。");
+	});
+
 	it("shows a delete failure beside the delete button", () => {
 		const html = renderToStaticMarkup(
 			<CaptureDetailEditorView

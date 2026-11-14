@@ -5,6 +5,9 @@ const {
 	deleteCaptureMock,
 	getCaptureMock,
 	getServerApiContextMock,
+	listTodayCapturesMock,
+	markCaptureScenarioDoneMock,
+	unmarkCaptureScenarioDoneMock,
 	retryCaptureMock,
 	updateCaptureMock,
 	searchCapturesMock,
@@ -13,6 +16,9 @@ const {
 	deleteCaptureMock: vi.fn(),
 	getCaptureMock: vi.fn(),
 	getServerApiContextMock: vi.fn(),
+	listTodayCapturesMock: vi.fn(),
+	markCaptureScenarioDoneMock: vi.fn(),
+	unmarkCaptureScenarioDoneMock: vi.fn(),
 	retryCaptureMock: vi.fn(),
 	updateCaptureMock: vi.fn(),
 	searchCapturesMock: vi.fn(),
@@ -24,6 +30,9 @@ vi.mock("@hibi/api-client", () => ({
 	deleteCapture: deleteCaptureMock,
 	getCapture: getCaptureMock,
 	listCaptures: vi.fn(),
+	listTodayCaptures: listTodayCapturesMock,
+	markCaptureScenarioDone: markCaptureScenarioDoneMock,
+	unmarkCaptureScenarioDone: unmarkCaptureScenarioDoneMock,
 	retryCapture: retryCaptureMock,
 	updateCapture: updateCaptureMock,
 	searchCaptures: searchCapturesMock,
@@ -36,6 +45,9 @@ import {
 	createCaptureFromApi,
 	deleteCaptureFromApi,
 	getCaptureFromApi,
+	listTodayCapturesFromApi,
+	markCaptureScenarioDoneFromApi,
+	unmarkCaptureScenarioDoneFromApi,
 	retryCaptureFromApi,
 	searchCapturesFromApi,
 	updateCaptureFromApi,
@@ -392,6 +404,124 @@ describe("searchCapturesFromApi", () => {
 
 		const result = await searchCapturesFromApi({ q: "牛乳", mode: "keyword" });
 
+		expect(result.ok).toBe(false);
+	});
+});
+
+describe("listTodayCapturesFromApi", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		getServerApiContextMock.mockResolvedValue({
+			ok: true,
+			baseUrl: "https://api.hibi.example",
+			accessToken: "access-token",
+		});
+	});
+
+	it("passes the limit with the bearer token and unwraps the data array", async () => {
+		const capture = {
+			id: "capture-1",
+			rawText: "牛乳を買う",
+			status: "completed",
+			createdAt: "2026-11-10T05:00:00Z",
+			updatedAt: "2026-11-10T05:00:00Z",
+		};
+		listTodayCapturesMock.mockResolvedValue({ data: { data: [capture] } });
+
+		const result = await listTodayCapturesFromApi({ limit: 3 });
+
+		expect(listTodayCapturesMock).toHaveBeenCalledWith({
+			baseUrl: "https://api.hibi.example",
+			auth: "access-token",
+			query: { limit: 3 },
+		});
+		expect(result).toEqual({ ok: true, data: [capture] });
+	});
+
+	it("works without arguments", async () => {
+		listTodayCapturesMock.mockResolvedValue({ data: { data: [] } });
+
+		const result = await listTodayCapturesFromApi();
+
+		expect(listTodayCapturesMock).toHaveBeenCalledOnce();
+		expect(result).toEqual({ ok: true, data: [] });
+	});
+
+	it("does not call the API without an authenticated context", async () => {
+		getServerApiContextMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "unauthenticated",
+				message: "Authentication is required.",
+			},
+		});
+
+		const result = await listTodayCapturesFromApi();
+
+		expect(listTodayCapturesMock).not.toHaveBeenCalled();
+		expect(result).toEqual({
+			ok: false,
+			error: {
+				kind: "unauthenticated",
+				message: "Authentication is required.",
+			},
+		});
+	});
+});
+
+describe.each([
+	{
+		name: "markCaptureScenarioDoneFromApi",
+		call: markCaptureScenarioDoneFromApi,
+		mock: markCaptureScenarioDoneMock,
+	},
+	{
+		name: "unmarkCaptureScenarioDoneFromApi",
+		call: unmarkCaptureScenarioDoneFromApi,
+		mock: unmarkCaptureScenarioDoneMock,
+	},
+])("$name", ({ call, mock }) => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		getServerApiContextMock.mockResolvedValue({
+			ok: true,
+			baseUrl: "https://api.hibi.example",
+			accessToken: "access-token",
+		});
+	});
+
+	it("calls the API for the capture and unwraps the capture", async () => {
+		const capture = {
+			id: "capture-1",
+			rawText: "牛乳を買う",
+			status: "completed",
+			createdAt: "2026-11-10T05:00:00Z",
+			updatedAt: "2026-11-10T05:00:00Z",
+		};
+		mock.mockResolvedValue({ data: { data: capture } });
+
+		const result = await call("capture-1");
+
+		expect(mock).toHaveBeenCalledWith({
+			baseUrl: "https://api.hibi.example",
+			auth: "access-token",
+			path: { capture_id: "capture-1" },
+		});
+		expect(result).toEqual({ ok: true, data: capture });
+	});
+
+	it("does not call the API without an authenticated context", async () => {
+		getServerApiContextMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "unauthenticated",
+				message: "Authentication is required.",
+			},
+		});
+
+		const result = await call("capture-1");
+
+		expect(mock).not.toHaveBeenCalled();
 		expect(result.ok).toBe(false);
 	});
 });

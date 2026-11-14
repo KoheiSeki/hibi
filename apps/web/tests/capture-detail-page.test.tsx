@@ -60,6 +60,66 @@ describe("CaptureDetailPage", () => {
 		expect(html).toContain("削除する");
 	});
 
+	it("shows the done label and the undo button when the scenario is done", async () => {
+		getCaptureFromApiMock.mockResolvedValue({
+			ok: true,
+			data: {
+				id: "capture-1",
+				rawText: "牛乳を買う",
+				status: "completed",
+				createdAt: "2026-10-04T09:30:00Z",
+				updatedAt: "2026-10-04T09:30:00Z",
+				scenario: {
+					route: "shopping",
+					status: "accepted",
+					title: "牛乳",
+					policyVersion: "capture-scenario-v1",
+					dueAt: null,
+					doneAt: "2026-10-04T10:00:00Z",
+				},
+			},
+		});
+
+		const html = renderToStaticMarkup(
+			await CaptureDetailPage({
+				params: Promise.resolve({ captureId: "capture-1" }),
+			}),
+		);
+
+		expect(html).toContain("完了済み");
+		expect(html).toContain("未完了に戻す");
+	});
+
+	it("does not show the undo button while the scenario is not done", async () => {
+		getCaptureFromApiMock.mockResolvedValue({
+			ok: true,
+			data: {
+				id: "capture-1",
+				rawText: "牛乳を買う",
+				status: "completed",
+				createdAt: "2026-10-04T09:30:00Z",
+				updatedAt: "2026-10-04T09:30:00Z",
+				scenario: {
+					route: "shopping",
+					status: "proposed",
+					title: "牛乳",
+					policyVersion: "capture-scenario-v1",
+					dueAt: null,
+					doneAt: null,
+				},
+			},
+		});
+
+		const html = renderToStaticMarkup(
+			await CaptureDetailPage({
+				params: Promise.resolve({ captureId: "capture-1" }),
+			}),
+		);
+
+		expect(html).not.toContain("完了済み");
+		expect(html).not.toContain("未完了に戻す");
+	});
+
 	it("renders the not-found boundary for a missing capture", async () => {
 		getCaptureFromApiMock.mockResolvedValue({
 			ok: false,
