@@ -756,12 +756,12 @@ git commit -m "feat(web): show today captures and complete them"
 
 ### Task 7: 全ゲート
 
-- [ ] **Step 1: Run every gate**
+- [x] **Step 1: Run every gate**
 
 Run: `uv run --project apps/api ruff format --check apps/api/src apps/api/tests scripts`、`ruff check`、`ty check apps/api/src`、`uv run --project apps/api pytest apps/api/tests`、`corepack pnpm typecheck && corepack pnpm lint && corepack pnpm test && corepack pnpm build`
 Expected: すべて GREEN(`format:check` は対象外)
 
-- [ ] **Step 2: Commit the plan and spec**
+- [x] **Step 2: Commit the plan and spec**
 
 ```bash
 git add docs/architecture/27-week9-today-priority.md docs/architecture/11-implementation-schedule.md docs/superpowers/plans/2026-11-10-week9-today-priority.md
