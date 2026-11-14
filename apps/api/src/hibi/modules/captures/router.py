@@ -24,6 +24,8 @@ from hibi.modules.captures.schemas import (
 from hibi.modules.captures.service import CaptureService
 from hibi.modules.captures.types import (
     CAPTURE_SEARCH_MODE_KEYWORD,
+    TODAY_DEFAULT_LIMIT,
+    TODAY_MAX_LIMIT,
     Capture,
     CaptureScenario,
     CaptureSearchMode,
@@ -31,6 +33,7 @@ from hibi.modules.captures.types import (
     CreateCaptureResult,
     ListCapturesQuery,
     SearchCapturesQuery,
+    TodayCapturesQuery,
     UpdateCaptureCommand,
 )
 from hibi.modules.profiles.repository import ProfileRepository
@@ -164,6 +167,64 @@ async def accept_capture_scenario(
     capture = await service.accept_capture_scenario(principal.user_id, capture_id)
     response.headers["Location"] = f"/api/v1/captures/{capture.id}"
     return ApiResponse(data=_to_capture_response(capture))
+
+
+@router.post(
+    "/{capture_id}/scenario/done",
+    operation_id="markCaptureScenarioDone",
+    response_model=ApiResponse[CaptureResponse],
+    responses=problem_responses(
+        status.HTTP_401_UNAUTHORIZED,
+        status.HTTP_404_NOT_FOUND,
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+    ),
+)
+async def mark_capture_scenario_done(
+    capture_id: UUID,
+    principal: Principal = Depends(get_principal),
+    service: CaptureService = Depends(_get_capture_service),
+):
+    """記録のシナリオを、完了にする。
+
+    今日やることから外れる。繰り返し呼んでも結果は同じで、200 を返す。完了にした
+    時刻は、最初に呼んだときのものが残る。シナリオを確認済み(accepted)にして
+    いなくても、完了にできる。成功は 200 で、更新後の記録を返す。自分の記録でない、
+    記録が無い、またはシナリオが無ければ、理由を区別せず 404。
+    """
+
+    capture = await service.set_capture_scenario_done(principal.user_id, capture_id, done=True)
+    return ApiResponse(data=_to_capture_response(capture))
+
+
+@router.get(
+    "/today",
+    operation_id="listTodayCaptures",
+    response_model=ApiResponse[list[CaptureResponse]],
+    responses=problem_responses(
+        status.HTTP_401_UNAUTHORIZED,
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+    ),
+)
+async def list_today_captures(
+    limit: Annotated[int, Query(ge=1, le=TODAY_MAX_LIMIT)] = TODAY_DEFAULT_LIMIT,
+    principal: Principal = Depends(get_principal),
+    service: CaptureService = Depends(_get_capture_service),
+):
+    """今日やることを、優先度の高い順に返す。
+
+    自分の未完了のシナリオのうち、期限が今日までのものが対象。期限を過ぎたものも
+    含む。今日の終わりは、プロフィールの timezone の暦日で決まる。緊急度が高い
+    ものと、期限が近いものが上に来る。同じ優先度のときの順序は、毎回同じになる。
+
+    limit は 1 以上 20 以下で、未指定は 5。範囲外は 422。対象が無ければ空の配列を
+    返し、404 にはしない。
+    """
+
+    query = TodayCapturesQuery(user_id=principal.user_id, limit=limit)
+    captures = await service.list_today_captures(query)
+    return ApiResponse(data=[_to_capture_response(capture) for capture in captures])
 
 
 @router.get(
@@ -308,6 +369,34 @@ async def delete_capture(
     await service.delete_capture(principal.user_id, capture_id)
 
 
+@router.delete(
+    "/{capture_id}/scenario/done",
+    operation_id="unmarkCaptureScenarioDone",
+    response_model=ApiResponse[CaptureResponse],
+    responses=problem_responses(
+        status.HTTP_401_UNAUTHORIZED,
+        status.HTTP_404_NOT_FOUND,
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+    ),
+)
+async def unmark_capture_scenario_done(
+    capture_id: UUID,
+    principal: Principal = Depends(get_principal),
+    service: CaptureService = Depends(_get_capture_service),
+):
+    """記録のシナリオを、未完了に戻す。
+
+    完了にしていなくても呼べて、その場合も 200 を返す。戻した記録は、期限などの
+    条件が合えば、今日やることに再び出る。成功は 200 で、更新後の記録を返す。本文は
+    空にならず、204 ではない。自分の記録でない、記録が無い、またはシナリオが無ければ、
+    理由を区別せず 404。
+    """
+
+    capture = await service.set_capture_scenario_done(principal.user_id, capture_id, done=False)
+    return ApiResponse(data=_to_capture_response(capture))
+
+
 def _to_capture_response(capture: Capture) -> CaptureResponse:
     """ドメインの Capture を、API のレスポンスに直す。
 
@@ -355,4 +444,6 @@ def _to_scenario_response(scenario: CaptureScenario | None) -> ScenarioResponse 
         amount=scenario.amount,
         remind_text=scenario.remind_text,
         policy_version=scenario.policy_version,
+        due_at=scenario.due_at,
+        done_at=scenario.done_at,
     )

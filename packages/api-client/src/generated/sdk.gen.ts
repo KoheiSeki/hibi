@@ -36,12 +36,21 @@ import type {
   ListCapturesData,
   ListCapturesErrors,
   ListCapturesResponses,
+  ListTodayCapturesData,
+  ListTodayCapturesErrors,
+  ListTodayCapturesResponses,
+  MarkCaptureScenarioDoneData,
+  MarkCaptureScenarioDoneErrors,
+  MarkCaptureScenarioDoneResponses,
   RetryCaptureData,
   RetryCaptureErrors,
   RetryCaptureResponses,
   SearchCapturesData,
   SearchCapturesErrors,
   SearchCapturesResponses,
+  UnmarkCaptureScenarioDoneData,
+  UnmarkCaptureScenarioDoneErrors,
+  UnmarkCaptureScenarioDoneResponses,
   UpdateCaptureData,
   UpdateCaptureErrors,
   UpdateCaptureResponses,
@@ -132,6 +141,35 @@ export const searchCaptures = <ThrowOnError extends boolean = false>(
   >({
     security: [{ scheme: "bearer", type: "http" }],
     url: "/api/v1/captures/search",
+    ...options,
+  });
+
+/**
+ * List Today Captures
+ *
+ * 今日やることを、優先度の高い順に返す。
+ *
+ * 自分の未完了のシナリオのうち、期限が今日までのものが対象。期限を過ぎたものも
+ * 含む。今日の終わりは、プロフィールの timezone の暦日で決まる。緊急度が高い
+ * ものと、期限が近いものが上に来る。同じ優先度のときの順序は、毎回同じになる。
+ *
+ * limit は 1 以上 20 以下で、未指定は 5。範囲外は 422。対象が無ければ空の配列を
+ * 返し、404 にはしない。
+ */
+export const listTodayCaptures = <ThrowOnError extends boolean = false>(
+  options?: Options<ListTodayCapturesData, ThrowOnError>,
+): RequestResult<
+  ListTodayCapturesResponses,
+  ListTodayCapturesErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListTodayCapturesResponses,
+    ListTodayCapturesErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/api/v1/captures/today",
     ...options,
   });
 
@@ -246,6 +284,60 @@ export const acceptCaptureScenario = <ThrowOnError extends boolean = false>(
   >({
     security: [{ scheme: "bearer", type: "http" }],
     url: "/api/v1/captures/{capture_id}/scenario/accept",
+    ...options,
+  });
+
+/**
+ * Unmark Capture Scenario Done
+ *
+ * 記録のシナリオを、未完了に戻す。
+ *
+ * 完了にしていなくても呼べて、その場合も 200 を返す。戻した記録は、期限などの
+ * 条件が合えば、今日やることに再び出る。成功は 200 で、更新後の記録を返す。本文は
+ * 空にならず、204 ではない。自分の記録でない、記録が無い、またはシナリオが無ければ、
+ * 理由を区別せず 404。
+ */
+export const unmarkCaptureScenarioDone = <ThrowOnError extends boolean = false>(
+  options: Options<UnmarkCaptureScenarioDoneData, ThrowOnError>,
+): RequestResult<
+  UnmarkCaptureScenarioDoneResponses,
+  UnmarkCaptureScenarioDoneErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    UnmarkCaptureScenarioDoneResponses,
+    UnmarkCaptureScenarioDoneErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/api/v1/captures/{capture_id}/scenario/done",
+    ...options,
+  });
+
+/**
+ * Mark Capture Scenario Done
+ *
+ * 記録のシナリオを、完了にする。
+ *
+ * 今日やることから外れる。繰り返し呼んでも結果は同じで、200 を返す。完了にした
+ * 時刻は、最初に呼んだときのものが残る。シナリオを確認済み(accepted)にして
+ * いなくても、完了にできる。成功は 200 で、更新後の記録を返す。自分の記録でない、
+ * 記録が無い、またはシナリオが無ければ、理由を区別せず 404。
+ */
+export const markCaptureScenarioDone = <ThrowOnError extends boolean = false>(
+  options: Options<MarkCaptureScenarioDoneData, ThrowOnError>,
+): RequestResult<
+  MarkCaptureScenarioDoneResponses,
+  MarkCaptureScenarioDoneErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    MarkCaptureScenarioDoneResponses,
+    MarkCaptureScenarioDoneErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/api/v1/captures/{capture_id}/scenario/done",
     ...options,
   });
 

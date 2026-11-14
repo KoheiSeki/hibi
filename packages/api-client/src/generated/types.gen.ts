@@ -457,6 +457,46 @@ export type SearchCapturesResponses = {
 export type SearchCapturesResponse =
   SearchCapturesResponses[keyof SearchCapturesResponses];
 
+export type ListTodayCapturesData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Limit
+     */
+    limit?: number;
+  };
+  url: "/api/v1/captures/today";
+};
+
+export type ListTodayCapturesErrors = {
+  /**
+   * Authentication failed.
+   */
+  401: ProblemDetails;
+  /**
+   * Request validation failed.
+   */
+  422: ProblemDetails;
+  /**
+   * An unexpected server error occurred.
+   */
+  500: ProblemDetails;
+};
+
+export type ListTodayCapturesError =
+  ListTodayCapturesErrors[keyof ListTodayCapturesErrors];
+
+export type ListTodayCapturesResponses = {
+  /**
+   * Successful Response
+   */
+  200: ApiResponseListCaptureResponse;
+};
+
+export type ListTodayCapturesResponse =
+  ListTodayCapturesResponses[keyof ListTodayCapturesResponses];
+
 export type DeleteCaptureData = {
   body?: never;
   path: {
@@ -683,6 +723,94 @@ export type AcceptCaptureScenarioResponses = {
 
 export type AcceptCaptureScenarioResponse =
   AcceptCaptureScenarioResponses[keyof AcceptCaptureScenarioResponses];
+
+export type UnmarkCaptureScenarioDoneData = {
+  body?: never;
+  path: {
+    /**
+     * Capture Id
+     */
+    capture_id: string;
+  };
+  query?: never;
+  url: "/api/v1/captures/{capture_id}/scenario/done";
+};
+
+export type UnmarkCaptureScenarioDoneErrors = {
+  /**
+   * Authentication failed.
+   */
+  401: ProblemDetails;
+  /**
+   * The requested resource was not found.
+   */
+  404: ProblemDetails;
+  /**
+   * Request validation failed.
+   */
+  422: ProblemDetails;
+  /**
+   * An unexpected server error occurred.
+   */
+  500: ProblemDetails;
+};
+
+export type UnmarkCaptureScenarioDoneError =
+  UnmarkCaptureScenarioDoneErrors[keyof UnmarkCaptureScenarioDoneErrors];
+
+export type UnmarkCaptureScenarioDoneResponses = {
+  /**
+   * Successful Response
+   */
+  200: ApiResponseCaptureResponse;
+};
+
+export type UnmarkCaptureScenarioDoneResponse =
+  UnmarkCaptureScenarioDoneResponses[keyof UnmarkCaptureScenarioDoneResponses];
+
+export type MarkCaptureScenarioDoneData = {
+  body?: never;
+  path: {
+    /**
+     * Capture Id
+     */
+    capture_id: string;
+  };
+  query?: never;
+  url: "/api/v1/captures/{capture_id}/scenario/done";
+};
+
+export type MarkCaptureScenarioDoneErrors = {
+  /**
+   * Authentication failed.
+   */
+  401: ProblemDetails;
+  /**
+   * The requested resource was not found.
+   */
+  404: ProblemDetails;
+  /**
+   * Request validation failed.
+   */
+  422: ProblemDetails;
+  /**
+   * An unexpected server error occurred.
+   */
+  500: ProblemDetails;
+};
+
+export type MarkCaptureScenarioDoneError =
+  MarkCaptureScenarioDoneErrors[keyof MarkCaptureScenarioDoneErrors];
+
+export type MarkCaptureScenarioDoneResponses = {
+  /**
+   * Successful Response
+   */
+  200: ApiResponseCaptureResponse;
+};
+
+export type MarkCaptureScenarioDoneResponse =
+  MarkCaptureScenarioDoneResponses[keyof MarkCaptureScenarioDoneResponses];
 
 export type EchoMessageData = {
   body: EchoRequest;

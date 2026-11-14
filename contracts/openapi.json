@@ -817,6 +817,77 @@
         ]
       }
     },
+    "/api/v1/captures/today": {
+      "get": {
+        "description": "\u4eca\u65e5\u3084\u308b\u3053\u3068\u3092\u3001\u512a\u5148\u5ea6\u306e\u9ad8\u3044\u9806\u306b\u8fd4\u3059\u3002\n\n\u81ea\u5206\u306e\u672a\u5b8c\u4e86\u306e\u30b7\u30ca\u30ea\u30aa\u306e\u3046\u3061\u3001\u671f\u9650\u304c\u4eca\u65e5\u307e\u3067\u306e\u3082\u306e\u304c\u5bfe\u8c61\u3002\u671f\u9650\u3092\u904e\u304e\u305f\u3082\u306e\u3082\n\u542b\u3080\u3002\u4eca\u65e5\u306e\u7d42\u308f\u308a\u306f\u3001\u30d7\u30ed\u30d5\u30a3\u30fc\u30eb\u306e timezone \u306e\u66a6\u65e5\u3067\u6c7a\u307e\u308b\u3002\u7dca\u6025\u5ea6\u304c\u9ad8\u3044\n\u3082\u306e\u3068\u3001\u671f\u9650\u304c\u8fd1\u3044\u3082\u306e\u304c\u4e0a\u306b\u6765\u308b\u3002\u540c\u3058\u512a\u5148\u5ea6\u306e\u3068\u304d\u306e\u9806\u5e8f\u306f\u3001\u6bce\u56de\u540c\u3058\u306b\u306a\u308b\u3002\n\nlimit \u306f 1 \u4ee5\u4e0a 20 \u4ee5\u4e0b\u3067\u3001\u672a\u6307\u5b9a\u306f 5\u3002\u7bc4\u56f2\u5916\u306f 422\u3002\u5bfe\u8c61\u304c\u7121\u3051\u308c\u3070\u7a7a\u306e\u914d\u5217\u3092\n\u8fd4\u3057\u3001404 \u306b\u306f\u3057\u306a\u3044\u3002",
+        "operationId": "listTodayCaptures",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 5,
+              "maximum": 20,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_list_CaptureResponse__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "An unexpected server error occurred."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Today Captures",
+        "tags": [
+          "captures"
+        ]
+      }
+    },
     "/api/v1/captures/{capture_id}": {
       "delete": {
         "description": "\u8a18\u9332\u3092\u524a\u9664\u3059\u308b\u3002\n\n\u30b7\u30ca\u30ea\u30aa\u3068 embedding \u3082\u4e00\u7dd2\u306b\u6d88\u3048\u308b\u3002\u6210\u529f\u306f 204 \u3067\u672c\u6587\u306f\u7121\u3044\u3002\u81ea\u5206\u306e\u8a18\u9332\u3067\u306a\u3044\u3001\n\u307e\u305f\u306f\u7121\u3051\u308c\u3070 404\u3002",
@@ -1236,6 +1307,162 @@
           }
         ],
         "summary": "Accept Capture Scenario",
+        "tags": [
+          "captures"
+        ]
+      }
+    },
+    "/api/v1/captures/{capture_id}/scenario/done": {
+      "delete": {
+        "description": "\u8a18\u9332\u306e\u30b7\u30ca\u30ea\u30aa\u3092\u3001\u672a\u5b8c\u4e86\u306b\u623b\u3059\u3002\n\n\u5b8c\u4e86\u306b\u3057\u3066\u3044\u306a\u304f\u3066\u3082\u547c\u3079\u3066\u3001\u305d\u306e\u5834\u5408\u3082 200 \u3092\u8fd4\u3059\u3002\u623b\u3057\u305f\u8a18\u9332\u306f\u3001\u671f\u9650\u306a\u3069\u306e\n\u6761\u4ef6\u304c\u5408\u3048\u3070\u3001\u4eca\u65e5\u3084\u308b\u3053\u3068\u306b\u518d\u3073\u51fa\u308b\u3002\u6210\u529f\u306f 200 \u3067\u3001\u66f4\u65b0\u5f8c\u306e\u8a18\u9332\u3092\u8fd4\u3059\u3002\u672c\u6587\u306f\n\u7a7a\u306b\u306a\u3089\u305a\u3001204 \u3067\u306f\u306a\u3044\u3002\u81ea\u5206\u306e\u8a18\u9332\u3067\u306a\u3044\u3001\u8a18\u9332\u304c\u7121\u3044\u3001\u307e\u305f\u306f\u30b7\u30ca\u30ea\u30aa\u304c\u7121\u3051\u308c\u3070\u3001\n\u7406\u7531\u3092\u533a\u5225\u305b\u305a 404\u3002",
+        "operationId": "unmarkCaptureScenarioDone",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "capture_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Capture Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_CaptureResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "The requested resource was not found."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "An unexpected server error occurred."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Unmark Capture Scenario Done",
+        "tags": [
+          "captures"
+        ]
+      },
+      "post": {
+        "description": "\u8a18\u9332\u306e\u30b7\u30ca\u30ea\u30aa\u3092\u3001\u5b8c\u4e86\u306b\u3059\u308b\u3002\n\n\u4eca\u65e5\u3084\u308b\u3053\u3068\u304b\u3089\u5916\u308c\u308b\u3002\u7e70\u308a\u8fd4\u3057\u547c\u3093\u3067\u3082\u7d50\u679c\u306f\u540c\u3058\u3067\u3001200 \u3092\u8fd4\u3059\u3002\u5b8c\u4e86\u306b\u3057\u305f\n\u6642\u523b\u306f\u3001\u6700\u521d\u306b\u547c\u3093\u3060\u3068\u304d\u306e\u3082\u306e\u304c\u6b8b\u308b\u3002\u30b7\u30ca\u30ea\u30aa\u3092\u78ba\u8a8d\u6e08\u307f(accepted)\u306b\u3057\u3066\n\u3044\u306a\u304f\u3066\u3082\u3001\u5b8c\u4e86\u306b\u3067\u304d\u308b\u3002\u6210\u529f\u306f 200 \u3067\u3001\u66f4\u65b0\u5f8c\u306e\u8a18\u9332\u3092\u8fd4\u3059\u3002\u81ea\u5206\u306e\u8a18\u9332\u3067\u306a\u3044\u3001\n\u8a18\u9332\u304c\u7121\u3044\u3001\u307e\u305f\u306f\u30b7\u30ca\u30ea\u30aa\u304c\u7121\u3051\u308c\u3070\u3001\u7406\u7531\u3092\u533a\u5225\u305b\u305a 404\u3002",
+        "operationId": "markCaptureScenarioDone",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "capture_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Capture Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_CaptureResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "The requested resource was not found."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "An unexpected server error occurred."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Mark Capture Scenario Done",
         "tags": [
           "captures"
         ]

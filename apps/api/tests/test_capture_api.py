@@ -312,6 +312,8 @@ def test_get_own_capture_returns_scenario() -> None:
         "amount": 1200,
         "remindText": None,
         "policyVersion": "capture-scenario-v1",
+        "dueAt": None,
+        "doneAt": None,
     }
 
 

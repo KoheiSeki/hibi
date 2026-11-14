@@ -21,6 +21,10 @@ CAPTURE_SEARCH_MODE_KEYWORD = "keyword"
 CAPTURE_SEARCH_MODE_SEMANTIC = "semantic"
 CAPTURE_SEARCH_LIMIT = 20
 
+TODAY_MAX_LIMIT = 20
+TODAY_DEFAULT_LIMIT = 5
+
+
 CaptureSearchMode = Literal["keyword", "semantic"]
 
 
