@@ -174,6 +174,8 @@
 
 ## Week 10: 朝ダイジェスト・週次レビュー
 
+方針は [28-week10-digest-and-review.md](./28-week10-digest-and-review.md)。
+
 - arq cronを実装する
 - ユーザーtimezoneとDSTを考慮する
 - ダイジェストを冪等upsertする
