@@ -29,6 +29,7 @@ class CaptureModel(Base):
     category: Mapped[str | None] = mapped_column()
     route: Mapped[str | None] = mapped_column()
     urgency: Mapped[str | None] = mapped_column()
+    urgency_score: Mapped[Decimal | None] = mapped_column(Numeric(3, 2))
     confidence: Mapped[Decimal | None] = mapped_column(Numeric)
     policy_version: Mapped[str | None] = mapped_column()
     question_version: Mapped[str | None] = mapped_column()
@@ -68,6 +69,8 @@ class CaptureScenarioModel(Base):
     amount: Mapped[int | None] = mapped_column()
     remind_text: Mapped[str | None] = mapped_column()
     policy_version: Mapped[str] = mapped_column()
+    due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

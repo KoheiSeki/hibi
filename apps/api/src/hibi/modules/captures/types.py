@@ -111,3 +111,5 @@ class CaptureScenario:
     amount: int | None
     remind_text: str | None
     policy_version: str
+    due_at: datetime | None = None
+    done_at: datetime | None = None
