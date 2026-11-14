@@ -613,7 +613,7 @@ async def _completed_with_scenario(
 
 
 @pytest.mark.integration
-async def test_list_today_candidates_returns_only_undone_completed_scenarios_of_the_owner(
+async def test_list_open_scenario_candidates_returns_only_undone_completed_scenarios_of_the_owner(
     session: AsyncSession,
 ) -> None:
     owner_id, other_id = uuid4(), uuid4()
@@ -643,7 +643,7 @@ async def test_list_today_candidates_returns_only_undone_completed_scenarios_of_
     # 別ユーザー
     await _completed_with_scenario(session, repo, other_id)
 
-    candidates = await repo.list_today_candidates(owner_id)
+    candidates = await repo.list_open_scenario_candidates(owner_id)
 
     assert [candidate.capture_id for candidate in candidates] == [open_capture.id]
     assert candidates[0].urgency_score == Decimal("0.50")
@@ -652,7 +652,7 @@ async def test_list_today_candidates_returns_only_undone_completed_scenarios_of_
 
 
 @pytest.mark.integration
-async def test_list_today_candidates_carries_the_deadline_and_a_null_urgency_score(
+async def test_list_open_scenario_candidates_carries_the_deadline_and_a_null_urgency_score(
     session: AsyncSession,
 ) -> None:
     user_id = uuid4()
@@ -667,7 +667,7 @@ async def test_list_today_candidates_carries_the_deadline_and_a_null_urgency_sco
         urgency_score=None,
     )
 
-    candidates = await repo.list_today_candidates(user_id)
+    candidates = await repo.list_open_scenario_candidates(user_id)
 
     assert [candidate.capture_id for candidate in candidates] == [reminder.id]
     assert candidates[0].urgency_score is None
@@ -675,11 +675,13 @@ async def test_list_today_candidates_carries_the_deadline_and_a_null_urgency_sco
 
 
 @pytest.mark.integration
-async def test_list_today_candidates_is_empty_without_scenarios(session: AsyncSession) -> None:
+async def test_list_open_scenario_candidates_is_empty_without_scenarios(
+    session: AsyncSession,
+) -> None:
     user_id = uuid4()
     await _insert_auth_user(session, user_id)
 
-    assert await CaptureRepository(session).list_today_candidates(user_id) == []
+    assert await CaptureRepository(session).list_open_scenario_candidates(user_id) == []
 
 
 @pytest.mark.integration

@@ -20,6 +20,7 @@ from hibi.modules.captures.policies import (
     ScenarioProposal,
 )
 from hibi.modules.captures.search import SearchDocument
+from hibi.modules.captures.today import TodayCandidate
 from hibi.modules.captures.types import (
     CAPTURE_STATUS_COMPLETED,
     CAPTURE_STATUS_FAILED,
@@ -261,6 +262,47 @@ class CaptureRepository:
         )
         result = await self._session.execute(stmt)
         return [_to_outbox_event(row) for row in result.scalars()]
+
+    async def list_open_scenario_candidates(self, user_id: UUID) -> list[TodayCandidate]:
+        """未完了のシナリオを、Today の順位付けの候補として読む。
+
+        completed の Capture で、シナリオが付き、`done_at` が null の行が対象。
+        シナリオが proposed か accepted かは問わない。期限による絞り込みは SQL では
+        行わない。今日の終わりの判定は夏時間を含むため、`rank_today` の 1 か所に
+        まとめてある。そのため、期限が明日以降の行や、期限が過ぎた行も返す。
+
+        Args:
+            user_id: 所有者。別ユーザーの行は読まない。
+
+        Returns:
+            優先度の計算に必要な項目だけを持つ TodayCandidate。並びは保証しない。
+            順位付けは `rank_today` が行う。対象が無ければ空のリスト。
+        """
+
+        stmt = (
+            select(
+                CaptureScenarioModel.capture_id,
+                CaptureModel.urgency_score,
+                CaptureScenarioModel.due_at,
+                CaptureModel.created_at,
+            )
+            .join(CaptureModel, CaptureModel.id == CaptureScenarioModel.capture_id)
+            .where(
+                CaptureModel.user_id == user_id,
+                CaptureModel.status == CAPTURE_STATUS_COMPLETED,
+                CaptureScenarioModel.done_at.is_(None),
+            )
+        )
+        result = await self._session.execute(stmt)
+        return [
+            TodayCandidate(
+                capture_id=capture_id,
+                urgency_score=urgency_score,
+                due_at=due_at,
+                created_at=created_at,
+            )
+            for capture_id, urgency_score, due_at, created_at in result.all()
+        ]
 
     async def create_capture(
         self,
@@ -583,6 +625,36 @@ class CaptureRepository:
             await self._session.flush()
 
         return _to_capture(row)
+
+    async def set_scenario_done(self, user_id: UUID, *, capture_id: UUID, done: bool) -> bool:
+        """所有者のシナリオを、完了にする、または未完了に戻す。
+
+        done が True なら `done_at` に現在時刻を入れる。既に入っているときは上書きせず、
+        最初に完了にした時刻を残す。これにより、同じ操作を繰り返しても結果が変わらない。
+        done が False なら `done_at` を null に戻す。シナリオの `status`(proposed か
+        accepted か)は見ない。確認済みかどうかと、済ませたかどうかは独立している。
+
+        Args:
+            user_id: 所有者。別ユーザーの行は更新しない。
+            capture_id: Capture の id。シナリオは Capture と同じ id で 1 行まで。
+            done: True なら完了にする。False なら未完了に戻す。
+
+        Returns:
+            シナリオの行があれば True。既に同じ状態でも True を返す。行が無い、または
+            別ユーザーの行なら False。
+        """
+
+        done_at = func.coalesce(CaptureScenarioModel.done_at, func.now()) if done else None
+        stmt = (
+            update(CaptureScenarioModel)
+            .where(
+                CaptureScenarioModel.capture_id == capture_id,
+                CaptureScenarioModel.user_id == user_id,
+            )
+            .values(done_at=done_at, updated_at=func.now())
+            .returning(CaptureScenarioModel.capture_id)
+        )
+        return await self._session.scalar(stmt) is not None
 
     async def accept_capture_scenario(self, user_id: UUID, *, capture_id: UUID) -> bool:
         """所有者の proposed のシナリオを、accepted にする。
