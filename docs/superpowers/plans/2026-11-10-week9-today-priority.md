@@ -730,12 +730,12 @@ Expected: FAIL(module not found)
 
 新しい export には、日本語の JSDoc を付ける(CLAUDE.md の方針)。
 
-- [ ] **Step 4: Run the web gate**
+- [x] **Step 4: Run the web gate**
 
 Run: `corepack pnpm typecheck && corepack pnpm lint && corepack pnpm test && corepack pnpm build`
 Expected: すべて PASS。`git checkout apps/web/next-env.d.ts`
 
-- [ ] **Step 5: Manual check**(`docs/architecture/27-week9-today-priority.md` の手動確認)
+- [x] **Step 5: Manual check**(`docs/architecture/27-week9-today-priority.md` の手動確認)
 
 `just dev-api`、`just dev-worker`、`just dev-web` を起動する。
 
@@ -745,7 +745,7 @@ Expected: すべて PASS。`git checkout apps/web/next-env.d.ts`
 4. 詳細で「完了済み」「未完了に戻す」が出て、戻すと Today に戻る
 5. 何も無いとき「今日やることはありません」が出る
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/web
