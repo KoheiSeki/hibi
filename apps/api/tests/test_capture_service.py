@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4, uuid7
 
 import pytest
+from profile_helpers import FakeProfileRepository, as_profile_repository
 from sqlalchemy.exc import IntegrityError
 
 from hibi.ai.fake_clarification import FakeClarificationGenerator
@@ -217,6 +218,7 @@ def _service(
             FakeCaptureClassifier(),
             FakeClarificationGenerator(),
             FakeTextEmbedder(),
+            as_profile_repository(FakeProfileRepository()),
         ),
         repository,
         session,

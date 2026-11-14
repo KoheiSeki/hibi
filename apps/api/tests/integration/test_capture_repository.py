@@ -582,33 +582,6 @@ async def test_complete_capture_saves_a_null_urgency_score(session: AsyncSession
     assert urgency_score is None
 
 
-@pytest.mark.integration
-async def test_get_user_timezone_defaults_to_tokyo_and_follows_the_profile(
-    session: AsyncSession,
-) -> None:
-    user_id = uuid4()
-    await _insert_auth_user(session, user_id)
-    repo = CaptureRepository(session)
-
-    assert await repo.get_user_timezone(user_id) == "Asia/Tokyo"
-
-    await session.execute(
-        text("UPDATE app.profiles SET timezone = :timezone WHERE user_id = :user_id"),
-        {"timezone": "America/New_York", "user_id": user_id},
-    )
-
-    assert await repo.get_user_timezone(user_id) == "America/New_York"
-
-
-@pytest.mark.integration
-async def test_get_user_timezone_falls_back_to_utc_without_a_profile(
-    session: AsyncSession,
-) -> None:
-    repo = CaptureRepository(session)
-
-    assert await repo.get_user_timezone(uuid4()) == "UTC"
-
-
 def _content_hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
@@ -619,6 +592,151 @@ async def _mark_processing(session: AsyncSession, capture_id: UUID) -> None:
         .where(CaptureModel.id == capture_id)
         .values(status=CAPTURE_STATUS_PROCESSING)
     )
+
+
+async def _completed_with_scenario(
+    session: AsyncSession,
+    repo: CaptureRepository,
+    user_id: UUID,
+    *,
+    raw_text: str = "牛乳を買う",
+    route: str = "shopping",
+    urgency_score: Decimal | None = Decimal("0.50"),
+) -> Capture:
+    capture = await _create_capture(repo, user_id, raw_text=raw_text)
+    await _mark_processing(session, capture.id)
+    proposal = propose_capture_scenario(
+        route=route, raw_text=raw_text, now=_NOW, timezone="Asia/Tokyo"
+    )
+    await _complete_classification(repo, capture, scenario=proposal, urgency_score=urgency_score)
+    return capture
+
+
+@pytest.mark.integration
+async def test_list_today_candidates_returns_only_undone_completed_scenarios_of_the_owner(
+    session: AsyncSession,
+) -> None:
+    owner_id, other_id = uuid4(), uuid4()
+    await _insert_auth_user(session, owner_id)
+    await _insert_auth_user(session, other_id)
+    repo = CaptureRepository(session)
+    open_capture = await _completed_with_scenario(session, repo, owner_id)
+    done_capture = await _completed_with_scenario(session, repo, owner_id, raw_text="卵を買う")
+    await repo.set_scenario_done(owner_id, capture_id=done_capture.id, done=True)
+    # シナリオの無い completed
+    no_scenario = await _create_capture(repo, owner_id, raw_text="あとで読む記事")
+    await _mark_processing(session, no_scenario.id)
+    await _complete_classification(repo, no_scenario, scenario=None)
+    # completed でない Capture に、シナリオの行だけがある
+    pending = await _create_capture(repo, owner_id, raw_text="パンを買う")
+    session.add(
+        CaptureScenarioModel(
+            capture_id=pending.id,
+            user_id=owner_id,
+            route="shopping",
+            status=CAPTURE_SCENARIO_STATUS_PROPOSED,
+            title="パン",
+            policy_version=CAPTURE_SCENARIO_POLICY_VERSION,
+        )
+    )
+    await session.flush()
+    # 別ユーザー
+    await _completed_with_scenario(session, repo, other_id)
+
+    candidates = await repo.list_today_candidates(owner_id)
+
+    assert [candidate.capture_id for candidate in candidates] == [open_capture.id]
+    assert candidates[0].urgency_score == Decimal("0.50")
+    assert candidates[0].due_at is None
+    assert candidates[0].created_at == open_capture.created_at
+
+
+@pytest.mark.integration
+async def test_list_today_candidates_carries_the_deadline_and_a_null_urgency_score(
+    session: AsyncSession,
+) -> None:
+    user_id = uuid4()
+    await _insert_auth_user(session, user_id)
+    repo = CaptureRepository(session)
+    reminder = await _completed_with_scenario(
+        session,
+        repo,
+        user_id,
+        raw_text="明日の 9 時に起こして",
+        route="reminder",
+        urgency_score=None,
+    )
+
+    candidates = await repo.list_today_candidates(user_id)
+
+    assert [candidate.capture_id for candidate in candidates] == [reminder.id]
+    assert candidates[0].urgency_score is None
+    assert candidates[0].due_at == datetime(2026, 11, 11, 0, 0, tzinfo=UTC)
+
+
+@pytest.mark.integration
+async def test_list_today_candidates_is_empty_without_scenarios(session: AsyncSession) -> None:
+    user_id = uuid4()
+    await _insert_auth_user(session, user_id)
+
+    assert await CaptureRepository(session).list_today_candidates(user_id) == []
+
+
+@pytest.mark.integration
+async def test_set_scenario_done_sets_and_clears_the_completion_time(
+    session: AsyncSession,
+) -> None:
+    user_id = uuid4()
+    await _insert_auth_user(session, user_id)
+    repo = CaptureRepository(session)
+    capture = await _completed_with_scenario(session, repo, user_id)
+    done_at_query = select(CaptureScenarioModel.done_at).where(
+        CaptureScenarioModel.capture_id == capture.id
+    )
+
+    assert await repo.set_scenario_done(user_id, capture_id=capture.id, done=True) is True
+    assert await session.scalar(done_at_query) is not None
+
+    assert await repo.set_scenario_done(user_id, capture_id=capture.id, done=False) is True
+    assert await session.scalar(done_at_query) is None
+
+
+@pytest.mark.integration
+async def test_set_scenario_done_keeps_the_first_completion_time(session: AsyncSession) -> None:
+    user_id = uuid4()
+    await _insert_auth_user(session, user_id)
+    repo = CaptureRepository(session)
+    capture = await _completed_with_scenario(session, repo, user_id)
+    first_done_at = datetime(2026, 11, 1, 0, 0, tzinfo=UTC)
+    # 同じ transaction の now() は変わらないため、過去の時刻を直接入れて上書きを検出する
+    await session.execute(
+        update(CaptureScenarioModel)
+        .where(CaptureScenarioModel.capture_id == capture.id)
+        .values(done_at=first_done_at)
+    )
+
+    assert await repo.set_scenario_done(user_id, capture_id=capture.id, done=True) is True
+    stored = await session.scalar(
+        select(CaptureScenarioModel.done_at).where(CaptureScenarioModel.capture_id == capture.id)
+    )
+
+    assert stored == first_done_at
+
+
+@pytest.mark.integration
+async def test_set_scenario_done_returns_false_for_other_owners_and_missing_scenarios(
+    session: AsyncSession,
+) -> None:
+    owner_id, other_id = uuid4(), uuid4()
+    await _insert_auth_user(session, owner_id)
+    await _insert_auth_user(session, other_id)
+    repo = CaptureRepository(session)
+    capture = await _completed_with_scenario(session, repo, owner_id)
+    no_scenario = await _create_capture(repo, owner_id, raw_text="あとで読む記事")
+
+    assert await repo.set_scenario_done(other_id, capture_id=capture.id, done=True) is False
+    assert await repo.set_scenario_done(owner_id, capture_id=no_scenario.id, done=True) is False
+    assert await repo.set_scenario_done(owner_id, capture_id=uuid4(), done=True) is False
 
 
 @pytest.mark.integration

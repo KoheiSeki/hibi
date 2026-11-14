@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import pytest
@@ -28,6 +29,9 @@ from hibi.modules.captures.types import (
     SearchCapturesQuery,
     UpdateCaptureCommand,
 )
+
+if TYPE_CHECKING:
+    from hibi.modules.captures.types import TodayCapturesQuery
 
 OWNER_ID = UUID("11111111-1111-4111-8111-111111111111")
 OTHER_ID = UUID("22222222-2222-4222-8222-222222222222")
@@ -68,6 +72,8 @@ class FakeCaptureService:
         self.create_error: Exception | None = None
         self.scenarios: dict[UUID, str] = {}
         self.search_calls: list[tuple[str, str]] = []
+        self.today_limits: list[int] = []
+        self.done_calls: list[tuple[UUID, bool]] = []
 
     async def create_capture(self, command: CreateCaptureCommand) -> CreateCaptureResult:
         if self.create_error is not None:
@@ -101,6 +107,19 @@ class FakeCaptureService:
             for capture in self.captures.values()
             if capture.user_id == query.user_id and query.q in capture.raw_text
         ]
+
+    async def list_today_captures(self, query: TodayCapturesQuery) -> list[Capture]:
+        self.today_limits.append(query.limit)
+        return [capture for capture in self.captures.values() if capture.user_id == query.user_id]
+
+    async def set_capture_scenario_done(
+        self, user_id: UUID, capture_id: UUID, *, done: bool
+    ) -> Capture:
+        capture = self.captures.get(capture_id)
+        if capture is None or capture.user_id != user_id or capture_id not in self.scenarios:
+            raise CaptureNotFoundError(capture_id)
+        self.done_calls.append((capture_id, done))
+        return capture
 
     async def update_capture(self, command: UpdateCaptureCommand) -> Capture:
         capture = self.captures.get(command.capture_id)
@@ -181,6 +200,9 @@ def test_capture_endpoints_reject_missing_token() -> None:
         client.delete(path),
         client.post(f"{path}/retry"),
         client.post(f"{path}/scenario/accept"),
+        client.get("/api/v1/captures/today"),
+        client.post(f"{path}/scenario/done"),
+        client.delete(f"{path}/scenario/done"),
     ]
     for response in requests:
         assert response.status_code == 401
@@ -514,3 +536,131 @@ def test_search_path_is_registered_before_the_capture_id_path() -> None:
 
     # /{capture_id}が先に当たると"search"のUUIDパースで422になる
     assert response.status_code == 200
+
+
+def test_today_returns_the_data_array_with_the_default_limit() -> None:
+    fake = FakeCaptureService()
+    fake.captures[CAPTURE_ID] = _capture(status="completed")
+
+    response = _client(fake).get("/api/v1/captures/today")
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()["data"]] == [str(CAPTURE_ID)]
+    assert fake.today_limits == [5]
+
+
+def test_today_passes_the_requested_limit() -> None:
+    fake = FakeCaptureService()
+
+    response = _client(fake).get("/api/v1/captures/today", params={"limit": "3"})
+
+    assert response.status_code == 200
+    assert fake.today_limits == [3]
+
+
+def test_today_returns_an_empty_array_without_captures() -> None:
+    response = _client(FakeCaptureService()).get("/api/v1/captures/today")
+
+    assert response.status_code == 200
+    assert response.json()["data"] == []
+
+
+def test_today_does_not_return_other_owners() -> None:
+    fake = FakeCaptureService()
+    fake.captures[CAPTURE_ID] = _capture(status="completed", user_id=OTHER_ID)
+
+    response = _client(fake).get("/api/v1/captures/today")
+
+    assert response.status_code == 200
+    assert response.json()["data"] == []
+
+
+@pytest.mark.parametrize("limit", ["0", "21", "abc"])
+def test_today_rejects_an_invalid_limit(limit: str) -> None:
+    fake = FakeCaptureService()
+
+    response = _client(fake).get("/api/v1/captures/today", params={"limit": limit})
+
+    assert response.status_code == 422
+    assert response.json()["errors"][0]["pointer"] == "/limit"
+    assert fake.today_limits == []
+
+
+def test_today_path_is_registered_before_the_capture_id_path() -> None:
+    response = _client(FakeCaptureService()).get("/api/v1/captures/today")
+
+    # /{capture_id}が先に当たると"today"のUUIDパースで422になる
+    assert response.status_code == 200
+
+
+def test_mark_scenario_done_returns_the_capture() -> None:
+    fake = FakeCaptureService()
+    fake.captures[CAPTURE_ID] = _capture(status="completed")
+    fake.scenarios[CAPTURE_ID] = "accepted"
+
+    response = _client(fake).post(f"/api/v1/captures/{CAPTURE_ID}/scenario/done")
+
+    assert response.status_code == 200
+    assert response.json()["data"]["id"] == str(CAPTURE_ID)
+    assert fake.done_calls == [(CAPTURE_ID, True)]
+
+
+def test_unmark_scenario_done_returns_the_capture() -> None:
+    fake = FakeCaptureService()
+    fake.captures[CAPTURE_ID] = _capture(status="completed")
+    fake.scenarios[CAPTURE_ID] = "accepted"
+
+    response = _client(fake).delete(f"/api/v1/captures/{CAPTURE_ID}/scenario/done")
+
+    assert response.status_code == 200
+    assert fake.done_calls == [(CAPTURE_ID, False)]
+
+
+@pytest.mark.parametrize("method", ["post", "delete"])
+def test_scenario_done_without_a_scenario_returns_404(method: str) -> None:
+    fake = FakeCaptureService()
+    fake.captures[CAPTURE_ID] = _capture(status="completed")
+
+    response = getattr(_client(fake), method)(f"/api/v1/captures/{CAPTURE_ID}/scenario/done")
+
+    assert response.status_code == 404
+    assert response.json()["type"].endswith("/capture-not-found")
+    assert fake.done_calls == []
+
+
+@pytest.mark.parametrize("method", ["post", "delete"])
+def test_scenario_done_of_another_owner_is_hidden_as_not_found(method: str) -> None:
+    fake = FakeCaptureService()
+    fake.captures[CAPTURE_ID] = _capture(user_id=OTHER_ID, status="completed")
+    fake.scenarios[CAPTURE_ID] = "accepted"
+
+    response = getattr(_client(fake), method)(f"/api/v1/captures/{CAPTURE_ID}/scenario/done")
+
+    assert response.status_code == 404
+    assert response.json()["type"].endswith("/capture-not-found")
+    assert fake.done_calls == []
+
+
+def test_scenario_response_includes_the_deadline_and_completion_time() -> None:
+    due_at = datetime(2026, 11, 11, 0, 0, tzinfo=UTC)
+    done_at = datetime(2026, 11, 10, 8, 0, tzinfo=UTC)
+    fake = FakeCaptureService()
+    fake.captures[CAPTURE_ID] = _capture(
+        status="completed",
+        scenario=CaptureScenario(
+            route="reminder",
+            status="accepted",
+            title="起こして",
+            amount=None,
+            remind_text="明日の 9 時",
+            policy_version="capture-scenario-v1",
+            due_at=due_at,
+            done_at=done_at,
+        ),
+    )
+
+    response = _client(fake).get(f"/api/v1/captures/{CAPTURE_ID}")
+
+    scenario = response.json()["data"]["scenario"]
+    assert datetime.fromisoformat(scenario["dueAt"]) == due_at
+    assert datetime.fromisoformat(scenario["doneAt"]) == done_at

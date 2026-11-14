@@ -6,6 +6,7 @@ from typing import cast
 from uuid import UUID, uuid4, uuid7
 
 import pytest
+from profile_helpers import FakeProfileRepository, as_profile_repository
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hibi.ai.classification import (
@@ -56,14 +57,11 @@ class FakeProcessCaptureRepository:
         allow_start: bool = True,
         fail_processing: bool = False,
         has_embedding: bool = False,
-        timezone: str = "Asia/Tokyo",
     ) -> None:
         self.capture = capture
         self.allow_start = allow_start
         self.fail_processing = fail_processing
         self.has_embedding = has_embedding
-        self.timezone = timezone
-        self.timezone_lookups: list[UUID] = []
         self.urgency_scores: list[Decimal | None] = []
         self.transitions: list[tuple[str, str]] = []
         self.classifications: list[dict[str, object]] = []
@@ -77,10 +75,6 @@ class FakeProcessCaptureRepository:
         del user_id
         self.embedding_lookups.append((capture_id, text))
         return self.has_embedding
-
-    async def get_user_timezone(self, user_id: UUID) -> str:
-        self.timezone_lookups.append(user_id)
-        return self.timezone
 
     async def get_by_capture_id(self, capture_id: UUID) -> Capture | None:
         if self.capture is None or self.capture.id != capture_id:
@@ -251,6 +245,7 @@ def _service(
     classifier: RecordingClassifier | ScriptedClassifier | FakeCaptureClassifier | None = None,
     generator: ScriptedGenerator | FakeClarificationGenerator | None = None,
     embedder: RecordingEmbedder | FakeTextEmbedder | None = None,
+    profiles: FakeProfileRepository | None = None,
     *,
     clock: Callable[[], datetime] | None = None,
 ) -> CaptureService:
@@ -261,6 +256,7 @@ def _service(
         classifier or FakeCaptureClassifier(),
         generator or FakeClarificationGenerator(),
         embedder or FakeTextEmbedder(),
+        as_profile_repository(profiles or FakeProfileRepository()),
         **extra,
     )
 
@@ -667,13 +663,14 @@ async def test_process_capture_does_not_embed_blank_text() -> None:
 @pytest.mark.asyncio
 async def test_reminder_saves_due_at_and_urgency_score() -> None:
     capture = _capture(raw_text="明日の 9 時に起こして")
-    repository = FakeProcessCaptureRepository(capture, timezone="Asia/Tokyo")
+    repository = FakeProcessCaptureRepository(capture)
+    profiles = FakeProfileRepository("Asia/Tokyo")
 
-    await _service(repository, clock=lambda: NOW).process_capture(capture.id, 1)
+    await _service(repository, profiles=profiles, clock=lambda: NOW).process_capture(capture.id, 1)
 
     assert repository.capture is not None
     assert repository.capture.route == "reminder"
-    assert repository.timezone_lookups == [capture.user_id]
+    assert profiles.lookups == [capture.user_id]
     assert repository.urgency_scores == [Decimal("0.50")]
     assert repository.scenario is not None
     assert repository.scenario.remind_text == "明日の 9 時"
@@ -684,12 +681,13 @@ async def test_reminder_saves_due_at_and_urgency_score() -> None:
 async def test_non_reminder_does_not_read_the_user_timezone() -> None:
     capture = _capture(raw_text="牛乳を買う")
     repository = FakeProcessCaptureRepository(capture)
+    profiles = FakeProfileRepository()
 
-    await _service(repository, clock=lambda: NOW).process_capture(capture.id, 1)
+    await _service(repository, profiles=profiles, clock=lambda: NOW).process_capture(capture.id, 1)
 
     assert repository.capture is not None
     assert repository.capture.route == "shopping"
-    assert repository.timezone_lookups == []
+    assert profiles.lookups == []
     assert repository.scenario is not None
     assert repository.scenario.due_at is None
 

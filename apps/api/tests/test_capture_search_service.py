@@ -4,6 +4,7 @@ from typing import cast
 from uuid import UUID
 
 import pytest
+from profile_helpers import FakeProfileRepository, as_profile_repository
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hibi.ai.fake_clarification import FakeClarificationGenerator
@@ -90,6 +91,7 @@ def _service(repository: FakeSearchRepository) -> CaptureService:
         FakeCaptureClassifier(),
         FakeClarificationGenerator(),
         FakeTextEmbedder(),
+        as_profile_repository(FakeProfileRepository()),
     )
 
 
