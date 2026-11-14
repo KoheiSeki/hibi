@@ -7,6 +7,7 @@ import {
 	acceptCaptureScenarioAction,
 	deleteCaptureAction,
 	retryCaptureAction,
+	unmarkScenarioDoneAction,
 	updateCaptureAction,
 } from "./actions";
 import { initialUpdateCaptureActionState } from "./capture-action-state";
@@ -61,6 +62,8 @@ export function CaptureDetailEditor({
 	});
 	const [acceptPending, startAcceptTransition] = useTransition();
 	const [acceptError, setAcceptError] = useState<string>();
+	const [undoDonePending, startUndoDoneTransition] = useTransition();
+	const [undoDoneError, setUndoDoneError] = useState<string>();
 	const completed = status === "completed";
 	const showClarification = completed && Boolean(clarificationText);
 	const visibleScenario = completed && !showClarification ? scenario : null;
@@ -85,6 +88,20 @@ export function CaptureDetailEditor({
 			const result = await acceptCaptureScenarioAction(captureId);
 			if (result.status === "error") {
 				setAcceptError(result.message);
+				return;
+			}
+			if (result.status === "success") {
+				setScenario(result.data.scenario);
+			}
+		});
+	}
+
+	function handleUndoDone() {
+		setUndoDoneError(undefined);
+		startUndoDoneTransition(async () => {
+			const result = await unmarkScenarioDoneAction(captureId);
+			if (result.status === "error") {
+				setUndoDoneError(result.message);
 				return;
 			}
 			if (result.status === "success") {
@@ -138,6 +155,12 @@ export function CaptureDetailEditor({
 			}
 			acceptPending={acceptPending}
 			acceptError={acceptError}
+			scenarioDone={Boolean(visibleScenario?.doneAt)}
+			undoDoneButtonProps={
+				visibleScenario?.doneAt ? { onClick: handleUndoDone } : undefined
+			}
+			undoDonePending={undoDonePending}
+			undoDoneError={undoDoneError}
 			editingDisabled={editingDisabled}
 			updatePending={pending}
 			updateFormProps={{ action: formAction }}

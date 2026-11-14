@@ -26,12 +26,20 @@ export default function CapturesLayout({ children }: { children: ReactNode }) {
           >
             Hibi
           </Link>
-          <Link
-            href="/account"
-            className="font-sans text-sm font-medium text-[#5A6A62] underline-offset-4 outline-none hover:text-[#15201A] hover:underline focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-[#1E6B43]"
-          >
-            アカウント
-          </Link>
+          <nav className="flex items-center gap-5">
+            <Link
+              href="/captures/today"
+              className="font-sans text-sm font-medium text-[#5A6A62] underline-offset-4 outline-none hover:text-[#15201A] hover:underline focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-[#1E6B43]"
+            >
+              今日
+            </Link>
+            <Link
+              href="/account"
+              className="font-sans text-sm font-medium text-[#5A6A62] underline-offset-4 outline-none hover:text-[#15201A] hover:underline focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-[#1E6B43]"
+            >
+              アカウント
+            </Link>
+          </nav>
         </div>
       </header>
 

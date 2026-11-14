@@ -42,9 +42,12 @@ const milk = todayCapture("capture-1", "牛乳");
 const eggs = todayCapture("capture-2", "卵");
 
 async function clickDone(index: number) {
-	const buttons = screen.getAllByRole("button", { name: "完了にする" });
+	const button = screen.getAllByRole("button", { name: "完了にする" })[index];
+	if (!button) {
+		throw new Error(`done button ${index} not found`);
+	}
 	await act(async () => {
-		fireEvent.click(buttons[index]);
+		fireEvent.click(button);
 	});
 }
 

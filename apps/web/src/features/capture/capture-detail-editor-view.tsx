@@ -18,15 +18,19 @@ type CaptureDetailEditorViewProps = {
 	pollingRetryButtonProps?: Omit<ComponentProps<typeof Button>, "children">;
 	retryButtonProps?: Omit<ComponentProps<typeof Button>, "children">;
 	acceptButtonProps?: Omit<ComponentProps<typeof Button>, "children">;
+	undoDoneButtonProps?: Omit<ComponentProps<typeof Button>, "children">;
 	clarificationText?: string | null;
 	scenarioSummary?: string;
 	scenarioAccepted?: boolean;
+	scenarioDone?: boolean;
 	editingDisabled?: boolean;
 	updatePending?: boolean;
 	deletePending?: boolean;
 	retryPending?: boolean;
 	acceptPending?: boolean;
 	acceptError?: string;
+	undoDonePending?: boolean;
+	undoDoneError?: string;
 };
 
 export function CaptureDetailEditorView({
@@ -43,15 +47,19 @@ export function CaptureDetailEditorView({
 	pollingRetryButtonProps,
 	retryButtonProps,
 	acceptButtonProps,
+	undoDoneButtonProps,
 	clarificationText,
 	scenarioSummary,
 	scenarioAccepted = false,
+	scenarioDone = false,
 	editingDisabled = false,
 	updatePending = false,
 	deletePending = false,
 	retryPending = false,
 	acceptPending = false,
 	acceptError,
+	undoDonePending = false,
+	undoDoneError,
 }: CaptureDetailEditorViewProps) {
 	const errorId = fieldError ? "capture-detail-raw-text-error" : undefined;
 	const deleteErrorId = errorMessage
@@ -166,6 +174,27 @@ export function CaptureDetailEditorView({
 									className="mt-3 h-10 rounded-full border-[#D5E3D9] bg-[#F7FBF8] px-5 text-[#1E6B43]"
 								>
 									{acceptPending ? "追加しています" : "追加する"}
+								</Button>
+							</>
+						) : null}
+						{scenarioDone ? (
+							<p className="mt-2 text-sm leading-6 text-[#5A6A62]">完了済み</p>
+						) : null}
+						{scenarioDone && undoDoneButtonProps ? (
+							<>
+								{undoDoneError ? (
+									<p className="mt-2 text-sm text-destructive" role="alert">
+										{undoDoneError}
+									</p>
+								) : null}
+								<Button
+									{...undoDoneButtonProps}
+									type="button"
+									variant="outline"
+									disabled={undoDonePending}
+									className="mt-3 h-10 rounded-full border-[#D5E3D9] bg-[#F7FBF8] px-5 text-[#1E6B43]"
+								>
+									{undoDonePending ? "戻しています" : "未完了に戻す"}
 								</Button>
 							</>
 						) : null}
