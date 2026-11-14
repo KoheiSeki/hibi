@@ -38,6 +38,7 @@ from hibi.modules.captures.policies import (
 )
 from hibi.modules.captures.repository import CaptureRepository
 from hibi.modules.captures.search import rank_capture_by_keyword, rank_captures_by_semantic
+from hibi.modules.captures.today import rank_today
 from hibi.modules.captures.types import (
     CAPTURE_SEARCH_LIMIT,
     CAPTURE_SEARCH_MODE_SEMANTIC,
@@ -51,6 +52,7 @@ from hibi.modules.captures.types import (
     CreateCaptureResult,
     ListCapturesQuery,
     SearchCapturesQuery,
+    TodayCapturesQuery,
     UpdateCaptureCommand,
 )
 from hibi.modules.profiles.repository import ProfileRepository
@@ -216,6 +218,37 @@ class CaptureService:
             next_cursor = self._encode_cursor(last.created_at, last.id)
 
         return CapturePage(items=items, next_cursor=next_cursor, has_next_page=has_next_page)
+
+    async def list_today_captures(self, query: TodayCapturesQuery) -> list[Capture]:
+        """今日やることを、優先度の高い順に最大 limit 件の Capture で返す。
+
+        所有者の未完了のシナリオを候補として読み、ユーザーの timezone の暦日で
+        今日の終わりを決めて、順位付けを `rank_today` に任せる。期限が今日の終わり
+        以降の行は除く。期限が過ぎた行は、日付に関係なく含める。現在時刻は
+        `clock` から、timezone はプロフィールから読む。プロフィールが無いか、
+        名前が不正なら UTC として扱う。
+
+        候補が無ければ、Capture を読まずに空のリストを返す。
+
+        Args:
+            query: 所有者と、返す最大件数。
+
+        Returns:
+            優先度の高い順の Capture。シナリオを含む。0 件なら空のリスト。
+        """
+
+        timezone = await self._profiles.get_timezone(query.user_id)
+        candidates = await self._repository.list_open_scenario_candidates(query.user_id)
+        ranked_candidate_ids = rank_today(
+            candidates, now=self._clock(), timezone=timezone, limit=query.limit
+        )
+        if not ranked_candidate_ids:
+            return []
+        captures = await self._repository.list_captures_by_ids(
+            user_id=query.user_id, capture_ids=ranked_candidate_ids
+        )
+        by_id = {capture.id: capture for capture in captures}
+        return [by_id[capture_id] for capture_id in ranked_candidate_ids if capture_id in by_id]
 
     async def search_captures(self, query: SearchCapturesQuery) -> list[Capture]:
         """所有者の完了済みCaptureを、近い順に最大 CAPTURE_SEARCH_LIMIT 件返す。
@@ -458,6 +491,39 @@ class CaptureService:
             raise CaptureNotFoundError(capture_id)
 
         raise ScenarioNotAcceptableError()
+
+    async def set_capture_scenario_done(
+        self, user_id: UUID, capture_id: UUID, *, done: bool
+    ) -> Capture:
+        """所有者の Capture のシナリオを、完了にする、または未完了に戻す。
+
+        同じ操作を繰り返しても結果は変わらない。完了にしたあとに、もう一度完了に
+        しても、最初の完了時刻が残る。シナリオの確認状態は見ない。更新したあと、
+        シナリオを含む最新の Capture を読み直して返す。
+
+        Args:
+            user_id: 所有者。
+            capture_id: Capture の id。
+            done: True なら完了にする。False なら未完了に戻す。
+
+        Returns:
+            更新後の Capture。シナリオを含む。
+
+        Raises:
+            CaptureNotFoundError: Capture が無い、別ユーザーの Capture、
+                またはシナリオが無い。存在を隠すため、理由は区別しない。
+        """
+
+        is_updated = await self._repository.set_scenario_done(
+            user_id, capture_id=capture_id, done=done
+        )
+        if not is_updated:
+            raise CaptureNotFoundError(capture_id)
+
+        capture = await self._repository.get_by_id(user_id, capture_id=capture_id)
+        if capture is None:
+            raise CaptureNotFoundError(capture_id)
+        return capture
 
     def _replay_or_conflict(
         self, existing: Capture | None, request_hash: str

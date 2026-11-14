@@ -69,13 +69,20 @@ _TOMORROW = datetime(2026, 11, 11, 0, 0, tzinfo=UTC)  # 09:00 JST 翌日
 
 
 class FakeTodayRepository:
-    def __init__(self, candidates: list[TodayCandidate], *, scenario_found: bool = True) -> None:
+    def __init__(
+        self,
+        candidates: list[TodayCandidate],
+        *,
+        scenario_found: bool = True,
+        vanished_ids: frozenset[UUID] = frozenset(),
+    ) -> None:
         self.candidates = candidates
         self.scenario_found = scenario_found
+        self.vanished_ids = vanished_ids
         self.by_ids_calls: list[list[UUID]] = []
         self.done_calls: list[tuple[UUID, UUID, bool]] = []
 
-    async def list_today_candidates(self, user_id: UUID) -> list[TodayCandidate]:
+    async def list_open_scenario_candidates(self, user_id: UUID) -> list[TodayCandidate]:
         assert user_id == _OWNER_ID
         return self.candidates
 
@@ -85,7 +92,11 @@ class FakeTodayRepository:
         assert user_id == _OWNER_ID
         self.by_ids_calls.append(list(capture_ids))
         # 順位の逆順で返し、service が順位どおりに並べ直すことを確かめる
-        return [_capture(capture_id) for capture_id in reversed(capture_ids)]
+        return [
+            _capture(capture_id)
+            for capture_id in reversed(capture_ids)
+            if capture_id not in self.vanished_ids
+        ]
 
     async def set_scenario_done(self, user_id: UUID, *, capture_id: UUID, done: bool) -> bool:
         self.done_calls.append((user_id, capture_id, done))
@@ -170,6 +181,18 @@ async def test_today_applies_the_limit() -> None:
     captures = await _service(repository).list_today_captures(_query(limit=3))
 
     assert [capture.id for capture in captures] == [UUID(int=1), UUID(int=2), UUID(int=3)]
+
+
+@pytest.mark.asyncio
+async def test_today_skips_a_candidate_that_vanished_before_the_capture_was_read() -> None:
+    repository = FakeTodayRepository(
+        [_candidate(_NO_DEADLINE_ID), _candidate(_OVERDUE_ID, due_at=_OVERDUE)],
+        vanished_ids=frozenset({_OVERDUE_ID}),
+    )
+
+    captures = await _service(repository).list_today_captures(_query())
+
+    assert [capture.id for capture in captures] == [_NO_DEADLINE_ID]
 
 
 @pytest.mark.asyncio
