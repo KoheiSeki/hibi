@@ -1,10 +1,10 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime, time, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID
 
-from hibi.core.timezone import zone_for
+from hibi.core.timezone import local_day_start, to_local
 
 _DEFAULT_URGENCY = Decimal("0.5")
 
@@ -45,9 +45,8 @@ def local_day_end(now: datetime, *, timezone: str) -> datetime:
         翌日 0 時に当たる UTC の時刻。この時刻ちょうどの期限は明日の扱い。
     """
 
-    zone = zone_for(timezone)
-    next_date = now.astimezone(zone).date() + timedelta(days=1)
-    return datetime.combine(next_date, time.min, tzinfo=zone).astimezone(UTC)
+    next_date = to_local(now, timezone=timezone).date() + timedelta(days=1)
+    return local_day_start(next_date, timezone=timezone)
 
 
 def calculate_today_priority(candidate: TodayCandidate, *, now: datetime) -> Decimal:

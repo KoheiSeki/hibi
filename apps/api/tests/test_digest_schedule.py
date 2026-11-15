@@ -4,7 +4,6 @@ import pytest
 
 from hibi.modules.digests.schedule import (
     daily_period_start,
-    local_day_start,
     weekly_period_start,
 )
 
@@ -54,15 +53,3 @@ def test_weekly_period_start_uses_the_local_weekday() -> None:
     assert weekly_period_start(datetime(2026, 11, 8, 23, 0, tzinfo=UTC), timezone=JST) == date(
         2026, 11, 2
     )
-
-
-@pytest.mark.parametrize(
-    ("day", "timezone", "expected"),
-    [
-        (date(2026, 11, 10), JST, datetime(2026, 11, 9, 15, 0, tzinfo=UTC)),
-        (date(2026, 3, 8), NY, datetime(2026, 3, 8, 5, 0, tzinfo=UTC)),
-        (date(2026, 11, 1), NY, datetime(2026, 11, 1, 4, 0, tzinfo=UTC)),
-    ],
-)
-def test_local_day_start(day: date, timezone: str, expected: datetime) -> None:
-    assert local_day_start(day, timezone=timezone) == expected
