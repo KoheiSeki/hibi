@@ -46,11 +46,12 @@ class FakeRedis:
         return outcome
 
 
-def _event(*, generation: int = 1) -> OutboxEvent:
+def _event(*, generation: int = 1, aggregate_type: str = "capture") -> OutboxEvent:
     return OutboxEvent(
         id=uuid7(),
         aggregate_id=uuid7(),
         processing_generation=generation,
+        aggregate_type=aggregate_type,
     )
 
 
@@ -119,3 +120,52 @@ async def test_relay_keeps_failed_event_pending_and_continues(
     assert logged[0]["outbox_id"] == failed_event.id
     assert logged[0]["aggregate_id"] == failed_event.aggregate_id
     assert logged[0]["processing_generation"] == failed_event.processing_generation
+
+
+@pytest.mark.asyncio
+async def test_relay_enqueues_a_digest_event_with_only_the_report_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    capture_event = _event()
+    digest_event = _event(aggregate_type="digest_report")
+    repository = FakeOutboxRepository([capture_event, digest_event])
+    redis = FakeRedis({capture_event.aggregate_id: object(), digest_event.aggregate_id: object()})
+    _patch_repository(monkeypatch, repository)
+
+    await relay_module.relay_outbox_events({"redis": redis})
+
+    assert repository.published_ids == [capture_event.id, digest_event.id]
+    assert redis.calls == [
+        (
+            PROCESS_CAPTURE_JOB_NAME,
+            (capture_event.aggregate_id, capture_event.processing_generation),
+            {"_job_id": f"outbox:{capture_event.id}"},
+        ),
+        (
+            "generate_digest_report_job",
+            (digest_event.aggregate_id,),
+            {"_job_id": f"outbox:{digest_event.id}"},
+        ),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_relay_logs_the_target_job_of_a_failed_digest_event(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    digest_event = _event(aggregate_type="digest_report")
+    repository = FakeOutboxRepository([digest_event])
+    redis = FakeRedis({digest_event.aggregate_id: ConnectionError("redis unavailable")})
+    logged: list[dict[str, Any]] = []
+    _patch_repository(monkeypatch, repository)
+    monkeypatch.setattr(
+        relay_module,
+        "log_outbox_enqueue_failure",
+        lambda **kwargs: logged.append(kwargs),
+    )
+
+    await relay_module.relay_outbox_events({"redis": redis})
+
+    assert repository.published_ids == []
+    assert logged[0]["target_job"] == "generate_digest_report_job"
+    assert logged[0]["outbox_id"] == digest_event.id

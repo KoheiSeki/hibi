@@ -5,7 +5,7 @@ from decimal import Decimal
 from uuid import UUID, uuid4, uuid7
 
 import pytest
-from sqlalchemy import select, text, update
+from sqlalchemy import func, select, text, update
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -190,6 +190,21 @@ async def test_delete_is_owner_scoped(session: AsyncSession) -> None:
     assert await repo.get_by_id(owner_id, capture_id=created.id) is not None
     assert await repo.delete_capture(owner_id, capture_id=created.id) is True
     assert await repo.get_by_id(owner_id, capture_id=created.id) is None
+
+
+@pytest.mark.integration
+async def test_delete_capture_also_deletes_its_outbox_events(session: AsyncSession) -> None:
+    user_id = uuid4()
+    await _insert_auth_user(session, user_id)
+    repo = CaptureRepository(session)
+    created = await _create_capture(repo, user_id)
+
+    assert await repo.delete_capture(user_id, capture_id=created.id) is True
+
+    remaining = await session.scalar(
+        select(func.count()).select_from(OutboxModel).where(OutboxModel.aggregate_id == created.id)
+    )
+    assert remaining == 0
 
 
 @pytest.mark.integration
