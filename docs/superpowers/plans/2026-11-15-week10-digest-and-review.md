@@ -242,7 +242,7 @@ def test_build_daily_content_for_no_items_is_still_valid() -> None:
 Run: `uv run --project apps/api pytest apps/api/tests/test_digest_content.py -v`
 Expected: FAIL(`ModuleNotFoundError: hibi.modules.digests.content`)
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 **domain**(`modules/digests/content.py`、純粋関数)
 
@@ -286,7 +286,7 @@ git commit -m "feat(digests): build the daily digest content from today candidat
   - `DigestRepository.get_report(report_id) -> DigestReport | None`
   - `DigestRepository.complete_report(report_id, *, content, summary_model) -> bool`、`fail_report(report_id, *, error_code) -> bool` — どちらも `pending` のときだけ更新する
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1:** Write the failing tests
 
 `tests/integration/test_digest_repository.py`(`integration`。`session` fixture は `test_profile_repository.py` と同じ形で用意する)
 
@@ -333,7 +333,7 @@ async def test_relay_enqueues_a_digest_event_with_only_the_report_id() -> None:
     # aggregate_type="capture" の event は従来どおり (aggregate_id, processing_generation)
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `uv run --project apps/api pytest apps/api/tests/test_relay_outbox_events.py -v` と `supabase db reset` 後に integration
 Expected: FAIL(`DigestRepository` が無い、relay が種類を区別しない)
