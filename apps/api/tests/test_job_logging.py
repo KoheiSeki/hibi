@@ -74,6 +74,7 @@ def test_log_outbox_enqueue_failure_serializes_uuid_fields(
 
     logging_module.log_outbox_enqueue_failure(
         error=ConnectionError("redis unavailable"),
+        target_job="process_capture_job",
         outbox_id=outbox_id,
         aggregate_id=aggregate_id,
         processing_generation=2,
@@ -83,4 +84,5 @@ def test_log_outbox_enqueue_failure_serializes_uuid_fields(
     assert event == "outbox_enqueue_failed"
     assert fields["outbox_id"] == str(outbox_id)
     assert fields["aggregate_id"] == str(aggregate_id)
+    assert fields["target_job"] == "process_capture_job"
     assert fields["retry_on_next_relay"] is True

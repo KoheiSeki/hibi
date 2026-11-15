@@ -1,0 +1,1 @@
+GENERATE_DIGEST_REPORT_JOB_NAME = "generate_digest_report_job"

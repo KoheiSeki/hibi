@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import func, select, tuple_, update
+from sqlalchemy import delete, func, select, tuple_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hibi.ai.embedding import Embedding
@@ -22,6 +22,8 @@ from hibi.modules.captures.policies import (
 from hibi.modules.captures.search import SearchDocument
 from hibi.modules.captures.today import TodayCandidate
 from hibi.modules.captures.types import (
+    CAPTURE_AGGREGATE_TYPE,
+    CAPTURE_PROCESSING_REQUESTED,
     CAPTURE_STATUS_COMPLETED,
     CAPTURE_STATUS_FAILED,
     CAPTURE_STATUS_PENDING,
@@ -340,7 +342,13 @@ class CaptureRepository:
             idempotency_key=idempotency_key,
             request_hash=request_hash,
         )
-        outbox = OutboxModel(id=outbox_id, user_id=user_id, aggregate_id=capture_id)
+        outbox = OutboxModel(
+            id=outbox_id,
+            user_id=user_id,
+            aggregate_id=capture_id,
+            aggregate_type=CAPTURE_AGGREGATE_TYPE,
+            event_type=CAPTURE_PROCESSING_REQUESTED,
+        )
         self._session.add(capture)
         self._session.add(outbox)
         await self._session.flush()
@@ -436,7 +444,9 @@ class CaptureRepository:
     async def delete_capture(self, user_id: UUID, *, capture_id: UUID) -> bool:
         """所有者の Capture を削除する。
 
-        外部キーの `on delete cascade` で、outbox、シナリオ、embedding も一緒に消える。
+        シナリオと embedding は外部キーの `on delete cascade` で消える。outbox は外部キーが
+        無いので、同じ transaction で明示的に消す。Capture が消えなかったとき(無い、または
+        別ユーザーの行)は、outbox にも触れない。
 
         Args:
             user_id: 所有者。
@@ -446,16 +456,24 @@ class CaptureRepository:
             削除したら True。無い、または別ユーザーの行なら False。
         """
 
-        stmt = select(CaptureModel).where(
-            CaptureModel.id == capture_id, CaptureModel.user_id == user_id
+        stmt = (
+            delete(CaptureModel)
+            .where(
+                CaptureModel.id == capture_id,
+                CaptureModel.user_id == user_id,
+            )
+            .returning(CaptureModel.id)
         )
-        result = await self._session.execute(stmt)
-        row = result.scalar_one_or_none()
-        if row is None:
+        deleted_id = await self._session.scalar(stmt)
+        if deleted_id is None:
             return False
 
-        await self._session.delete(row)
-        await self._session.flush()
+        await self._session.execute(
+            delete(OutboxModel).where(
+                OutboxModel.aggregate_type == CAPTURE_AGGREGATE_TYPE,
+                OutboxModel.aggregate_id == capture_id,
+            )
+        )
         return True
 
     async def retry_failed_capture(
@@ -500,6 +518,8 @@ class CaptureRepository:
                 id=outbox_id,
                 user_id=user_id,
                 aggregate_id=capture_id,
+                aggregate_type=CAPTURE_AGGREGATE_TYPE,
+                event_type=CAPTURE_PROCESSING_REQUESTED,
                 processing_generation=row.processing_generation,
             )
         )
@@ -763,6 +783,7 @@ def _to_outbox_event(row: OutboxModel) -> OutboxEvent:
     return OutboxEvent(
         id=row.id,
         aggregate_id=row.aggregate_id,
+        aggregate_type=row.aggregate_type,
         processing_generation=row.processing_generation,
     )
 

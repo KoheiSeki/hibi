@@ -174,6 +174,7 @@ class OutboxEvent:
 
     id: UUID
     aggregate_id: UUID
+    aggregate_type: str
     processing_generation: int
 
 

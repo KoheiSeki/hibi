@@ -32,6 +32,7 @@ def log_job_failure(
 def log_outbox_enqueue_failure(
     *,
     error: Exception,
+    target_job: str,
     outbox_id: UUID,
     aggregate_id: UUID,
     processing_generation: int,
@@ -39,7 +40,7 @@ def log_outbox_enqueue_failure(
     logger.error(
         "outbox_enqueue_failed",
         relay_job="relay_outbox_events",
-        target_job="process_capture_job",
+        target_job=target_job,
         outbox_id=str(outbox_id),
         aggregate_id=str(aggregate_id),
         processing_generation=processing_generation,
