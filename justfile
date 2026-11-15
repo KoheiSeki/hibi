@@ -10,6 +10,9 @@ dev-api:
 dev-worker:
     cd apps/api && uv run arq hibi.jobs.main.WorkerSettings
 
+test-api:
+    cd apps/api && uv run pytest
+
 dev-web:
     corepack pnpm dev:web
 
