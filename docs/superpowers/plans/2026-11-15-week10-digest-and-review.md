@@ -60,14 +60,14 @@
 
 **Interfaces:**
 
-- Consumes: `hibi.core.timezone.zone_for(timezone: str) -> ZoneInfo`
+- Consumes: `hibi.core.timezone.to_local(now: datetime, *, timezone: str) -> datetime`
 - Produces:
   - `DIGEST_HOUR = 7`
   - `daily_period_start(now: datetime, *, timezone: str) -> date | None` — 現地時刻が 7 時以降なら、その日の暦日。前なら None
   - `weekly_period_start(now: datetime, *, timezone: str) -> date | None` — 月曜の 7 時以降なら、先週の月曜。それ以外は None
-  - `local_day_start(day: date, *, timezone: str) -> datetime` — その暦日の現地 0 時を、UTC で返す
+  - (`local_day_start` と `to_local` は `hibi.core.timezone` にある。Week 9 の `local_day_end` と重複していたため、共有の場所に置いた)
 
-- [ ] **Step 1: Write the failing tests** in `tests/test_digest_schedule.py`
+- [x] **Step 1: Write the failing tests** in `tests/test_digest_schedule.py`
 
 ```python
 from datetime import UTC, date, datetime
@@ -76,7 +76,6 @@ import pytest
 
 from hibi.modules.digests.schedule import (
     daily_period_start,
-    local_day_start,
     weekly_period_start,
 )
 
@@ -126,42 +125,30 @@ def test_weekly_period_start_uses_the_local_weekday() -> None:
     assert weekly_period_start(datetime(2026, 11, 8, 23, 0, tzinfo=UTC), timezone=JST) == date(
         2026, 11, 2
     )
-
-
-@pytest.mark.parametrize(
-    ("day", "timezone", "expected"),
-    [
-        (date(2026, 11, 10), JST, datetime(2026, 11, 9, 15, 0, tzinfo=UTC)),
-        (date(2026, 3, 8), NY, datetime(2026, 3, 8, 5, 0, tzinfo=UTC)),
-        (date(2026, 11, 1), NY, datetime(2026, 11, 1, 4, 0, tzinfo=UTC)),
-    ],
-)
-def test_local_day_start(day: date, timezone: str, expected: datetime) -> None:
-    assert local_day_start(day, timezone=timezone) == expected
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `uv run --project apps/api pytest apps/api/tests/test_digest_schedule.py -v`
 Expected: FAIL(`ModuleNotFoundError: hibi.modules.digests.schedule`)
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 **domain**(`modules/digests/schedule.py`、純粋関数。時計と timezone は引数で受ける)
 
 - `daily_period_start(now, *, timezone)`: `now` をユーザーの timezone に直し、時が `DIGEST_HOUR` 以降ならその暦日を、前なら None を返す
 - `weekly_period_start(now, *, timezone)`: 現地の曜日が月曜で、時が 7 時以降なら、`今日 - 7 日` の暦日(先週の月曜)を返す。それ以外は None。日の引き算は `date` で行う
-- `local_day_start(day, *, timezone)`: `datetime.combine(day, time.min, tzinfo=zone)` を UTC に直す。24 時間を足さない
+- `to_local(now, *, timezone)`(`core/timezone.py`): `now` を現地時刻に直す。Task 1 より前に、Week 9 の `local_day_end` と共有する形で `core/timezone.py` に置く
 - `DIGEST_HOUR`: 7
 
 docstring は、3 つとも日本語の Google style で付ける。
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `uv run --project apps/api pytest apps/api/tests/test_digest_schedule.py -v` と `ruff check`、`ty check apps/api/src`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api/src/hibi/modules/digests/schedule.py apps/api/tests/test_digest_schedule.py
@@ -184,10 +171,10 @@ git commit -m "feat(digests): decide when a digest is due in the user timezone"
   - `@dataclass(frozen=True, slots=True) class DigestItem: capture_id: UUID; title: str; due_at: datetime | None`
   - `@dataclass(frozen=True, slots=True) class DeadlineCounts: overdue_count: int; due_today_count: int`
   - `count_deadlines(candidates: Sequence[TodayCandidate], *, now: datetime, timezone: str) -> DeadlineCounts`
-  - `build_daily_content(*, items: Sequence[DigestItem], deadlines: DeadlineCounts, done_yesterday_count: int) -> dict[str, object]`
+  - `build_daily_content(*, items: Sequence[DigestItem], deadline_counts: DeadlineCounts, done_yesterday_count: int) -> dict[str, object]`
   - `DAILY_ITEM_LIMIT = 5`、`DAILY_CONTENT_VERSION = "daily-digest-v1"`
 
-- [ ] **Step 1: Write the failing tests** in `tests/test_digest_content.py`
+- [x] **Step 1: Write the failing tests** in `tests/test_digest_content.py`
 
 ```python
 from datetime import UTC, datetime
@@ -230,7 +217,7 @@ def test_build_daily_content_uses_camel_case_keys_and_iso_times() -> None:
         DigestItem(UUID(int=2), "牛乳", None),
     ]
     content = build_daily_content(
-        items=items, deadlines=DeadlineCounts(1, 2), done_yesterday_count=3
+        items=items, deadline_counts=DeadlineCounts(1, 2), done_yesterday_count=3
     )
     assert content == {
         "items": [
@@ -245,12 +232,12 @@ def test_build_daily_content_uses_camel_case_keys_and_iso_times() -> None:
 
 def test_build_daily_content_for_no_items_is_still_valid() -> None:
     content = build_daily_content(
-        items=[], deadlines=DeadlineCounts(0, 0), done_yesterday_count=0
+        items=[], deadline_counts=DeadlineCounts(0, 0), done_yesterday_count=0
     )
     assert content["items"] == []
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `uv run --project apps/api pytest apps/api/tests/test_digest_content.py -v`
 Expected: FAIL(`ModuleNotFoundError: hibi.modules.digests.content`)
@@ -262,17 +249,17 @@ Expected: FAIL(`ModuleNotFoundError: hibi.modules.digests.content`)
 - `DigestItem`(dataclass): `capture_id`、`title`、`due_at`。daily の 1 行
 - `DeadlineCounts`(dataclass): `overdue_count`、`due_today_count`
 - `count_deadlines(candidates, *, now, timezone)`: 期限が `now` より前なら超過、`now` 以降で `local_day_end` より前なら今日が期限として数える。期限なしと明日以降は数えない
-- `build_daily_content(*, items, deadlines, done_yesterday_count)`: JSON に保存できる辞書にする。キーは camelCase、時刻は UTC の ISO 8601(`Z` 表記)。空の `items` も正常
+- `build_daily_content(*, items, deadline_counts, done_yesterday_count)`: JSON に保存できる辞書にする。キーは camelCase、時刻は UTC の ISO 8601(`Z` 表記)。空の `items` も正常
 - `DAILY_ITEM_LIMIT`(5)、`DAILY_CONTENT_VERSION`(`daily-digest-v1`): 定数
 
 docstring は、日本語の Google style。
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `uv run --project apps/api pytest apps/api/tests/test_digest_content.py -v` と `ruff check`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api/src/hibi/modules/digests/content.py apps/api/tests/test_digest_content.py
@@ -895,7 +882,7 @@ git commit -m "docs: add the week 10 digest and review spec and plan"
 
 - **outbox を使い回す理由:** 再実行(retry)は、状態の更新と job の投入を同じ transaction で行う必要があり、Week 4 の outbox がそれを担う。作り直すと、2 つの配送の仕組みが並ぶ。代わりに、`aggregate_id` の FK を外す必要が出る(Task 3)。capture の削除では、repository が outbox を明示的に消す。
 - **cron を 15 分ごとにする理由:** ユーザーごとの予定表を持たずに、timezone と夏時間を、`daily_period_start` の判定に閉じ込められる。配信は最大 15 分遅れるが、朝 7 時の目安としては足りる。分を細かくすると、ユーザー数に比例して、毎回の走査が増える。
-- **`ON CONFLICT DO NOTHING` の claim を正本にする理由:** arq の `unique` や `_job_id` は、Redis の状態に依存し、再起動やキーの期限で崩れる。DB の unique なら、worker が何台でも、行は 1 件になる。
-- **`pending` の重複実行を許す理由:** 回復の再投入と、元の job が重なると、同じ `pending` の行を 2 つの job が処理しうる。`complete_report` は `pending` を条件にした UPDATE なので、書き込みは 1 回だけになる。weekly の LLM は、まれに 2 回呼ばれうるが、重複を避ける錠(列の追加)は、頻度に見合わないので入れない。
-- **`updated_at` を `update_processing_status` で更新する理由:** 止まった `processing` の判定を、`updated_at` で行うため。今は `status` だけを更新しているので、`created_at` 近くの古い値のまま残る。
+- `ON CONFLICT DO NOTHING` **の claim を正本にする理由:** arq の `unique` や `_job_id` は、Redis の状態に依存し、再起動やキーの期限で崩れる。DB の unique なら、worker が何台でも、行は 1 件になる。
+- `pending` **の重複実行を許す理由:** 回復の再投入と、元の job が重なると、同じ `pending` の行を 2 つの job が処理しうる。`complete_report` は `pending` を条件にした UPDATE なので、書き込みは 1 回だけになる。weekly の LLM は、まれに 2 回呼ばれうるが、重複を避ける錠(列の追加)は、頻度に見合わないので入れない。
+- `updated_at` **を** `update_processing_status` **で更新する理由:** 止まった `processing` の判定を、`updated_at` で行うため。今は `status` だけを更新しているので、`created_at` 近くの古い値のまま残る。
 - **要確認(方針文書で決めた前提):** 配信時刻の固定(7 時)、週の起点(月曜)、対象ユーザー(直近 14 日)、LLM への入力(集計と title だけ)、通知の見送り。
