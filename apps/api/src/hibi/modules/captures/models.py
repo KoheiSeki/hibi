@@ -8,8 +8,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from hibi.db.base import Base
 from hibi.modules.captures.types import (
-    CAPTURE_AGGREGATE_TYPE,
-    CAPTURE_PROCESSING_REQUESTED,
     CAPTURE_STATUS_PENDING,
     OUTBOX_STATUS_PENDING,
 )
@@ -45,9 +43,9 @@ class OutboxModel(Base):
 
     id: Mapped[UUID] = mapped_column(primary_key=True)
     user_id: Mapped[UUID] = mapped_column()
-    aggregate_type: Mapped[str] = mapped_column(default=CAPTURE_AGGREGATE_TYPE)
+    aggregate_type: Mapped[str] = mapped_column()
     aggregate_id: Mapped[UUID] = mapped_column()
-    event_type: Mapped[str] = mapped_column(default=CAPTURE_PROCESSING_REQUESTED)
+    event_type: Mapped[str] = mapped_column()
     processing_generation: Mapped[int] = mapped_column(default=1)
     status: Mapped[str] = mapped_column(default=OUTBOX_STATUS_PENDING)
     available_at: Mapped[datetime] = mapped_column(

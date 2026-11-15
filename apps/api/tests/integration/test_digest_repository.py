@@ -3,6 +3,13 @@ from datetime import date
 from uuid import UUID, uuid4, uuid7
 
 import pytest
+from sqlalchemy import func, select, text
+from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from hibi.core.config import get_settings
+from hibi.db.engine import dispose_engine, get_engine
+from hibi.modules.captures.models import OutboxModel
 from hibi.modules.digests.repository import DigestRepository
 from hibi.modules.digests.types import (
     DIGEST_AGGREGATE_TYPE,
@@ -13,13 +20,6 @@ from hibi.modules.digests.types import (
     DIGEST_STATUS_PENDING,
     DIGEST_STATUS_READY,
 )
-from sqlalchemy import func, select, text
-from sqlalchemy.exc import IntegrityError, OperationalError
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-
-from hibi.core.config import get_settings
-from hibi.db.engine import dispose_engine, get_engine
-from hibi.modules.captures.models import OutboxModel
 
 _DAY = date(2026, 11, 10)
 _CONTENT = {"items": [], "overdueCount": 0, "dueTodayCount": 0, "doneYesterdayCount": 0}
