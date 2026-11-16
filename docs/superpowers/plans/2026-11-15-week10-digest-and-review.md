@@ -338,7 +338,7 @@ async def test_relay_enqueues_a_digest_event_with_only_the_report_id() -> None:
 Run: `uv run --project apps/api pytest apps/api/tests/test_relay_outbox_events.py -v` と `supabase db reset` 後に integration
 Expected: FAIL(`DigestRepository` が無い、relay が種類を区別しない)
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 **migration**(`supabase/migrations/<timestamp>_digest_reports.sql`)
 
@@ -365,12 +365,12 @@ Expected: FAIL(`DigestRepository` が無い、relay が種類を区別しない)
 - `relay_outbox_events`: `aggregate_type` が `digest_report` なら `enqueue_job("generate_digest_report_job", aggregate_id, _job_id=f"outbox:{event.id}")`、それ以外は従来どおり
 - `log_outbox_enqueue_failure`: `target_job` を引数で受ける
 
-- [ ] **Step 4: Run to verify they pass**
+- [x] **Step 4: Run to verify they pass**
 
 Run: `uv run --project apps/api pytest apps/api/tests -m 'not integration' -q`、`supabase db reset` 後に `pytest apps/api/tests/integration -m integration`、`ruff check`、`ty check apps/api/src`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add supabase/migrations apps/api/src apps/api/tests
@@ -393,57 +393,68 @@ git commit -m "feat(digests): claim one digest report per user, kind and period"
 - Produces:
   - `ActiveUser(user_id: UUID, timezone: str)`(`types.py`)
   - `DigestRepository.list_active_users(*, active_since: datetime, limit: int) -> list[ActiveUser]`
-  - `DigestRepository.count_done_between(user_id, *, start, end) -> int`
-  - `DigestService(session, digests: DigestRepository, captures: CaptureRepository, summarizer: ReviewSummarizer, *, clock=_utc_now)`
+  - `DigestRepository.count_done_between(user_id, *, start, end) -> int` — `done_at` が `[start, end)` のシナリオの数
+  - `DIGEST_GENERATION_MAX_ATTEMPTS = 3`(`types.py`)
+  - `DigestService(digests: DigestRepository, captures: CaptureRepository, *, clock=_utc_now)` — `session` は持たない(commit は job の `session_scope`)。`summarizer: ReviewSummarizer` は Task 5 で足す
   - `DigestService.schedule_due_reports() -> int` — 新しく claim した行の数
   - `DigestService.generate_report(report_id: UUID) -> None`
   - `run_daily_digest(ctx) -> None`(cron)、`generate_digest_report_job(ctx, report_id) -> None`(arq entry)
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
-`tests/test_digest_service.py`(fake repository。`FakeProfile` ではなく、`list_active_users` が timezone を返す)
+`tests/test_digest_service.py`(17 件。`FakeDigestRepository` と `FakeCaptureRepository`。`clock=lambda: now` を渡す)
 
 ```python
+# schedule_due_reports
 async def test_schedule_claims_daily_only_after_seven_in_the_user_timezone() -> None:
-    # 利用者 A(JST)と B(America/New_York)。now=2026-11-10 22:00 UTC → A は 07:00 JST で due、B は 17:00 EST で due
-    # now=2026-11-10 21:59 UTC → A は due でない
-    # claim_report の呼び出しが、due な利用者の daily だけ
-
+    # JST と America/New_York の利用者。22:00 UTC → 東京は翌日 07:00、NY は 17:00 で、どちらも daily が due
+async def test_schedule_skips_a_user_before_seven_in_the_user_timezone() -> None: ...   # 21:59 UTC → 東京は 06:59 で対象外
 async def test_schedule_does_not_claim_weekly_on_a_tuesday() -> None: ...
-async def test_schedule_claims_weekly_on_monday_with_last_monday_as_the_period() -> None: ...
+async def test_schedule_claims_weekly_on_monday_with_last_monday_as_the_period() -> None:
+    # 2026-11-09 00:00 UTC(東京の月曜 09:00)→ daily 11-09 と weekly 11-02(content_version は weekly-review-v1)
+async def test_schedule_claims_nothing_on_monday_before_seven() -> None: ...
+async def test_schedule_counts_only_the_reports_that_were_newly_claimed() -> None: ...   # claim が False の行は数えない
+async def test_schedule_reads_only_users_active_in_the_last_14_days() -> None: ...       # active_since == now - 14 日
+async def test_schedule_issues_distinct_ids_for_each_report_and_outbox_event() -> None: ...
 
+# generate_report
 async def test_generate_daily_report_completes_with_ranked_items() -> None:
-    # pending の daily。候補 3 件(超過、今日、期限なし)→ complete_report の content の items が [超過, 今日, 期限なし]
-    # doneYesterdayCount は count_done_between の結果。LLM(summarizer)は呼ばれない
-
-async def test_generate_report_does_nothing_unless_pending() -> None:
-    # status=ready の行 → complete_report も fail_report も呼ばれない
+    # 候補 3 件(期限なし、超過、今日)→ items が [超過, 今日, 期限なし]、dueAt は Z 表記、
+    # overdueCount=1、dueTodayCount=1、doneYesterdayCount は count_done_between の結果、summary_model は None
+async def test_generate_daily_report_never_puts_the_raw_text_in_the_content() -> None: ...
+async def test_generate_daily_report_limits_the_items_to_five() -> None: ...
+async def test_generate_daily_report_counts_yesterday_in_the_report_timezone() -> None:
+    # period_start=11-10、Asia/Tokyo → count_done_between(start=11-09 00:00 JST, end=11-10 00:00 JST)
+async def test_generate_daily_report_without_candidates_completes_with_an_empty_digest() -> None: ...   # captures を読まない
+async def test_generate_report_does_nothing_unless_pending(status) -> None: ...   # ready と failed
+async def test_generate_report_does_nothing_for_a_missing_report() -> None: ...
 ```
 
-`tests/test_run_daily_digest.py`
+`tests/test_run_daily_digest.py`(2 件。`session_scope`、`DigestRepository`、`CaptureRepository`、`DigestService` を monkeypatch する)
 
 ```python
-async def test_run_daily_digest_commits_the_schedule_in_one_session() -> None:
-    # service.schedule_due_reports が 1 回呼ばれ、session が commit される(job テストと同じ monkeypatch の形)
+async def test_run_daily_digest_commits_the_schedule_in_one_session() -> None: ...
+async def test_run_daily_digest_rolls_back_and_raises_when_the_schedule_fails() -> None: ...   # cron は max_tries=1
 ```
 
-`tests/test_generate_digest_report_job.py`
+`tests/test_generate_digest_report_job.py`(5 件。`DigestRepository` の fake が、`fail_report` を呼んだ session を記録する)
 
 ```python
 async def test_job_commits_a_successful_generation() -> None: ...
+async def test_job_schedules_a_retry_before_the_final_attempt(attempt) -> None: ...   # job_try=1、2 → Retry、failed にしない
 async def test_job_marks_failed_on_the_final_attempt_in_a_separate_session() -> None:
-    # job_try=3 で generate_report が例外 → fail_report が別 session で呼ばれ、例外は再送出される
-async def test_job_schedules_a_retry_before_the_final_attempt() -> None: ...   # Retry(defer=...) を送出
+    # job_try=3 → 別 session で fail_report、例外を再送出。error_code は理由の種類だけで、例外のメッセージを含まない
+async def test_job_does_nothing_after_the_final_attempt() -> None: ...   # job_try=4
 ```
 
-`tests/test_worker_settings.py` に追加する。
+`tests/test_worker_settings.py`(関数と cron が 2 つずつになるので、名前と coroutine で探す形に書き換える)
 
 ```python
 def test_worker_registers_the_digest_job_and_the_daily_digest_cron() -> None:
-    # functions に generate_digest_report_job(max_tries=3)、cron_jobs に run_daily_digest(minute={0,15,30,45})
+    # generate_digest_report_job(max_tries=3)、run_daily_digest(minute={0,15,30,45}、second=0、unique=True、max_tries=1)
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `uv run --project apps/api pytest apps/api/tests/test_digest_service.py apps/api/tests/test_run_daily_digest.py apps/api/tests/test_generate_digest_report_job.py apps/api/tests/test_worker_settings.py -v`
 Expected: FAIL(module not found)
@@ -465,7 +476,7 @@ Expected: FAIL(module not found)
 **job**
 
 - `run_daily_digest(ctx)`(`jobs/run_daily_digest.py`): `session_scope` で `DigestService.schedule_due_reports` を呼ぶ。cron の本体
-- `generate_digest_report_job(ctx, report_id)`(`jobs/generate_digest_report_job.py`): `process_capture_job` と同じ形。引数は `report_id` だけ。`job_try` で試行を数え、最終試行の失敗では、別の session で `fail_report` してから例外を再送出する
+- `generate_digest_report_job(ctx, report_id)`(`jobs/generate_digest_report_job.py`): `process_capture_job` と同じ形。引数は `report_id` だけ。`job_try` で試行を数え、最終試行の失敗では、別の session で `fail_report` してから例外を再送出する。`error_code` は理由の種類(例外のクラス名など)だけで、例外のメッセージは入れない。最終試行より後(`job_try` が `DIGEST_GENERATION_MAX_ATTEMPTS` を超える)は、何もしない。再試行の待ち時間は `process_capture_job` と同じ指数バックオフで、共有するときは private 名を import せず `job_logging.py` などへ移す
 - `WorkerSettings`(`jobs/main.py`): `generate_digest_report_job` を `max_tries=3` で登録し、`cron(run_daily_digest, minute={0, 15, 30, 45}, second=0, unique=True, max_tries=1)` を足す
 
 - [ ] **Step 4: Run to verify they pass**
@@ -563,6 +574,7 @@ Expected: FAIL(module not found)
 
 **service**(`digests/service.py`)
 
+- `DigestService.__init__` に `summarizer: ReviewSummarizer` を足す(Task 4 のテストの `_service` と、job の組み立てにも渡す)
 - `generate_report(report_id)`: weekly なら、期間(月曜から翌月曜の 0 時、現地)を `local_day_start` で求め、集計を作る。`captured_count` が 0 なら LLM を呼ばず `EMPTY_WEEK_SUMMARY`。それ以外は `summarizer.summarize_week` を 1 回呼び、`normalize_summary` を通して `complete_report`。`ReviewProviderError` は握りつぶさず、job の retry に任せる
 
 - [ ] **Step 4: Run to verify they pass**
