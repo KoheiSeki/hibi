@@ -16,6 +16,7 @@ from hibi.ai.classification import (
     normalize_clarification_text,
 )
 from hibi.ai.embedding import Embedding, TextEmbedder
+from hibi.core.timezone import utc_now
 from hibi.modules.captures.errors import (
     CaptureNotEditableError,
     CaptureNotFoundError,
@@ -61,11 +62,6 @@ _IDEMPOTENCY_KEY_PATTERN = re.compile(r"^[\x20-\x7E]{8,128}$")
 _MAX_CAPTURE_LENGTH = 2_000
 
 
-def _utc_now() -> datetime:
-    """現在時刻を、UTC の aware な datetime で返す。"""
-    return datetime.now(UTC)
-
-
 class CaptureService:
     """Capture の作成、参照、更新、削除、AI 処理、検索をまとめるサービス。
 
@@ -82,7 +78,7 @@ class CaptureService:
         embedder: TextEmbedder,
         profiles: ProfileRepository,
         *,
-        clock: Callable[[], datetime] = _utc_now,
+        clock: Callable[[], datetime] = utc_now,
     ) -> None:
         """サービスが使う依存を受け取って保持する。
 
@@ -96,6 +92,7 @@ class CaptureService:
             clock: 現在時刻の取得元。シナリオの期限を決める基準になる。
                 テストで固定時刻を差し込めるよう、引数にしている。
         """
+
         self._session = session
         self._repository = repository
         self._classifier = classifier
