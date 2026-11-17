@@ -384,7 +384,7 @@ git commit -m "feat(digests): claim one digest report per user, kind and period"
 **Files:**
 
 - Create: `apps/api/src/hibi/modules/digests/service.py`、`apps/api/src/hibi/jobs/run_daily_digest.py`、`apps/api/src/hibi/jobs/generate_digest_report_job.py`
-- Modify: `apps/api/src/hibi/modules/digests/repository.py`、`apps/api/src/hibi/jobs/main.py`、`apps/api/src/hibi/modules/captures/repository.py`
+- Modify: `apps/api/src/hibi/modules/digests/repository.py`、`apps/api/src/hibi/jobs/main.py`
 - Test: `apps/api/tests/test_digest_service.py`(新規)、`apps/api/tests/test_run_daily_digest.py`(新規)、`apps/api/tests/test_generate_digest_report_job.py`(新規)、`apps/api/tests/test_worker_settings.py`
 
 **Interfaces:**
@@ -465,7 +465,7 @@ Expected: FAIL(module not found)
 
 - `DigestRepository.list_active_users(*, active_since, limit)`: 直近に Capture がある `user_id` と、`profiles.timezone` を返す。`limit` 件まで
 - `DigestRepository.count_done_between(user_id, *, start, end)`: `done_at` が `[start, end)` のシナリオの数
-- `CaptureRepository.list_open_scenario_candidates` と `list_captures_by_ids`: Week 9 のものを、daily の `items`(title と期限)に使う
+- `CaptureRepository.list_open_scenario_candidates` と `list_captures_by_ids`: Week 9 のものを、変更せずに使う。候補は `rank_today`(`items`)と `count_deadlines`(期限の件数)に渡し、title と期限は `list_captures_by_ids` の `scenario` から読む。期限の絞り込みを SQL に足さない(`overdueCount` が崩れる)。docstring だけ、Today とダイジェストの両方が読むことを書く
 
 **service**(`digests/service.py`)
 
