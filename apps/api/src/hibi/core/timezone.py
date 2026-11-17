@@ -2,6 +2,16 @@ from datetime import UTC, date, datetime, time
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
+def utc_now() -> datetime:
+    """現在時刻を、UTC の aware な datetime で返す。
+
+    service の `clock` の既定値に使う。テストでは、固定の時刻を返す関数に差し替える。
+    保存と比較に使う時刻は、すべて UTC の aware な datetime に揃える。
+    """
+
+    return datetime.now(UTC)
+
+
 def zone_for(timezone: str) -> ZoneInfo:
     """IANA 名から ZoneInfo を返す。
 
