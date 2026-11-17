@@ -7,6 +7,7 @@ from hibi.modules.captures.today import TodayCandidate, local_day_end
 
 DAILY_ITEM_LIMIT = 5
 DAILY_CONTENT_VERSION = "daily-digest-v1"
+WEEKLY_CONTENT_VERSION = "weekly-review-v1"
 
 
 @dataclass(frozen=True, slots=True)
