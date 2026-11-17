@@ -1,11 +1,11 @@
-from datetime import date
+from datetime import date, datetime
 from uuid import UUID
 
 from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from hibi.modules.captures.models import OutboxModel
+from hibi.modules.captures.models import CaptureModel, CaptureScenarioModel, OutboxModel
 from hibi.modules.digests.models import DigestReportModel
 from hibi.modules.digests.types import (
     DIGEST_AGGREGATE_TYPE,
@@ -13,8 +13,10 @@ from hibi.modules.digests.types import (
     DIGEST_STATUS_FAILED,
     DIGEST_STATUS_PENDING,
     DIGEST_STATUS_READY,
+    ActiveUser,
     DigestReport,
 )
+from hibi.modules.profiles.models import ProfileModel
 
 
 class DigestRepository:
@@ -187,6 +189,74 @@ class DigestRepository:
             .returning(DigestReportModel.id)
         )
         return await self._session.scalar(stmt) is not None
+
+    async def list_active_users(self, *, active_since: datetime, limit: int) -> list[ActiveUser]:
+        """直近に Capture がある利用者と、その timezone を読む。
+
+        cron が 15 分ごとに、ダイジェストを作る対象を探すのに使う。`active_since` 以降に
+        Capture を作った利用者だけを返すので、休眠中の利用者に空のダイジェストを作り続けない。
+        1 人は 1 回だけ返す。Capture の数にかかわらず重複しない。
+
+        timezone はプロフィールから読む。Capture は、プロフィールが無い利用者には作れない
+        (外部キー)ので、プロフィールが無い利用者は、ここに現れない。名前の検証はしない。
+        不正な名前は、日付を決める側が UTC として扱う。
+
+        並びは `user_id` の昇順で固定する。`limit` を超える利用者がいると、後ろの利用者が
+        毎回対象から外れて、いつまでもダイジェストが作られない。`limit` は、1 回の cron が
+        抱える量の上限で、全利用者を覆う上限ではない。利用者が増えたら、読み方を変える。
+
+        Args:
+            active_since: この時刻以降に Capture がある利用者を対象にする。aware な datetime。
+            limit: 返す利用者の最大数。
+
+        Returns:
+            利用者の id と timezone。該当が無ければ空のリスト。
+        """
+
+        stmt = (
+            select(CaptureModel.user_id, ProfileModel.timezone)
+            .join(ProfileModel, CaptureModel.user_id == ProfileModel.user_id)
+            .where(CaptureModel.created_at >= active_since)
+            .group_by(CaptureModel.user_id, ProfileModel.timezone)
+            .order_by(CaptureModel.user_id)
+            .limit(limit)
+        )
+        result = await self._session.execute(stmt)
+        return [
+            ActiveUser(user_id=user_id, timezone=timezone) for user_id, timezone in result.all()
+        ]
+
+    async def count_done_between(self, user_id: UUID, *, start: datetime, end: datetime) -> int:
+        """所有者が、期間の中で完了にしたシナリオの数を返す。
+
+        日次ダイジェストの「昨日、完了にした件数」に使う。`done_at` が `start` 以上で、
+        `end` より前のものを数える。期間は半開区間で、`end` ちょうどに完了にしたものは、
+        次の期間の分になる。そのため、昨日の終わりと今日の始まりが同じ時刻でも、二重に数えない。
+        暦日の境界は、夏時間の日を含むため、この関数では決めない。呼び出し側が、ユーザーの
+        timezone で求めた UTC の時刻を渡す。
+
+        完了を未完了に戻したシナリオは `done_at` が null になるので、数えない。Capture を
+        削除すると、シナリオも消えるので、その完了も数えない。
+
+        Args:
+            user_id: 所有者。別ユーザーのシナリオは数えない。
+            start: 期間の始まり。この時刻を含む。UTC の aware な datetime。
+            end: 期間の終わり。この時刻を含まない。UTC の aware な datetime。
+
+        Returns:
+            期間に完了にしたシナリオの数。無ければ 0。
+        """
+
+        stmt = (
+            select(func.count())
+            .select_from(CaptureScenarioModel)
+            .where(
+                CaptureScenarioModel.user_id == user_id,
+                CaptureScenarioModel.done_at >= start,
+                CaptureScenarioModel.done_at < end,
+            )
+        )
+        return await self._session.scalar(stmt) or 0
 
 
 def _to_digest_report(row: DigestReportModel) -> DigestReport:

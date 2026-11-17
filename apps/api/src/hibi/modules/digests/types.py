@@ -44,3 +44,17 @@ class DigestReport:
     generated_at: datetime | None
     created_at: datetime
     updated_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class ActiveUser:
+    """ダイジェストを作る対象になる、直近に Capture がある利用者。
+
+    Attributes:
+        user_id: 利用者の id。
+        timezone: プロフィールの IANA 名。プロフィールが無ければ UTC。
+            名前の検証はしないので、不正な名前もそのまま入る。
+    """
+
+    user_id: UUID
+    timezone: str

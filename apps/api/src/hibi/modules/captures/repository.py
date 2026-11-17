@@ -216,15 +216,20 @@ class CaptureRepository:
     ) -> list[Capture]:
         """id の一覧から、所有者の Capture を scenario 付きで読む。
 
+        Today、検索、日次ダイジェストが、順位付けで求めた id から、画面や内容に出す
+        Capture を引くのに使う。
+
         返す順序は保証しない。SQL の IN は順序を持たない。呼び出し側が
-        順位に合わせて並べ直す。所有者が違う id は黙って落とす。
+        順位に合わせて並べ直す。所有者が違う id と、順位付けのあとに削除された id は、
+        黙って落とすので、返る件数は `capture_ids` より少ないことがある。
 
         Args:
             user_id: 所有者。
             capture_ids: 読みたい Capture の id。空なら DB を叩かず空を返す。
 
         Returns:
-            見つかった Capture。
+            見つかった Capture。scenario が無い Capture は `scenario` が None。
+            1 件も無ければ空のリスト。
         """
 
         if not capture_ids:
@@ -266,19 +271,23 @@ class CaptureRepository:
         return [_to_outbox_event(row) for row in result.scalars()]
 
     async def list_open_scenario_candidates(self, user_id: UUID) -> list[TodayCandidate]:
-        """未完了のシナリオを、Today の順位付けの候補として読む。
+        """未完了のシナリオを、Today とダイジェストの候補として読む。
 
         completed の Capture で、シナリオが付き、`done_at` が null の行が対象。
         シナリオが proposed か accepted かは問わない。期限による絞り込みは SQL では
-        行わない。今日の終わりの判定は夏時間を含むため、`rank_today` の 1 か所に
-        まとめてある。そのため、期限が明日以降の行や、期限が過ぎた行も返す。
+        行わない。今日の終わりの判定は夏時間を含むため、`rank_today` と `count_deadlines`
+        の側で、ユーザーの timezone を使って行う。そのため、期限が明日以降の行や、
+        期限が過ぎた行も返す。
+
+        Today の一覧と、日次ダイジェストの `items`、期限の件数が、同じ候補を読む。
+        読む条件を変えると、両方の結果が変わる。
 
         Args:
             user_id: 所有者。別ユーザーの行は読まない。
 
         Returns:
-            優先度の計算に必要な項目だけを持つ TodayCandidate。並びは保証しない。
-            順位付けは `rank_today` が行う。対象が無ければ空のリスト。
+            優先度の計算と、期限の数え上げに必要な項目だけを持つ TodayCandidate。
+            並びは保証しない。順位付けは `rank_today` が行う。対象が無ければ空のリスト。
         """
 
         stmt = (
