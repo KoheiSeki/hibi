@@ -1,15 +1,9 @@
-from hibi.jobs.run_daily_digest import run_daily_digest
-
-from hibi.jobs.generate_digest_report_job import (
-    GENERATE_DIGEST_REPORT_JOB_NAME,
-    generate_digest_report_job,
-)
+from hibi.jobs.generate_digest_report_job import generate_digest_report_job
 from hibi.jobs.main import WorkerSettings
-from hibi.jobs.process_capture_job import (
-    PROCESS_CAPTURE_JOB_NAME,
-    process_capture_job,
-)
+from hibi.jobs.names import GENERATE_DIGEST_REPORT_JOB_NAME, PROCESS_CAPTURE_JOB_NAME
+from hibi.jobs.process_capture_job import process_capture_job
 from hibi.jobs.relay_outbox_events import relay_outbox_events
+from hibi.jobs.run_daily_digest import run_daily_digest
 from hibi.modules.captures.types import CAPTURE_PROCESSING_MAX_ATTEMPTS
 
 

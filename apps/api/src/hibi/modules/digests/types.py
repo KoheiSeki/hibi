@@ -10,6 +10,11 @@ DIGEST_STATUS_PENDING = "pending"
 DIGEST_STATUS_READY = "ready"
 DIGEST_STATUS_FAILED = "failed"
 
+DIGEST_GENERATION_MAX_ATTEMPTS = 3
+
+DIGEST_ERROR_GENERATION_FAILED = "generation_failed"
+DIGEST_ERROR_REVIEW_PROVIDER = "review_provider_error"
+
 
 @dataclass(frozen=True, slots=True)
 class DigestReport:
