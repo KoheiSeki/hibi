@@ -3,9 +3,8 @@ from typing import Any
 from arq.connections import ArqRedis
 
 from hibi.db.session import session_scope
-from hibi.jobs.generate_digest_report_job import GENERATE_DIGEST_REPORT_JOB_NAME
 from hibi.jobs.job_logging import log_outbox_enqueue_failure
-from hibi.jobs.process_capture_job import PROCESS_CAPTURE_JOB_NAME
+from hibi.jobs.names import GENERATE_DIGEST_REPORT_JOB_NAME, PROCESS_CAPTURE_JOB_NAME
 from hibi.modules.captures.repository import CaptureRepository
 from hibi.modules.captures.types import OutboxEvent
 from hibi.modules.digests.types import DIGEST_AGGREGATE_TYPE

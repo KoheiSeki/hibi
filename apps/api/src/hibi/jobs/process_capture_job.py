@@ -11,12 +11,11 @@ from hibi.ai.classifier_factory import (
 )
 from hibi.db.session import session_scope
 from hibi.jobs.job_logging import log_job_failure
+from hibi.jobs.names import PROCESS_CAPTURE_JOB_NAME
 from hibi.modules.captures.repository import CaptureRepository
 from hibi.modules.captures.service import CaptureService
 from hibi.modules.captures.types import CAPTURE_PROCESSING_MAX_ATTEMPTS
 from hibi.modules.profiles.repository import ProfileRepository
-
-PROCESS_CAPTURE_JOB_NAME = "process_capture_job"
 
 _RETRY_BASE_DELAY_SECONDS = 5
 _RETRY_JITTER_SECONDS = 1

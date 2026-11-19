@@ -6,7 +6,7 @@ from uuid import UUID, uuid7
 
 import pytest
 
-from hibi.jobs.process_capture_job import PROCESS_CAPTURE_JOB_NAME
+from hibi.jobs.names import PROCESS_CAPTURE_JOB_NAME
 from hibi.modules.captures.types import OutboxEvent
 
 relay_module = import_module("hibi.jobs.relay_outbox_events")

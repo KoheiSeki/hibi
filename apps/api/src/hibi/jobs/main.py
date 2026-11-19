@@ -6,7 +6,8 @@ from arq.cron import CronJob
 from arq.worker import Function, func
 
 from hibi.core.config import get_settings
-from hibi.jobs.process_capture_job import PROCESS_CAPTURE_JOB_NAME, process_capture_job
+from hibi.jobs.names import PROCESS_CAPTURE_JOB_NAME
+from hibi.jobs.process_capture_job import process_capture_job
 from hibi.jobs.relay_outbox_events import relay_outbox_events
 from hibi.modules.captures.types import CAPTURE_PROCESSING_MAX_ATTEMPTS
 
