@@ -94,7 +94,7 @@ async def test_process_capture_job_rolls_back_and_schedules_retry(
     monkeypatch.setattr(job_module, "CaptureService", FailingService)
     logged: list[dict[str, Any]] = []
     monkeypatch.setattr(job_module, "log_job_failure", lambda **kwargs: logged.append(kwargs))
-    monkeypatch.setattr(job_module, "_retry_delay", lambda attempt: attempt * 5.0)
+    monkeypatch.setattr(job_module, "retry_delay", lambda attempt: attempt * 5.0)
 
     with pytest.raises(Retry) as retry:
         await job_module.process_capture_job({"job_try": attempt}, uuid7(), processing_generation=1)
@@ -175,12 +175,3 @@ async def test_process_capture_job_ignores_attempt_above_limit(
     )
 
     await job_module.process_capture_job({"job_try": 4}, uuid7(), processing_generation=1)
-
-
-def test_retry_delay_uses_exponential_backoff_and_jitter(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(job_module.random, "uniform", lambda _start, _end: 0.5)
-
-    assert job_module._retry_delay(1) == 5.5
-    assert job_module._retry_delay(2) == 10.5

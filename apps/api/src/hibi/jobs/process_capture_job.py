@@ -1,4 +1,3 @@
-import random
 from typing import Any
 from uuid import UUID
 
@@ -12,13 +11,11 @@ from hibi.ai.classifier_factory import (
 from hibi.db.session import session_scope
 from hibi.jobs.job_logging import log_job_failure
 from hibi.jobs.names import PROCESS_CAPTURE_JOB_NAME
+from hibi.jobs.retry import retry_delay
 from hibi.modules.captures.repository import CaptureRepository
 from hibi.modules.captures.service import CaptureService
 from hibi.modules.captures.types import CAPTURE_PROCESSING_MAX_ATTEMPTS
 from hibi.modules.profiles.repository import ProfileRepository
-
-_RETRY_BASE_DELAY_SECONDS = 5
-_RETRY_JITTER_SECONDS = 1
 
 
 async def process_capture_job(
@@ -36,7 +33,7 @@ async def process_capture_job(
         processing_generation: ジョブが想定する処理の世代。
 
     Raises:
-        Retry: 最終試行より前に失敗した。待ち時間は _retry_delay で決める。
+        Retry: 最終試行より前に失敗した。待ち時間は `retry_delay` で決める。
         Exception: 最終試行で失敗した。元の例外をそのまま送出する。
     """
     attempt = int(ctx["job_try"])
@@ -58,7 +55,7 @@ async def process_capture_job(
             await service.process_capture(capture_id, processing_generation)
     except Exception as error:
         is_final_attempt = attempt >= CAPTURE_PROCESSING_MAX_ATTEMPTS
-        retry_delay = None if is_final_attempt else _retry_delay(attempt)
+        delay = None if is_final_attempt else retry_delay(attempt)
 
         if is_final_attempt:
             async with session_scope() as session:
@@ -79,27 +76,11 @@ async def process_capture_job(
             context={
                 "capture_id": str(capture_id),
                 "processing_generation": processing_generation,
-                "retry_delay_seconds": retry_delay,
+                "retry_delay_seconds": delay,
             },
         )
 
-        if retry_delay is not None:
-            raise Retry(defer=retry_delay) from error
+        if delay is not None:
+            raise Retry(defer=delay) from error
 
         raise
-
-
-def _retry_delay(attempt: int) -> float:
-    """次の再試行までの待ち時間を、秒で返す。
-
-    試行ごとに倍にする指数バックオフに、ジッターを足す。失敗したジョブが
-    同時に再試行して、外部 API に負荷が集中するのを避けるため。
-
-    Args:
-        attempt: 失敗した試行の回数。1 始まり。
-
-    Returns:
-        待ち時間の秒数。
-    """
-    exponential_delay = _RETRY_BASE_DELAY_SECONDS * (2 ** (attempt - 1))
-    return exponential_delay + random.uniform(0, _RETRY_JITTER_SECONDS)
