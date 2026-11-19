@@ -459,7 +459,7 @@ def test_worker_registers_the_digest_job_and_the_daily_digest_cron() -> None:
 Run: `uv run --project apps/api pytest apps/api/tests/test_digest_service.py apps/api/tests/test_run_daily_digest.py apps/api/tests/test_generate_digest_report_job.py apps/api/tests/test_worker_settings.py -v`
 Expected: FAIL(module not found)
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 **repository**(`digests/repository.py`、`captures/repository.py`)
 
@@ -479,12 +479,12 @@ Expected: FAIL(module not found)
 - `generate_digest_report_job(ctx, report_id)`(`jobs/generate_digest_report_job.py`): `process_capture_job` と同じ形。引数は `report_id` だけ。`job_try` で試行を数え、最終試行の失敗では、別の session で `fail_report` してから例外を再送出する。`error_code` は理由の種類(例外のクラス名など)だけで、例外のメッセージは入れない。最終試行より後(`job_try` が `DIGEST_GENERATION_MAX_ATTEMPTS` を超える)は、何もしない。再試行の待ち時間は `process_capture_job` と同じ指数バックオフで、共有するときは private 名を import せず `job_logging.py` などへ移す
 - `WorkerSettings`(`jobs/main.py`): `generate_digest_report_job` を `max_tries=3` で登録し、`cron(run_daily_digest, minute={0, 15, 30, 45}, second=0, unique=True, max_tries=1)` を足す
 
-- [ ] **Step 4: Run to verify they pass**
+- [x] **Step 4: Run to verify they pass**
 
 Run: `uv run --project apps/api pytest apps/api/tests -m 'not integration' -q`、`ruff check`、`ty check apps/api/src`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api/src apps/api/tests
