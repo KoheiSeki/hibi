@@ -498,88 +498,112 @@ git commit -m "feat(digests): generate the daily digest from a quarter-hour cron
 **Files:**
 
 - Create: `apps/api/src/hibi/ai/review_summary.py`、`fake_review_summary.py`、`llm_review_summary.py`
-- Modify: `apps/api/src/hibi/ai/classifier_factory.py`、`apps/api/src/hibi/modules/digests/{content,repository,service}.py`、`apps/api/src/hibi/jobs/generate_digest_report_job.py`
-- Test: `apps/api/tests/test_digest_weekly.py`(新規)、`apps/api/tests/test_llm_review_summary.py`(新規)、`apps/api/tests/test_classifier_factory.py`
+- Modify: `apps/api/src/hibi/ai/classifier_factory.py`、`apps/api/src/hibi/modules/digests/{content,repository,service}.py`、`apps/api/src/hibi/jobs/{run_daily_digest,generate_digest_report_job}.py`
+- Test: `apps/api/tests/test_digest_weekly.py`(新規)、`apps/api/tests/test_llm_review_summary.py`(新規)、`apps/api/tests/test_fake_review_summary.py`(新規)、`apps/api/tests/digest_helpers.py`(新規)、`apps/api/tests/test_digest_content.py`、`apps/api/tests/test_classifier_factory.py`、`apps/api/tests/integration/test_digest_repository.py`、Task 4 の `test_digest_service.py`、`test_run_daily_digest.py`、`test_generate_digest_report_job.py`
 
 **Interfaces:**
 
+- Consumes: Task 4 の `DigestService`、`count_done_between`、`count_deadlines`、`list_open_scenario_candidates`
 - Produces:
   - `WeeklyStats(captured_count: int, done_count: int, open_count: int, overdue_count: int)`(`content.py`)
-  - `WeeklyReviewInput(stats: WeeklyStats, done_titles: Sequence[str])`(`review_summary.py`)
-  - `ReviewSummarizer.summarize_week(review: WeeklyReviewInput) -> str`(port)、`ReviewProviderError`
-  - `FakeReviewSummarizer`、`LlmReviewSummarizer`、`build_review_summarizer() -> ReviewSummarizer`
+  - `WeeklyReviewInput(stats: WeeklyStats, done_titles: Sequence[str])`(`review_summary.py`)。本文を持たない
+  - `ReviewSummarizer`(port): `model_name: str`、`summarize_week(review: WeeklyReviewInput) -> str`。service は `model_name` を `summary_model` に記録する
+  - `ReviewProviderError`、`REVIEW_SUMMARY_MODEL_FAKE`(`review_summary.py`)
+  - `FakeReviewSummarizer`、`LlmReviewSummarizer(client: ReviewModelClient | None = None)`、`SdkReviewClient.complete_json(*, review: WeeklyReviewInput) -> str`、`build_review_summarizer() -> ReviewSummarizer`
   - `build_weekly_content(*, stats: WeeklyStats, summary: str) -> dict[str, object]`
-  - `WEEKLY_CONTENT_VERSION = "weekly-review-v1"`、`WEEKLY_SUMMARY_MAX_LENGTH = 500`、`EMPTY_WEEK_SUMMARY`(Capture が無い週の定型文)、`SUMMARY_FALLBACK_TEXT`(要約が不正なときの定型文)、`normalize_summary(text: str) -> str`
+  - `WEEKLY_SUMMARY_MAX_LENGTH = 500`、`EMPTY_WEEK_SUMMARY`(Capture が無い週の定型文)、`SUMMARY_FALLBACK_TEXT`(要約が不正なときの定型文)、`normalize_summary(text: str) -> str`(`content.py`。`WEEKLY_CONTENT_VERSION` は Task 4 で足した)
+  - `DigestRepository.count_captured_between(user_id, *, start, end) -> int`、`list_done_titles_between(user_id, *, start, end, limit) -> list[str]`
+  - `DigestService(digests, captures, summarizer, *, clock=utc_now)`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
-`tests/test_digest_weekly.py`
+共有の fake は `tests/digest_helpers.py` に置く(`FakeDigestRepository`、`FakeCaptureRepository`、`FakeSummarizer`、`make_report` ほか)。Task 4 の `test_digest_service.py` はここから import し、`_service` に `summarizer` を渡す。job のテストの `FakeService` も `summarizer` を受け取る。
+
+`tests/test_digest_weekly.py`(8 件。現在時刻は 2026-11-09 00:00 UTC、行は weekly、`period_start=11-02`、Asia/Tokyo)
 
 ```python
 async def test_weekly_report_calls_the_summarizer_once_with_titles_only() -> None:
-    # 先週に Capture がある利用者。summarizer が受け取る WeeklyReviewInput に raw_text が含まれず、done_titles だけ
-    # complete_report の content が {"stats": {...}, "summary": "..."} で、summary_model が fake の名前
-
+    # captured=5、done=3、題 2 件、未完了 2 件(超過 1)→ WeeklyStats(5, 3, 2, 1) と題だけを渡す
+    # list_captures_by_ids は呼ばない。content は {"stats": {camelCase}, "summary": ...}、summary_model は model_name
+async def test_weekly_report_reads_the_week_in_the_report_timezone() -> None:
+    # count_captured_between、count_done_between、list_done_titles_between の範囲が [11-02 0 時 JST, 11-09 0 時 JST)
 async def test_weekly_report_for_an_empty_week_does_not_call_the_summarizer() -> None:
-    # captured_count=0 → summarizer の呼び出し 0 回、summary は EMPTY_WEEK_SUMMARY、status は ready
-
-async def test_weekly_report_uses_the_fallback_for_an_invalid_summary() -> None:
-    # summarizer が "" または 501 文字を返す → 定型文で ready。再試行しない
-
+    # captured=0 → 呼び出し 0 回、summary は EMPTY_WEEK_SUMMARY、summary_model は None
+async def test_weekly_report_uses_the_fallback_for_an_invalid_summary(summary) -> None: ...   # ""、空白、501 文字。再試行しない
+async def test_weekly_report_keeps_a_summary_at_the_maximum_length() -> None: ...           # 500 文字は残す
 async def test_weekly_report_reraises_a_provider_error_for_the_job_to_retry() -> None:
-    # ReviewProviderError → 例外が呼び出し側へ。complete_report も fail_report も呼ばれない(失敗の確定は job)
-
-def test_build_weekly_content_keeps_camel_case_keys() -> None: ...
+    # ReviewProviderError は呼び出し側へ。complete_report も fail_report も呼ばない
+async def test_weekly_report_does_nothing_unless_pending() -> None: ...
+def test_the_review_input_carries_stats_and_titles_only() -> None: ...   # WeeklyReviewInput の項目は stats と done_titles だけ
 ```
 
-`tests/test_llm_review_summary.py`(`test_llm_clarification.py` と同じ形で、`AsyncOpenAI` を monkeypatch する)
+`tests/test_llm_review_summary.py`(11 件。`test_llm_clarification.py` と同じ形で、`AsyncOpenAI` を monkeypatch する)
 
 ```python
-async def test_sdk_client_prompt_mentions_json_for_json_mode() -> None:
-    # create の引数に response_format={"type": "json_object"} があり、messages のどこかに "json" がある
-async def test_sdk_client_maps_transient_errors_to_review_provider_error() -> None:
-    # timeout、接続失敗、429、5xx → ReviewProviderError
-async def test_sdk_client_does_not_send_raw_text() -> None:
-    # 渡した title と集計だけが messages に入る
+async def test_llm_summarizer_returns_the_summary_and_counts_the_call() -> None: ...
+async def test_llm_summarizer_returns_an_empty_summary_for_an_invalid_output(raw) -> None:
+    # "not-json"、"{}"、summary が数値や null → ""。定型文に直すのは service の normalize_summary
+async def test_llm_summarizer_reraises_a_provider_error() -> None: ...
+def test_llm_summarizer_reports_the_configured_model() -> None: ...   # model_name は open_ai_model
+async def test_sdk_client_maps_transient_errors_to_review_provider_error(error) -> None: ...   # timeout、接続失敗、429、5xx
+async def test_sdk_client_does_not_map_non_transient_errors() -> None: ...
+async def test_sdk_client_returns_message_content() -> None: ...
+async def test_sdk_client_prompt_mentions_json_for_json_mode() -> None: ...
+async def test_sdk_client_sends_only_the_stats_and_the_done_titles() -> None: ...   # system と user の 2 通。user に題と件数
 ```
 
-`tests/test_classifier_factory.py` に追加する。
+`tests/test_fake_review_summary.py`(3 件): 呼び出しを数える、集計から決まる固定の短文で `normalize_summary` を通る、`model_name` は `REVIEW_SUMMARY_MODEL_FAKE`
+
+`tests/test_digest_content.py` に追加する(4 件): `build_weekly_content` の camelCase、`normalize_summary` の正しい値と不正な値(空、空白、501 文字)、定型文が 500 文字以内で互いに違う
+
+`tests/test_classifier_factory.py` に追加する(3 件): キーが空か空白なら `FakeReviewSummarizer`、あれば `LlmReviewSummarizer`
+
+`tests/integration/test_digest_repository.py` に追加する(2 件)
 
 ```python
-def test_review_summarizer_falls_back_to_the_fake_without_an_api_key(monkeypatch) -> None: ...
+async def test_count_captured_between_counts_a_half_open_range_of_the_owner(session) -> None: ...
+async def test_list_done_titles_between_returns_the_titles_done_in_the_range_in_order(session) -> None:
+    # 完了にした順。範囲の外、未完了、他人は入らない。limit で切る
 ```
 
 - [ ] **Step 2: Run to verify they fail**
 
-Run: `uv run --project apps/api pytest apps/api/tests/test_digest_weekly.py apps/api/tests/test_llm_review_summary.py apps/api/tests/test_classifier_factory.py -v`
-Expected: FAIL(module not found)
+Run: `just test-api` と、`supabase db reset` 後に `cd apps/api && uv run pytest -m integration tests/integration/test_digest_repository.py`
+Expected: FAIL(`hibi.ai.review_summary` などの module not found、`DigestService` が `summarizer` を取らない、repository のメソッドが無い)
 
 - [ ] **Step 3: Implement**
 
 **port / adapter**(`ai/`)
 
-- `review_summary.py`: `WeeklyReviewInput`(dataclass)、`ReviewSummarizer`(Protocol)、`ReviewProviderError`(`ClarificationProviderError` と同じ形)、`REVIEW_SUMMARY_MODEL_FAKE`
-- `fake_review_summary.py`: `FakeReviewSummarizer.summarize_week`: `record_llm_call()` を呼び、集計から決まる固定の短文を返す。network しない
-- `llm_review_summary.py`: `SdkReviewClient.complete_json(review)`: `AsyncOpenAI`(`max_retries=0`)で `json_object` モード。system プロンプトに `JSON` の語と `{"summary":"..."}` の形、500 文字以内を書く。timeout、接続失敗、429、5xx は `ReviewProviderError`。`LlmReviewSummarizer`: JSON の `summary` を取り出し、不正なら定型文
-- `classifier_factory.py`: `build_review_summarizer()`: `open_ai_api_key` が空なら fake、あれば `LlmReviewSummarizer`
+- `review_summary.py`: `WeeklyReviewInput`(dataclass)、`ReviewSummarizer`(Protocol。`model_name` と `summarize_week`)、`ReviewProviderError`(`ClarificationProviderError` と同じ形)、`REVIEW_SUMMARY_MODEL_FAKE`
+- `fake_review_summary.py`: `FakeReviewSummarizer.summarize_week`: `record_llm_call()` を呼び、集計から決まる固定の短文を返す。network しない。`model_name` は `REVIEW_SUMMARY_MODEL_FAKE`
+- `llm_review_summary.py`: `SdkReviewClient.complete_json(*, review)`: `AsyncOpenAI`(`max_retries=0`)で `json_object` モード。system プロンプトに `JSON` の語と `{"summary":"..."}` の形、500 文字以内を書く。user には集計と題だけを入れる。timeout、接続失敗、429、5xx は `ReviewProviderError`。`LlmReviewSummarizer`: `record_llm_call()` を呼び、JSON の `summary` を取り出す。不正なら `""` を返す(定型文に直すのは service。`ai/` が `modules/digests/` を import しないため)。`model_name` は `open_ai_model`
+- `classifier_factory.py`: `build_review_summarizer()`: `open_ai_api_key` が空か空白なら fake、あれば `LlmReviewSummarizer`
 
 **domain**(`digests/content.py`)
 
 - `WeeklyStats`(dataclass)と `build_weekly_content(*, stats, summary)`: キーは camelCase
-- `normalize_summary(text)`: 空、または 500 文字超なら `SUMMARY_FALLBACK_TEXT` を返す。正しければそのまま返す
+- `normalize_summary(text)`: 空、空白だけ、または 500 文字超なら `SUMMARY_FALLBACK_TEXT` を返す。正しければそのまま返す
 
 **repository**(`digests/repository.py`)
 
-- `count_captured_between(user_id, *, start, end)`、`list_done_titles_between(user_id, *, start, end, limit)`、`count_open(user_id)`: 週次の集計の元。期限超過の数は、`count_deadlines` を再利用する
+- `count_captured_between(user_id, *, start, end)`: `created_at` が `[start, end)` の Capture の数。状態は問わない
+- `list_done_titles_between(user_id, *, start, end, limit)`: `done_at` が `[start, end)` のシナリオの題を、完了にした順に `limit` 件
+- 未完了の件数は `count_open` を作らず、`list_open_scenario_candidates` の件数で数える。期限超過の数は `count_deadlines` を再利用する。完了の件数は Task 4 の `count_done_between`
 
 **service**(`digests/service.py`)
 
-- `DigestService.__init__` に `summarizer: ReviewSummarizer` を足す(Task 4 のテストの `_service` と、job の組み立てにも渡す)
-- `generate_report(report_id)`: weekly なら、期間(月曜から翌月曜の 0 時、現地)を `local_day_start` で求め、集計を作る。`captured_count` が 0 なら LLM を呼ばず `EMPTY_WEEK_SUMMARY`。それ以外は `summarizer.summarize_week` を 1 回呼び、`normalize_summary` を通して `complete_report`。`ReviewProviderError` は握りつぶさず、job の retry に任せる
+- `DigestService.__init__` に `summarizer: ReviewSummarizer` を足す
+- `generate_report(report_id)`: weekly なら `_build_weekly_content(report)` を足す。期間は `[local_day_start(period_start), local_day_start(period_start + 7 日))`(行の timezone)。`captured_count` が 0 なら LLM を呼ばず `EMPTY_WEEK_SUMMARY` で、`summary_model` は None。それ以外は `summarizer.summarize_week` を 1 回呼び、`normalize_summary` を通して、`summary_model=summarizer.model_name` で `complete_report`。`ReviewProviderError` は握りつぶさず、job の retry に任せる
+
+**job**
+
+- `run_daily_digest`、`generate_digest_report_job`: `DigestService` に `summarizer=build_review_summarizer()` を渡す
+- `generate_digest_report_job._error_code`: `ReviewProviderError` なら `DIGEST_ERROR_REVIEW_PROVIDER`、それ以外は `DIGEST_ERROR_GENERATION_FAILED`
 
 - [ ] **Step 4: Run to verify they pass**
 
-Run: `uv run --project apps/api pytest apps/api/tests -m 'not integration' -q`、`ruff check`、`ty check apps/api/src`
+Run: `just test-api`、integration、`ruff check`、`ty check apps/api/src`
 Expected: PASS
 
 - [ ] **Step 5: Commit**
