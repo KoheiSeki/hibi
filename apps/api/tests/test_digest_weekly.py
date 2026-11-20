@@ -1,3 +1,4 @@
+from dataclasses import fields
 from datetime import UTC, date, datetime
 from typing import cast
 from uuid import UUID
@@ -11,8 +12,8 @@ from digest_helpers import (
     make_candidate,
     make_report,
 )
-from hibi.ai.review_summary import ReviewProviderError, ReviewSummarizer, WeeklyReviewInput
 
+from hibi.ai.review_summary import ReviewProviderError, ReviewSummarizer, WeeklyReviewInput
 from hibi.modules.captures.repository import CaptureRepository
 from hibi.modules.digests.content import (
     EMPTY_WEEK_SUMMARY,
@@ -180,4 +181,5 @@ def test_the_review_input_carries_stats_and_titles_only() -> None:
         done_titles=["牛乳を買う"],
     )
 
-    assert set(vars(review)) == {"stats", "done_titles"}
+    # slots=True の dataclass は __dict__ を持たないので、vars() ではなく fields() で項目を読む
+    assert {field.name for field in fields(review)} == {"stats", "done_titles"}
