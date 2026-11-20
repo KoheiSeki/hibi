@@ -505,7 +505,7 @@ git commit -m "feat(digests): generate the daily digest from a quarter-hour cron
 
 - Consumes: Task 4 の `DigestService`、`count_done_between`、`count_deadlines`、`list_open_scenario_candidates`
 - Produces:
-  - `WeeklyStats(captured_count: int, done_count: int, open_count: int, overdue_count: int)`(`content.py`)
+  - `WeeklyStats(captured_count: int, done_count: int, open_count: int, overdue_count: int)`(`review_summary.py`)。`content.py` はここから import する(依存の向きを `modules/` から `ai/` の一方向にするため)。`open_count` と `overdue_count` は、作った時点の数
   - `WeeklyReviewInput(stats: WeeklyStats, done_titles: Sequence[str])`(`review_summary.py`)。本文を持たない
   - `ReviewSummarizer`(port): `model_name: str`、`summarize_week(review: WeeklyReviewInput) -> str`。service は `model_name` を `summary_model` に記録する
   - `ReviewProviderError`、`REVIEW_SUMMARY_MODEL_FAKE`(`review_summary.py`)
@@ -566,7 +566,7 @@ async def test_list_done_titles_between_returns_the_titles_done_in_the_range_in_
     # 完了にした順。範囲の外、未完了、他人は入らない。limit で切る
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `just test-api` と、`supabase db reset` 後に `cd apps/api && uv run pytest -m integration tests/integration/test_digest_repository.py`
 Expected: FAIL(`hibi.ai.review_summary` などの module not found、`DigestService` が `summarizer` を取らない、repository のメソッドが無い)
@@ -575,14 +575,14 @@ Expected: FAIL(`hibi.ai.review_summary` などの module not found、`DigestServ
 
 **port / adapter**(`ai/`)
 
-- `review_summary.py`: `WeeklyReviewInput`(dataclass)、`ReviewSummarizer`(Protocol。`model_name` と `summarize_week`)、`ReviewProviderError`(`ClarificationProviderError` と同じ形)、`REVIEW_SUMMARY_MODEL_FAKE`
+- `review_summary.py`: `WeeklyStats` と `WeeklyReviewInput`(dataclass。本文の項目を持たせず、LLM に渡せないようにする)、`ReviewSummarizer`(Protocol。`model_name` と `summarize_week`)、`ReviewProviderError`(`ClarificationProviderError` と同じ形)、`REVIEW_SUMMARY_MODEL_FAKE`
 - `fake_review_summary.py`: `FakeReviewSummarizer.summarize_week`: `record_llm_call()` を呼び、集計から決まる固定の短文を返す。network しない。`model_name` は `REVIEW_SUMMARY_MODEL_FAKE`
 - `llm_review_summary.py`: `SdkReviewClient.complete_json(*, review)`: `AsyncOpenAI`(`max_retries=0`)で `json_object` モード。system プロンプトに `JSON` の語と `{"summary":"..."}` の形、500 文字以内を書く。user には集計と題だけを入れる。timeout、接続失敗、429、5xx は `ReviewProviderError`。`LlmReviewSummarizer`: `record_llm_call()` を呼び、JSON の `summary` を取り出す。不正なら `""` を返す(定型文に直すのは service。`ai/` が `modules/digests/` を import しないため)。`model_name` は `open_ai_model`
 - `classifier_factory.py`: `build_review_summarizer()`: `open_ai_api_key` が空か空白なら fake、あれば `LlmReviewSummarizer`
 
 **domain**(`digests/content.py`)
 
-- `WeeklyStats`(dataclass)と `build_weekly_content(*, stats, summary)`: キーは camelCase
+- `build_weekly_content(*, stats, summary)`: キーは camelCase。`WeeklyStats` は `ai/review_summary.py` から import する(テストの `from hibi.modules.digests.content import WeeklyStats` もそのまま読める)
 - `normalize_summary(text)`: 空、空白だけ、または 500 文字超なら `SUMMARY_FALLBACK_TEXT` を返す。正しければそのまま返す
 
 **repository**(`digests/repository.py`)
