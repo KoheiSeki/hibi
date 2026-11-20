@@ -32,7 +32,7 @@ async def test_run_daily_digest_commits_the_schedule_in_one_session(
     calls: list[str] = []
 
     class FakeService:
-        def __init__(self, *, digests: object, captures: object) -> None:
+        def __init__(self, *, digests: object, captures: object, summarizer: object) -> None:
             pass
 
         async def schedule_due_reports(self) -> int:
@@ -59,7 +59,7 @@ async def test_run_daily_digest_rolls_back_and_raises_when_the_schedule_fails(
     state = TransactionState()
 
     class FailingService:
-        def __init__(self, *, digests: object, captures: object) -> None:
+        def __init__(self, *, digests: object, captures: object, summarizer: object) -> None:
             pass
 
         async def schedule_due_reports(self) -> int:

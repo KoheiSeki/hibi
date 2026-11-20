@@ -2,12 +2,20 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID
 
+import pytest
+
 from hibi.modules.captures.today import TodayCandidate
 from hibi.modules.digests.content import (
+    EMPTY_WEEK_SUMMARY,
+    SUMMARY_FALLBACK_TEXT,
+    WEEKLY_SUMMARY_MAX_LENGTH,
     DeadlineCounts,
     DigestItem,
+    WeeklyStats,
     build_daily_content,
+    build_weekly_content,
     count_deadlines,
+    normalize_summary,
 )
 
 NOW = datetime(2026, 11, 10, 6, 0, tzinfo=UTC)  # 15:00 JST
@@ -56,3 +64,34 @@ def test_build_daily_content_for_no_items_is_still_valid() -> None:
         items=[], deadline_counts=DeadlineCounts(0, 0), done_yesterday_count=0
     )
     assert content["items"] == []
+
+
+def test_build_weekly_content_keeps_camel_case_keys() -> None:
+    content = build_weekly_content(
+        stats=WeeklyStats(captured_count=5, done_count=3, open_count=2, overdue_count=1),
+        summary="先週は 3 件を終わらせました。",
+    )
+
+    assert content == {
+        "stats": {"capturedCount": 5, "doneCount": 3, "openCount": 2, "overdueCount": 1},
+        "summary": "先週は 3 件を終わらせました。",
+    }
+
+
+@pytest.mark.parametrize(
+    "summary", ["先週は 3 件を終わらせました。", "あ", "あ" * WEEKLY_SUMMARY_MAX_LENGTH]
+)
+def test_normalize_summary_keeps_a_valid_summary(summary: str) -> None:
+    assert normalize_summary(summary) == summary
+
+
+@pytest.mark.parametrize("summary", ["", "   ", "\n", "あ" * (WEEKLY_SUMMARY_MAX_LENGTH + 1)])
+def test_normalize_summary_replaces_an_invalid_summary_with_the_fallback(summary: str) -> None:
+    assert normalize_summary(summary) == SUMMARY_FALLBACK_TEXT
+
+
+def test_the_fixed_summaries_fit_in_the_maximum_length() -> None:
+    assert WEEKLY_SUMMARY_MAX_LENGTH == 500
+    assert 0 < len(EMPTY_WEEK_SUMMARY) <= WEEKLY_SUMMARY_MAX_LENGTH
+    assert 0 < len(SUMMARY_FALLBACK_TEXT) <= WEEKLY_SUMMARY_MAX_LENGTH
+    assert EMPTY_WEEK_SUMMARY != SUMMARY_FALLBACK_TEXT

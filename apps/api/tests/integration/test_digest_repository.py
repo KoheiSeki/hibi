@@ -217,7 +217,9 @@ async def _capture_created_at(session: AsyncSession, user_id: UUID, created_at: 
     return capture.id
 
 
-async def _scenario_done_at(session: AsyncSession, user_id: UUID, done_at: datetime | None) -> None:
+async def _scenario_done_at(
+    session: AsyncSession, user_id: UUID, done_at: datetime | None, *, title: str = "牛乳"
+) -> None:
     capture_id = await _capture_created_at(session, user_id, _NOW)
     session.add(
         CaptureScenarioModel(
@@ -225,7 +227,7 @@ async def _scenario_done_at(session: AsyncSession, user_id: UUID, done_at: datet
             user_id=user_id,
             route="shopping",
             status=CAPTURE_SCENARIO_STATUS_PROPOSED,
-            title="牛乳",
+            title=title,
             policy_version=CAPTURE_SCENARIO_POLICY_VERSION,
             done_at=done_at,
         )
@@ -334,3 +336,54 @@ async def test_count_done_between_ignores_other_users_and_undone_scenarios(
 
     assert await repo.count_done_between(owner_id, start=start, end=end) == 1
     assert await repo.count_done_between(uuid4(), start=start, end=end) == 0
+
+
+@pytest.mark.integration
+async def test_count_captured_between_counts_a_half_open_range_of_the_owner(
+    session: AsyncSession,
+) -> None:
+    owner_id, other_id = uuid4(), uuid4()
+    await _insert_auth_user(session, owner_id)
+    await _insert_auth_user(session, other_id)
+    start = datetime(2099, 1, 5, tzinfo=UTC)
+    end = start + timedelta(days=7)
+    for created_at in (
+        start - timedelta(seconds=1),  # 範囲の前
+        start,  # 始まりちょうど。数える
+        start + timedelta(days=3),  # 範囲の中。数える
+        end,  # 終わりちょうど。次の週の分なので数えない
+    ):
+        await _capture_created_at(session, owner_id, created_at)
+    await _capture_created_at(session, other_id, start + timedelta(days=1))  # 別ユーザー
+
+    repo = DigestRepository(session)
+
+    assert await repo.count_captured_between(owner_id, start=start, end=end) == 2
+    assert await repo.count_captured_between(uuid4(), start=start, end=end) == 0
+
+
+@pytest.mark.integration
+async def test_list_done_titles_between_returns_the_titles_done_in_the_range_in_order(
+    session: AsyncSession,
+) -> None:
+    owner_id, other_id = uuid4(), uuid4()
+    await _insert_auth_user(session, owner_id)
+    await _insert_auth_user(session, other_id)
+    start = datetime(2099, 1, 5, tzinfo=UTC)
+    end = start + timedelta(days=7)
+    # 完了にした順と、登録した順を、変えておく
+    await _scenario_done_at(session, owner_id, start + timedelta(days=2), title="二番目")
+    await _scenario_done_at(session, owner_id, start + timedelta(days=1), title="一番目")
+    await _scenario_done_at(session, owner_id, start + timedelta(days=3), title="三番目")
+    await _scenario_done_at(session, owner_id, end, title="範囲の外")
+    await _scenario_done_at(session, owner_id, None, title="未完了")
+    await _scenario_done_at(session, other_id, start + timedelta(days=1), title="他人")
+
+    repo = DigestRepository(session)
+
+    titles = await repo.list_done_titles_between(owner_id, start=start, end=end, limit=10)
+    limited = await repo.list_done_titles_between(owner_id, start=start, end=end, limit=2)
+
+    # 完了にした順。範囲の外、未完了、他人のシナリオは入らない
+    assert titles == ["一番目", "二番目", "三番目"]
+    assert limited == ["一番目", "二番目"]

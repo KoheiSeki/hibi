@@ -66,7 +66,7 @@ async def test_job_commits_a_successful_generation(monkeypatch: pytest.MonkeyPat
     generated: list[UUID] = []
 
     class FakeService:
-        def __init__(self, *, digests: object, captures: object) -> None:
+        def __init__(self, *, digests: object, captures: object, summarizer: object) -> None:
             pass
 
         async def generate_report(self, report_id: UUID) -> None:
@@ -91,7 +91,7 @@ async def test_job_schedules_a_retry_before_the_final_attempt(
     state = TransactionState()
 
     class FailingService:
-        def __init__(self, *, digests: object, captures: object) -> None:
+        def __init__(self, *, digests: object, captures: object, summarizer: object) -> None:
             pass
 
         async def generate_report(self, report_id: UUID) -> None:
@@ -122,7 +122,7 @@ async def test_job_marks_failed_on_the_final_attempt_in_a_separate_session(
     failure_session = object()
 
     class FailingService:
-        def __init__(self, *, digests: object, captures: object) -> None:
+        def __init__(self, *, digests: object, captures: object, summarizer: object) -> None:
             pass
 
         async def generate_report(self, report_id: UUID) -> None:
@@ -157,7 +157,7 @@ async def test_job_marks_failed_on_the_final_attempt_in_a_separate_session(
 async def test_job_does_nothing_after_the_final_attempt(monkeypatch: pytest.MonkeyPatch) -> None:
     # 通常は arq が実行前に止める。防御的に、何も変えない
     class UnexpectedService:
-        def __init__(self, *, digests: object, captures: object) -> None:
+        def __init__(self, *, digests: object, captures: object, summarizer: object) -> None:
             raise AssertionError("the service must not be built")
 
     _patch_job(monkeypatch, UnexpectedService, [])
