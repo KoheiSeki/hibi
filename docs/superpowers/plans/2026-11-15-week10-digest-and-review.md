@@ -577,7 +577,7 @@ Expected: FAIL(`hibi.ai.review_summary` などの module not found、`DigestServ
 
 - `review_summary.py`: `WeeklyStats` と `WeeklyReviewInput`(dataclass。本文の項目を持たせず、LLM に渡せないようにする)、`ReviewSummarizer`(Protocol。`model_name` と `summarize_week`)、`ReviewProviderError`(`ClarificationProviderError` と同じ形)、`REVIEW_SUMMARY_MODEL_FAKE`
 - `fake_review_summary.py`: `FakeReviewSummarizer.summarize_week`: `record_llm_call()` を呼び、集計から決まる固定の短文を返す。network しない。`model_name` は `REVIEW_SUMMARY_MODEL_FAKE`
-- `llm_review_summary.py`: `SdkReviewClient.complete_json(*, review)`: `AsyncOpenAI`(`max_retries=0`)で `json_object` モード。system プロンプトに `JSON` の語と `{"summary":"..."}` の形、500 文字以内を書く。user には集計と題だけを入れる。timeout、接続失敗、429、5xx は `ReviewProviderError`。`LlmReviewSummarizer`: `record_llm_call()` を呼び、JSON の `summary` を取り出す。不正なら `""` を返す(定型文に直すのは service。`ai/` が `modules/digests/` を import しないため)。`model_name` は `open_ai_model`
+- `llm_review_summary.py`: `SdkReviewClient.complete_json(*, review)`: `AsyncOpenAI`(`max_retries=0`)で `json_object` モード。system プロンプトに `JSON` の語と `{"summary":"..."}` の形、500 文字以内を書く。user には集計と題だけを入れる。題は本文を trim しただけのことがあるので、`_format_review` で 1 つの題を `_TITLE_MAX_LENGTH = 40` 文字に切ってから送る(方針文書の「内容」)。timeout、接続失敗、429、5xx は `ReviewProviderError`。`LlmReviewSummarizer`: `record_llm_call()` を呼び、JSON の `summary` を取り出す。不正なら `""` を返す(定型文に直すのは service。`ai/` が `modules/digests/` を import しないため)。`model_name` は `open_ai_model`
 - `factory.py`: `build_review_summarizer()`: `open_ai_api_key` が空か空白なら fake、あれば `LlmReviewSummarizer`
 
 **domain**(`digests/content.py`)
@@ -594,6 +594,7 @@ Expected: FAIL(`hibi.ai.review_summary` などの module not found、`DigestServ
 **service**(`digests/service.py`)
 
 - `DigestService.__init__` に `summarizer: ReviewSummarizer` を足す
+- 完了の題は `_WEEKLY_DONE_TITLE_LIMIT = 20` 件まで読む
 - `generate_report(report_id)`: weekly なら `_build_weekly_content(report)` を足す。期間は `[local_day_start(period_start), local_day_start(period_start + 7 日))`(行の timezone)。`captured_count` が 0 なら LLM を呼ばず `EMPTY_WEEK_SUMMARY` で、`summary_model` は None。それ以外は `summarizer.summarize_week` を 1 回呼び、`normalize_summary` を通して、`summary_model=summarizer.model_name` で `complete_report`。`ReviewProviderError` は握りつぶさず、job の retry に任せる
 
 **job**

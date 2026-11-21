@@ -97,7 +97,9 @@ stats    capturedCount、doneCount、openCount、overdueCount
 summary  500 文字以内の要約
 ```
 
-- LLM に渡すのは、集計と、完了にしたシナリオの title だけ。本文(`raw_text`)は送らない。
+- LLM に渡すのは、集計と、完了にしたシナリオの title だけ。`raw_text` の項目は送らない。
+- ただし、dataset に無い本文のシナリオは、本文を trim した値が title になる。title は本文の先頭を含み得るので、1 つの title を 40 文字で切ってから送り、送る title は 20 件までにする。要約の精度とプライバシーのトレードオフとして、この範囲を受け入れる(Week 6 の聞き返しは、すでに本文を送っている)。
+- 本文の PII をマスキングしてから送り、要約の精度を上げる案は、後続で検討する。
 - 先週に Capture が 1 件も無ければ、LLM を呼ばず、定型の要約にする。
 - structured output は `{"summary": "..."}` だけにする。不正なときは再試行せず、定型文で `ready` にする([Week 6](./24-week6-llm-system-two.md) と同じ)。
 - timeout、接続失敗、429、5xx は例外にして、job の retry に乗せる。3 回目で `failed` にする。
