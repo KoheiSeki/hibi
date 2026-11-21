@@ -12,7 +12,6 @@ from hibi.modules.captures.models import (
     CaptureEmbeddingModel,
     CaptureModel,
     CaptureScenarioModel,
-    OutboxModel,
 )
 from hibi.modules.captures.policies import (
     CAPTURE_SCENARIO_STATUS_ACCEPTED,
@@ -28,12 +27,10 @@ from hibi.modules.captures.types import (
     CAPTURE_STATUS_FAILED,
     CAPTURE_STATUS_PENDING,
     CAPTURE_STATUS_PROCESSING,
-    OUTBOX_STATUS_PENDING,
-    OUTBOX_STATUS_PUBLISHED,
     Capture,
     CaptureScenario,
-    OutboxEvent,
 )
+from hibi.modules.outbox.models import OutboxModel
 
 
 class CaptureRepository:
@@ -243,33 +240,6 @@ class CaptureRepository:
         result = await self._session.execute(stmt)
         return [_to_capture(row, scenario_row) for row, scenario_row in result.all()]
 
-    async def list_pending_outbox_events(self, *, limit: int) -> list[OutboxEvent]:
-        """配送待ちの outbox を、古い順に読む。
-
-        `status` が pending で、`available_at` を過ぎた行が対象。`FOR UPDATE SKIP LOCKED`
-        で読むので、relay が同時に動いても、同じ行を重複して取らない。行のロックは
-        呼び出し側の transaction が終わるまで続く。
-
-        Args:
-            limit: 読む最大件数。
-
-        Returns:
-            `available_at`、`id` の昇順の OutboxEvent。
-        """
-
-        stmt = (
-            select(OutboxModel)
-            .where(
-                OutboxModel.status == OUTBOX_STATUS_PENDING,
-                OutboxModel.available_at <= func.now(),
-            )
-            .order_by(OutboxModel.available_at, OutboxModel.id)
-            .limit(limit)
-            .with_for_update(skip_locked=True)
-        )
-        result = await self._session.execute(stmt)
-        return [_to_outbox_event(row) for row in result.scalars()]
-
     async def list_open_scenario_candidates(self, user_id: UUID) -> list[TodayCandidate]:
         """未完了のシナリオを、Today とダイジェストの候補として読む。
 
@@ -429,24 +399,6 @@ class CaptureRepository:
             )
             .values(status=status)
             .returning(CaptureModel.id)
-        )
-        return await self._session.scalar(stmt) is not None
-
-    async def update_outbox_published(self, *, outbox_id: UUID) -> bool:
-        """pending の outbox を、配送済みにする。
-
-        Args:
-            outbox_id: outbox の id。
-
-        Returns:
-            更新したら True。既に配送済み、または存在しなければ False。
-        """
-
-        stmt = (
-            update(OutboxModel)
-            .where(OutboxModel.id == outbox_id, OutboxModel.status == OUTBOX_STATUS_PENDING)
-            .values(status=OUTBOX_STATUS_PUBLISHED, published_at=func.now())
-            .returning(OutboxModel.id)
         )
         return await self._session.scalar(stmt) is not None
 
@@ -776,24 +728,6 @@ def _to_capture(row: CaptureModel, scenario_row: CaptureScenarioModel | None = N
         created_at=row.created_at,
         updated_at=row.updated_at,
         scenario=scenario,
-    )
-
-
-def _to_outbox_event(row: OutboxModel) -> OutboxEvent:
-    """ORM の outbox の行を、ドメインの OutboxEvent に直す。
-
-    Args:
-        row: outbox の行。
-
-    Returns:
-        配送に必要な項目だけを持つ OutboxEvent。
-    """
-
-    return OutboxEvent(
-        id=row.id,
-        aggregate_id=row.aggregate_id,
-        aggregate_type=row.aggregate_type,
-        processing_generation=row.processing_generation,
     )
 
 

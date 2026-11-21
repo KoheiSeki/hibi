@@ -7,7 +7,7 @@ from uuid import UUID, uuid7
 import pytest
 
 from hibi.jobs.names import PROCESS_CAPTURE_JOB_NAME
-from hibi.modules.captures.types import OutboxEvent
+from hibi.modules.outbox.types import OutboxEvent
 
 relay_module = import_module("hibi.jobs.relay_outbox_events")
 
@@ -57,7 +57,7 @@ def _event(*, generation: int = 1, aggregate_type: str = "capture") -> OutboxEve
 
 def _patch_repository(monkeypatch: pytest.MonkeyPatch, repository: FakeOutboxRepository) -> None:
     monkeypatch.setattr(relay_module, "session_scope", _session_scope)
-    monkeypatch.setattr(relay_module, "CaptureRepository", lambda _session: repository)
+    monkeypatch.setattr(relay_module, "OutboxRepository", lambda _session: repository)
 
 
 @pytest.mark.asyncio

@@ -12,9 +12,6 @@ CAPTURE_STATUS_PROCESSING = "processing"
 CAPTURE_STATUS_COMPLETED = "completed"
 CAPTURE_STATUS_FAILED = "failed"
 
-OUTBOX_STATUS_PENDING = "pending"
-OUTBOX_STATUS_PUBLISHED = "published"
-
 CAPTURE_PROCESSING_MAX_ATTEMPTS = 3
 
 CAPTURE_SEARCH_MODE_KEYWORD = "keyword"
@@ -160,22 +157,6 @@ class CapturePage:
     items: list[Capture]
     next_cursor: str | None
     has_next_page: bool
-
-
-@dataclass(frozen=True, slots=True)
-class OutboxEvent:
-    """配送待ちの outbox 1 件のうち、arq に投入するのに必要な項目。
-
-    Attributes:
-        id: outbox の id。job の重複防止の id に使う。
-        aggregate_id: 処理する Capture の id。
-        processing_generation: 依頼した処理の世代。
-    """
-
-    id: UUID
-    aggregate_id: UUID
-    aggregate_type: str
-    processing_generation: int
 
 
 @dataclass(frozen=True, slots=True)

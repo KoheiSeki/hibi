@@ -18,7 +18,6 @@ from hibi.modules.captures.models import (
     CaptureEmbeddingModel,
     CaptureModel,
     CaptureScenarioModel,
-    OutboxModel,
 )
 from hibi.modules.captures.policies import (
     CAPTURE_ROUTE_POLICY_VERSION,
@@ -34,10 +33,11 @@ from hibi.modules.captures.types import (
     CAPTURE_STATUS_FAILED,
     CAPTURE_STATUS_PENDING,
     CAPTURE_STATUS_PROCESSING,
-    OUTBOX_STATUS_PENDING,
-    OUTBOX_STATUS_PUBLISHED,
     Capture,
 )
+from hibi.modules.outbox.models import OutboxModel
+from hibi.modules.outbox.repository import OutboxRepository
+from hibi.modules.outbox.types import OUTBOX_STATUS_PENDING, OUTBOX_STATUS_PUBLISHED
 
 _HASH_A = "a" * 64
 _HASH_B = "b" * 64
@@ -325,8 +325,8 @@ async def test_list_pending_outbox_events_filters_orders_and_limits(
         .values(available_at=now + timedelta(minutes=1))
     )
 
-    first_page = await repo.list_pending_outbox_events(limit=1)
-    all_available = await repo.list_pending_outbox_events(limit=20)
+    first_page = await OutboxRepository(session).list_pending_outbox_events(limit=1)
+    all_available = await OutboxRepository(session).list_pending_outbox_events(limit=20)
 
     assert [event.aggregate_id for event in first_page] == [oldest.id]
     assert [event.aggregate_id for event in all_available] == [oldest.id, newer.id]
@@ -343,8 +343,8 @@ async def test_update_outbox_published_sets_timestamp_once(
     outbox = await session.scalar(select(OutboxModel).where(OutboxModel.aggregate_id == capture.id))
     assert outbox is not None
 
-    first_update = await repo.update_outbox_published(outbox_id=outbox.id)
-    second_update = await repo.update_outbox_published(outbox_id=outbox.id)
+    first_update = await OutboxRepository(session).update_outbox_published(outbox_id=outbox.id)
+    second_update = await OutboxRepository(session).update_outbox_published(outbox_id=outbox.id)
     await session.refresh(outbox)
 
     assert first_update is True

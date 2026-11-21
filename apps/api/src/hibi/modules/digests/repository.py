@@ -5,7 +5,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from hibi.modules.captures.models import CaptureModel, CaptureScenarioModel, OutboxModel
+from hibi.modules.captures.models import CaptureModel, CaptureScenarioModel
 from hibi.modules.digests.models import DigestReportModel
 from hibi.modules.digests.types import (
     DIGEST_AGGREGATE_TYPE,
@@ -16,6 +16,7 @@ from hibi.modules.digests.types import (
     ActiveUser,
     DigestReport,
 )
+from hibi.modules.outbox.models import OutboxModel
 from hibi.modules.profiles.models import ProfileModel
 
 
