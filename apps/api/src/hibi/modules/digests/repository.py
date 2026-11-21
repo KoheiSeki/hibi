@@ -226,6 +226,45 @@ class DigestRepository:
             ActiveUser(user_id=user_id, timezone=timezone) for user_id, timezone in result.all()
         ]
 
+    async def list_done_titles_between(
+        self, user_id: UUID, *, start: datetime, end: datetime, limit: int
+    ) -> list[str]:
+        """所有者が、期間の中で完了にしたシナリオの題を、完了にした順に返す。
+
+        週次レビューの要約の材料として、LLM に渡す。そのため、題だけを読み、Capture の
+        本文は読まない。`done_at` が `start` 以上で、`end` より前のものが対象で、期間は
+        半開区間。`count_done_between` と同じ範囲なので、件数と題の一覧は食い違わない
+        (ただし、`limit` で切った分だけ、題は件数より少なくなる)。
+
+        並びは完了にした順で、同じ時刻なら Capture の id 順にして、毎回同じ並びにする。
+        `limit` は、LLM に送る量の上限。完了が多い週でも、プロンプトが長くなりすぎない
+        ようにする。上限を超えた分は、先に完了にしたものを残す。
+
+        完了を未完了に戻したシナリオは `done_at` が null になるので、入らない。シナリオの
+        status(proposed か accepted か)は問わない。
+
+        Args:
+            user_id: 所有者。別ユーザーのシナリオは入らない。
+            start: 期間の始まり。この時刻を含む。UTC の aware な datetime。
+            end: 期間の終わり。この時刻を含まない。UTC の aware な datetime。
+            limit: 返す題の最大数。
+
+        Returns:
+            完了にした順の題。無ければ空のリスト。
+        """
+
+        stmt = (
+            select(CaptureScenarioModel.title)
+            .where(
+                CaptureScenarioModel.user_id == user_id,
+                CaptureScenarioModel.done_at >= start,
+                CaptureScenarioModel.done_at < end,
+            )
+            .order_by(CaptureScenarioModel.done_at, CaptureScenarioModel.capture_id)
+            .limit(limit)
+        )
+        return list(await self._session.scalars(stmt))
+
     async def count_done_between(self, user_id: UUID, *, start: datetime, end: datetime) -> int:
         """所有者が、期間の中で完了にしたシナリオの数を返す。
 
@@ -254,6 +293,38 @@ class DigestRepository:
                 CaptureScenarioModel.user_id == user_id,
                 CaptureScenarioModel.done_at >= start,
                 CaptureScenarioModel.done_at < end,
+            )
+        )
+        return await self._session.scalar(stmt) or 0
+
+    async def count_captured_between(self, user_id: UUID, *, start: datetime, end: datetime) -> int:
+        """所有者が、期間の中で記録した Capture の数を返す。
+
+        週次レビューの「先週、記録した件数」に使う。0 なら、service は LLM を呼ばず、
+        定型の要約にする。`created_at` が `start` 以上で、`end` より前のものを数える。
+        期間は半開区間で、`end` ちょうどに記録したものは、次の期間の分になる。週の境界は、
+        夏時間の日を含むため、この関数では決めない。呼び出し側が、ユーザーの timezone で
+        求めた UTC の時刻を渡す。
+
+        Capture の状態は問わない。処理に失敗した Capture も、利用者が記録したことに
+        変わりはないので数える。削除した Capture は、行が無いので数えない。
+
+        Args:
+            user_id: 所有者。別ユーザーの Capture は数えない。
+            start: 期間の始まり。この時刻を含む。UTC の aware な datetime。
+            end: 期間の終わり。この時刻を含まない。UTC の aware な datetime。
+
+        Returns:
+            期間に記録した Capture の数。無ければ 0。
+        """
+
+        stmt = (
+            select(func.count())
+            .select_from(CaptureModel)
+            .where(
+                CaptureModel.user_id == user_id,
+                CaptureModel.created_at >= start,
+                CaptureModel.created_at < end,
             )
         )
         return await self._session.scalar(stmt) or 0
