@@ -2,12 +2,12 @@ import json
 from types import SimpleNamespace
 
 import pytest
-from hibi.ai.llm_review_summary import LlmReviewSummarizer, SdkReviewClient
-from hibi.ai.review_summary import ReviewProviderError, WeeklyReviewInput
 from openai import APIConnectionError, APITimeoutError, InternalServerError, RateLimitError
 from pydantic import SecretStr
 
+from hibi.ai.llm_review_summary import LlmReviewSummarizer, SdkReviewClient
 from hibi.ai.metrics import llm_call_count, reset_llm_call
+from hibi.ai.review_summary import ReviewProviderError, WeeklyReviewInput
 from hibi.modules.digests.content import WeeklyStats
 
 _REVIEW = WeeklyReviewInput(
@@ -190,3 +190,46 @@ async def test_sdk_client_sends_only_the_stats_and_the_done_titles(
     user_content = str(messages[1]["content"])
     for expected in ("牛乳を買う", "卵を買う", "5", "3", "2", "1"):
         assert expected in user_content
+
+
+def _settings(*, base_url: str) -> SimpleNamespace:
+    return SimpleNamespace(
+        open_ai_api_key=SecretStr("secret-key"),
+        open_ai_base_url=base_url,
+        open_ai_model="review-model",
+        open_ai_timeout_seconds=12.5,
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("base_url", "expected"),
+    [("", None), ("https://llm.example/v1", "https://llm.example/v1")],
+    ids=["blank_uses_the_sdk_default", "configured"],
+)
+async def test_sdk_client_uses_the_configured_model_and_endpoint(
+    monkeypatch: pytest.MonkeyPatch, base_url: str, expected: str | None
+) -> None:
+    fake = FakeAsyncOpenAI(result='{"summary":"よくできました"}')
+    client_kwargs: dict[str, object] = {}
+
+    def _build(**kwargs: object) -> FakeAsyncOpenAI:
+        client_kwargs.update(kwargs)
+        return fake
+
+    monkeypatch.setattr(
+        "hibi.ai.llm_review_summary.get_settings", lambda: _settings(base_url=base_url)
+    )
+    monkeypatch.setattr("hibi.ai.llm_review_summary.AsyncOpenAI", _build)
+
+    await SdkReviewClient().complete_json(review=_REVIEW)
+
+    # モデル名には、設定のモデルを使う。キーを渡すと、要求が失敗し、キーが外に出る
+    assert fake.create_kwargs["model"] == "review-model"
+    assert "secret-key" not in str(fake.create_kwargs)
+    # 空の base_url は None にして、SDK の既定の接続先を使う
+    assert client_kwargs["base_url"] == expected
+    assert client_kwargs["api_key"] == "secret-key"
+    assert client_kwargs["timeout"] == 12.5
+    # 再試行は job に任せるので、SDK では再試行しない
+    assert client_kwargs["max_retries"] == 0
