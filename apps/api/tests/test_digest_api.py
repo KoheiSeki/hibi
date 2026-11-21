@@ -3,15 +3,15 @@ from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
-from hibi.modules.digests.errors import (
-    DigestReportNotFoundError,
-    DigestReportNotRetryableError,
-)
 from hibi.modules.digests.router import _get_digest_service
 
 from hibi.api.dependencies import get_principal
 from hibi.api.main import create_app
 from hibi.auth.principal import Principal
+from hibi.modules.digests.errors import (
+    DigestReportNotFoundError,
+    DigestReportNotRetryableError,
+)
 from hibi.modules.digests.types import DigestReport, ListDigestReportsQuery
 
 OWNER_ID = UUID("11111111-1111-4111-8111-111111111111")
@@ -57,7 +57,7 @@ class FakeDigestService:
         self.list_queries.append(query)
         return [report for report in self.reports if report.user_id == query.user_id]
 
-    async def retry_report(self, user_id: UUID, report_id: UUID) -> DigestReport:
+    async def retry_report(self, user_id: UUID, *, report_id: UUID) -> DigestReport:
         self.retried.append((user_id, report_id))
         report = next((report for report in self.reports if report.id == report_id), None)
         if report is None or report.user_id != user_id:

@@ -100,7 +100,8 @@ class DigestRepository:
         """id で行を 1 件読む。
 
         所有者の条件を持たない。job が `report_id` だけを受け取って中身を作る、内部の読み出し用。
-        API から呼ぶ読み出しは、`user_id` を条件に含める別のメソッドを使う。
+        API から呼ぶ読み出しは、`user_id` を条件に含める `list_reports` を使う。ただし、所有者を
+        比べて、エラーの理由を分けるためだけに読むときは、使って良い(`DigestService.retry_report`)。
 
         Args:
             report_id: 読む行の id。
@@ -322,7 +323,7 @@ class DigestRepository:
 
     async def list_reports(
         self, user_id: UUID, *, kind: str | None, from_date: date | None, limit: int
-    ) -> list[DigestReport] | None:
+    ) -> list[DigestReport]:
         """所有者のダイジェストと週次レビューを、期間の日付の新しい順に読む。
 
         一覧の API が使う。所有者の行だけを読み、別ユーザーの行は返さない。並びは

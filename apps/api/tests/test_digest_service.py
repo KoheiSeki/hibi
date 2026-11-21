@@ -19,10 +19,10 @@ from digest_helpers import (
     make_report,
     title_of,
 )
-from hibi.modules.digests.errors import DigestReportNotFoundError, DigestReportNotRetryableError
 
 from hibi.ai.review_summary import ReviewSummarizer
 from hibi.modules.captures.repository import CaptureRepository
+from hibi.modules.digests.errors import DigestReportNotFoundError, DigestReportNotRetryableError
 from hibi.modules.digests.repository import DigestRepository
 from hibi.modules.digests.service import DigestService
 from hibi.modules.digests.types import (
@@ -318,7 +318,7 @@ async def test_retry_report_returns_the_requeued_report() -> None:
     requeued = make_report(status=DIGEST_STATUS_PENDING)
     digests = FakeDigestRepository(requeued=requeued)
 
-    report = await _service(digests).retry_report(TOKYO_USER.user_id, requeued.id)
+    report = await _service(digests).retry_report(TOKYO_USER.user_id, report_id=requeued.id)
 
     assert report == requeued
     [call] = digests.requeue_calls
@@ -334,7 +334,7 @@ async def test_retry_report_raises_not_found_for_a_missing_report() -> None:
     digests = FakeDigestRepository()
 
     with pytest.raises(DigestReportNotFoundError):
-        await _service(digests).retry_report(TOKYO_USER.user_id, UUID(int=100))
+        await _service(digests).retry_report(TOKYO_USER.user_id, report_id=UUID(int=100))
 
 
 @pytest.mark.asyncio
@@ -343,7 +343,7 @@ async def test_retry_report_hides_a_foreign_report_as_not_found() -> None:
     digests = FakeDigestRepository(report=make_report(status=DIGEST_STATUS_FAILED))
 
     with pytest.raises(DigestReportNotFoundError):
-        await _service(digests).retry_report(NEW_YORK_USER.user_id, UUID(int=100))
+        await _service(digests).retry_report(NEW_YORK_USER.user_id, report_id=UUID(int=100))
 
 
 @pytest.mark.asyncio
@@ -354,4 +354,4 @@ async def test_retry_report_raises_not_retryable_for_a_report_that_is_not_failed
     digests = FakeDigestRepository(report=make_report(status=status))
 
     with pytest.raises(DigestReportNotRetryableError):
-        await _service(digests).retry_report(TOKYO_USER.user_id, UUID(int=100))
+        await _service(digests).retry_report(TOKYO_USER.user_id, report_id=UUID(int=100))

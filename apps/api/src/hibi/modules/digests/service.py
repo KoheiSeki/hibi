@@ -17,6 +17,7 @@ from hibi.modules.digests.content import (
     count_deadlines,
     normalize_summary,
 )
+from hibi.modules.digests.errors import DigestReportNotFoundError, DigestReportNotRetryableError
 from hibi.modules.digests.repository import DigestRepository
 from hibi.modules.digests.schedule import daily_period_start, weekly_period_start
 from hibi.modules.digests.types import (
@@ -25,6 +26,7 @@ from hibi.modules.digests.types import (
     DIGEST_STATUS_PENDING,
     ActiveUser,
     DigestReport,
+    ListDigestReportsQuery,
 )
 
 _ACTIVE_USER_LIMIT = 1000
@@ -66,6 +68,24 @@ class DigestService:
         self._captures = captures
         self._summarizer = summarizer
         self._clock = clock
+
+    async def list_reports(self, query: ListDigestReportsQuery) -> list[DigestReport]:
+        """所有者のダイジェストと週次レビューを、期間の日付の新しい順に返す。
+
+        条件はそのまま repository に渡し、ここでは加工しない。値の範囲は router が
+        検証済みで、所有者の条件は `query.user_id` で必ず付く。`pending` と `failed` の
+        行も、そのまま返す。画面が、作っている途中と、失敗の表示を出すため。
+
+        Args:
+            query: 所有者、種類、期間の日付の下限、最大件数。
+
+        Returns:
+            新しい順の行。無ければ空のリスト。
+        """
+
+        return await self._digests.list_reports(
+            query.user_id, kind=query.kind, from_date=query.from_date, limit=query.limit
+        )
 
     async def schedule_due_reports(self) -> int:
         """今が作る時刻の利用者に、足りないダイジェストの行を作り、生成を予約する。
@@ -151,6 +171,41 @@ class DigestService:
             await self._digests.complete_report(
                 report_id=report.id, content=content, summary_model=summary_model
             )
+
+    async def retry_report(self, user_id: UUID, *, report_id: UUID) -> DigestReport:
+        """failed の行を pending に戻し、中身の生成をもう一度予約する。
+
+        画面の「もう一度作る」が使う。戻す判断は、repository の 1 回の条件つき更新に
+        任せるので、retry が続けて届いても、生成の予約(outbox)は 1 件しか増えない。
+        outbox の id は、ここで新しく発行する。
+
+        戻せなかったときだけ、行を読み直して、理由を分ける。行が無いときと、別ユーザーの
+        行のときは、どちらも `DigestReportNotFoundError` にする。他人の行が存在することを、
+        応答から推測させないため。それ以外(pending か ready)は、`DigestReportNotRetryableError`
+        にする。読み直しの前に、別の要求が戻していた場合も、pending なので 409 になる。
+
+        Args:
+            user_id: 検証済みの所有者。
+            report_id: 戻す行の id。
+
+        Returns:
+            pending に戻した行。`content` と `error_code` は None。
+
+        Raises:
+            DigestReportNotFoundError: 行が無い、または別ユーザーの行。
+            DigestReportNotRetryableError: 行が failed でない。
+        """
+
+        report = await self._digests.requeue_failed_report(
+            user_id, report_id=report_id, outbox_id=uuid7()
+        )
+        if report is not None:
+            return report
+
+        current = await self._digests.get_report(report_id)
+        if current is None or current.user_id != user_id:
+            raise DigestReportNotFoundError(report_id)
+        raise DigestReportNotRetryableError()
 
     async def _build_daily_content(self, report: DigestReport) -> dict[str, object]:
         """日次ダイジェストの中身を、Today の候補と昨日の完了数から組み立てる。
