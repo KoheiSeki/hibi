@@ -7,6 +7,8 @@ from uuid import UUID, uuid7
 import pytest
 from arq import Retry
 
+from hibi.ai.review_summary import ReviewProviderError
+
 job_module = import_module("hibi.jobs.generate_digest_report_job")
 
 # spec: 3 回目の失敗で failed にする
@@ -148,9 +150,39 @@ async def test_job_marks_failed_on_the_final_attempt_in_a_separate_session(
     assert session is failure_session
     assert failed_id == report_id
     # error_code は理由の種類だけ。例外のメッセージ(本文の断片を含み得る)は入れない
-    assert error_code
+    assert error_code == "generation_failed"
     assert "牛乳" not in error_code
     assert logged[0]["attempt"] == _FINAL_ATTEMPT
+
+
+@pytest.mark.asyncio
+async def test_job_marks_a_provider_failure_with_its_own_error_code(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # LLM の一時的な障害は、画面で「要約を作れなかった」と出し分けるため、別の識別子にする
+    class ProviderFailingService:
+        def __init__(self, *, digests: object, captures: object, summarizer: object) -> None:
+            pass
+
+        async def generate_report(self, report_id: UUID) -> None:
+            raise ReviewProviderError()
+
+    _patch_job(
+        monkeypatch,
+        ProviderFailingService,
+        [
+            _session_scope(TransactionState(), object()),
+            _session_scope(TransactionState(), object()),
+        ],
+    )
+    report_id = uuid7()
+
+    with pytest.raises(ReviewProviderError):
+        await job_module.generate_digest_report_job({"job_try": _FINAL_ATTEMPT}, report_id)
+
+    [(_, failed_id, error_code)] = FakeDigestRepository.failed
+    assert failed_id == report_id
+    assert error_code == "review_provider_error"
 
 
 @pytest.mark.asyncio

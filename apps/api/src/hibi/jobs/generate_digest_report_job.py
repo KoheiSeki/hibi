@@ -3,6 +3,8 @@ from uuid import UUID
 
 from arq import Retry
 
+from hibi.ai.factory import build_review_summarizer
+from hibi.ai.review_summary import ReviewProviderError
 from hibi.db.session import session_scope
 from hibi.jobs.job_logging import log_job_failure
 from hibi.jobs.names import GENERATE_DIGEST_REPORT_JOB_NAME
@@ -12,6 +14,7 @@ from hibi.modules.digests.repository import DigestRepository
 from hibi.modules.digests.service import DigestService
 from hibi.modules.digests.types import (
     DIGEST_ERROR_GENERATION_FAILED,
+    DIGEST_ERROR_REVIEW_PROVIDER,
     DIGEST_GENERATION_MAX_ATTEMPTS,
 )
 
@@ -52,6 +55,7 @@ async def generate_digest_report_job(ctx: dict[str, Any], report_id: UUID) -> No
             service = DigestService(
                 digests=DigestRepository(session=session),
                 captures=CaptureRepository(session=session),
+                summarizer=build_review_summarizer(),
             )
             await service.generate_report(report_id)
     except Exception as error:
@@ -82,8 +86,22 @@ async def generate_digest_report_job(ctx: dict[str, Any], report_id: UUID) -> No
 def _error_code(error: Exception) -> str:
     """失敗の種類を、画面と集計で使う短い識別子にする。
 
+    LLM の一時的な障害(`ReviewProviderError`)は `DIGEST_ERROR_REVIEW_PROVIDER`、
+    それ以外はすべて `DIGEST_ERROR_GENERATION_FAILED` にする。画面は、この値で
+    「要約を作れなかった」と「作れなかった」の文言を出し分ける。種類を足すときは、
+    画面の文言の対応も足す。未知の値は、画面が `generation_failed` と同じ扱いにする。
+
     例外のクラス名やメッセージは入れない。内部の名前を契約にしないためと、
     メッセージが本文の断片を含み得るため。
+
+    Args:
+        error: 最終試行で送出された例外。
+
+    Returns:
+        `DIGEST_ERROR_*` のいずれか。
     """
+
+    if isinstance(error, ReviewProviderError):
+        return DIGEST_ERROR_REVIEW_PROVIDER
 
     return DIGEST_ERROR_GENERATION_FAILED

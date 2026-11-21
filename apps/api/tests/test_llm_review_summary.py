@@ -233,3 +233,21 @@ async def test_sdk_client_uses_the_configured_model_and_endpoint(
     assert client_kwargs["timeout"] == 12.5
     # 再試行は job に任せるので、SDK では再試行しない
     assert client_kwargs["max_retries"] == 0
+
+
+@pytest.mark.asyncio
+async def test_sdk_client_cuts_each_title_before_sending(monkeypatch: pytest.MonkeyPatch) -> None:
+    # dataset に無い本文のシナリオは、本文を trim した値が題になる。本文を丸ごと送らないよう、
+    # 1 つの題を 40 文字で切ってから送る
+    long_title = "あ" * 40 + "ここから先は送らない"
+    review = WeeklyReviewInput(stats=_REVIEW.stats, done_titles=[long_title, "牛乳を買う"])
+    fake = FakeAsyncOpenAI(result='{"summary":"よくできました"}')
+    monkeypatch.setattr("hibi.ai.llm_review_summary.AsyncOpenAI", lambda **kwargs: fake)
+
+    await SdkReviewClient().complete_json(review=review)
+
+    messages = list(fake.create_kwargs["messages"])  # type: ignore[call-overload]
+    user_content = str(messages[1]["content"])
+    assert "あ" * 40 in user_content
+    assert "ここから先は送らない" not in user_content
+    assert "牛乳を買う" in user_content

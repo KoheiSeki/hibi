@@ -2,16 +2,20 @@ from collections.abc import Callable, Sequence
 from datetime import date, datetime, timedelta
 from uuid import UUID, uuid7
 
+from hibi.ai.review_summary import ReviewSummarizer, WeeklyReviewInput, WeeklyStats
 from hibi.core.timezone import local_day_start, utc_now
 from hibi.modules.captures.repository import CaptureRepository
 from hibi.modules.captures.today import rank_today
 from hibi.modules.digests.content import (
     DAILY_CONTENT_VERSION,
     DAILY_ITEM_LIMIT,
+    EMPTY_WEEK_SUMMARY,
     WEEKLY_CONTENT_VERSION,
     DigestItem,
     build_daily_content,
+    build_weekly_content,
     count_deadlines,
+    normalize_summary,
 )
 from hibi.modules.digests.repository import DigestRepository
 from hibi.modules.digests.schedule import daily_period_start, weekly_period_start
@@ -25,6 +29,10 @@ from hibi.modules.digests.types import (
 
 _ACTIVE_USER_LIMIT = 1000
 _ACTIVE_WINDOW_DAYS = 14
+
+# 週次レビューの要約に渡す、完了したシナリオの題の上限。要約は 500 文字なので、
+# これより多くの題を渡しても、要約は良くならず、プロンプトが長くなるだけ
+_WEEKLY_DONE_TITLE_LIMIT = 20
 
 
 class DigestService:
@@ -41,6 +49,7 @@ class DigestService:
         self,
         digests: DigestRepository,
         captures: CaptureRepository,
+        summarizer: ReviewSummarizer,
         *,
         clock: Callable[[], datetime] = utc_now,
     ) -> None:
@@ -55,6 +64,7 @@ class DigestService:
 
         self._digests = digests
         self._captures = captures
+        self._summarizer = summarizer
         self._clock = clock
 
     async def schedule_due_reports(self) -> int:
@@ -136,6 +146,11 @@ class DigestService:
         if report.kind == DIGEST_KIND_DAILY:
             content = await self._build_daily_content(report)
             await self._digests.complete_report(report_id, content=content, summary_model=None)
+        elif report.kind == DIGEST_KIND_WEEKLY:
+            content, summary_model = await self._build_weekly_content(report)
+            await self._digests.complete_report(
+                report_id=report.id, content=content, summary_model=summary_model
+            )
 
     async def _build_daily_content(self, report: DigestReport) -> dict[str, object]:
         """日次ダイジェストの中身を、Today の候補と昨日の完了数から組み立てる。
@@ -170,6 +185,63 @@ class DigestService:
             deadline_counts=deadline_counts,
             done_yesterday_count=done_yesterday_count,
         )
+
+    async def _build_weekly_content(
+        self, report: DigestReport
+    ) -> tuple[dict[str, object], str | None]:
+        """週次レビューの中身を、先週の集計と LLM の要約から組み立てる。
+
+        先週は、行の期間の日付(月曜)の 0 時から、翌週の月曜の 0 時までで、行に記録した
+        timezone で決める。暦日から求めるので、夏時間の週は 167 時間や 169 時間になる。
+        記録の数、完了の数、完了の題は、この範囲で読む。未完了と期限超過の数は、今の
+        時点の候補から数える。先週の終わりの時点の状態は、記録が無く求められないため。
+
+        先週に Capture が 1 件も無ければ、LLM を呼ばず、`EMPTY_WEEK_SUMMARY` にする。
+        要約の材料が無いので、呼んでも意味がないため。それ以外は、集計と完了の題だけを
+        渡して、LLM を 1 回呼ぶ。本文の項目は渡さない。返った要約は `normalize_summary` を
+        通し、空や長すぎるときは、再試行せず定型文にする。
+
+        Args:
+            report: 中身を作る行。所有者、timezone、期間の日付を使う。
+
+        Returns:
+            `build_weekly_content` が作る辞書と、`summary_model` に記録するモデル名の組。
+            LLM を呼ばなかった週は、モデル名が None。
+
+        Raises:
+            ReviewProviderError: LLM の一時的な障害。握りつぶさず、job の retry に任せる。
+        """
+
+        week_start = local_day_start(report.period_start, timezone=report.timezone)
+        week_end = local_day_start(
+            report.period_start + timedelta(days=7), timezone=report.timezone
+        )
+        captured_count = await self._digests.count_captured_between(
+            report.user_id, start=week_start, end=week_end
+        )
+        done_count = await self._digests.count_done_between(
+            report.user_id, start=week_start, end=week_end
+        )
+        candidates = await self._captures.list_open_scenario_candidates(report.user_id)
+        overdue_count = count_deadlines(
+            candidates, now=self._clock(), timezone=report.timezone
+        ).overdue_count
+        done_titles = await self._digests.list_done_titles_between(
+            report.user_id, start=week_start, end=week_end, limit=_WEEKLY_DONE_TITLE_LIMIT
+        )
+        stats = WeeklyStats(
+            captured_count=captured_count,
+            done_count=done_count,
+            open_count=len(candidates),
+            overdue_count=overdue_count,
+        )
+        if stats.captured_count == 0:
+            return build_weekly_content(stats=stats, summary=EMPTY_WEEK_SUMMARY), None
+        review = WeeklyReviewInput(stats=stats, done_titles=done_titles)
+        summary = await self._summarizer.summarize_week(review)
+        return build_weekly_content(
+            stats=stats, summary=normalize_summary(summary)
+        ), self._summarizer.model_name
 
     async def _load_items(self, user_id: UUID, ranked_ids: Sequence[UUID]) -> list[DigestItem]:
         """順位付けで選んだ id から、ダイジェストの行(題と期限)を順位どおりに作る。

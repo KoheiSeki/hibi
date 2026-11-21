@@ -1,5 +1,6 @@
 from typing import Any
 
+from hibi.ai.factory import build_review_summarizer
 from hibi.db.session import session_scope
 from hibi.jobs.job_logging import log_job_failure
 from hibi.jobs.names import RUN_DAILY_DIGEST_JOB_NAME
@@ -36,6 +37,7 @@ async def run_daily_digest(ctx: dict[str, Any]) -> None:
             service = DigestService(
                 digests=DigestRepository(session=session),
                 captures=CaptureRepository(session=session),
+                summarizer=build_review_summarizer(),
             )
             await service.schedule_due_reports()
     except Exception as error:

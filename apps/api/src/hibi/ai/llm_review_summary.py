@@ -16,6 +16,9 @@ from hibi.ai.metrics import record_llm_call
 from hibi.ai.review_summary import ReviewProviderError, WeeklyReviewInput
 from hibi.core.config import get_settings
 
+# 題は本文を trim しただけのことがある。本文を丸ごと送らないよう、送る前にこの長さで切る
+_TITLE_MAX_LENGTH = 40
+
 
 class ReviewOutput(BaseModel):
     """LLM の応答の JSON を、検証してから読むための型。
@@ -189,6 +192,9 @@ def _format_review(review: WeeklyReviewInput) -> str:
     取り違えないようにするため。題が無い週は、題の行の代わりに「なし」と書き、空の
     見出しだけが残って、モデルが続きを補おうとしないようにする。
 
+    題は、本文を trim しただけのことがあるので、`_TITLE_MAX_LENGTH` 文字で切る。要約の
+    材料としては先頭で足り、本文を丸ごと LLM に送らないため。
+
     題は、利用者が書いた本文から作るので、指示のような文を含み得る。題は見出しの下に
     並べるだけにして、system の指示とは別のメッセージに置く。
 
@@ -207,7 +213,7 @@ def _format_review(review: WeeklyReviewInput) -> str:
         f"期限を過ぎた件数: {stats.overdue_count}",
         "完了したことの題:",
     ]
-    lines += [f"- {title}" for title in review.done_titles] or ["なし"]
+    lines += [f"- {title[:_TITLE_MAX_LENGTH]}" for title in review.done_titles] or ["なし"]
     return "\n".join(lines)
 
 
