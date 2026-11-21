@@ -727,6 +727,43 @@ git commit -m "feat(digests): list digest reports and retry a failed one over HT
 
 ---
 
+### Task 6.5: outbox を captures から切り出す
+
+Task 3 で、outbox は Capture とダイジェストが共有する仕組みになった。ところが `OutboxModel`、`OutboxEvent`、配送の読み書きは `captures` に残っていて、digest と relay が `captures` の中を読んでいた。動作を変えずに、共有の module に移す。Task 6 の repository の変更とは、別の commit にする。
+
+**Files:**
+
+- Create: `apps/api/src/hibi/modules/outbox/{models,types,repository}.py`
+- Modify: `apps/api/src/hibi/modules/captures/{models,types,repository}.py`、`apps/api/src/hibi/modules/digests/repository.py`、`apps/api/src/hibi/jobs/relay_outbox_events.py`
+- Test: `apps/api/tests/test_relay_outbox_events.py`、`apps/api/tests/integration/{test_capture_repository,test_digest_repository}.py`(import と、差し替え先の変更だけ)
+
+**Interfaces:**
+
+- Produces:
+  - `OutboxModel`(`outbox/models.py`)
+  - `OutboxEvent`、`OUTBOX_STATUS_PENDING`、`OUTBOX_STATUS_PUBLISHED`(`outbox/types.py`)
+  - `OutboxRepository(session)`: `list_pending_outbox_events(*, limit) -> list[OutboxEvent]`、`update_outbox_published(*, outbox_id) -> bool`(`CaptureRepository` から、名前を変えずに移す)
+
+- [x] **Step 1: 移す**
+
+- `OutboxModel` を `outbox/models.py` に、`OutboxEvent` と `OUTBOX_STATUS_*` を `outbox/types.py` に移す
+- `CaptureRepository.list_pending_outbox_events`、`update_outbox_published`、`_to_outbox_event` を、`OutboxRepository` に移す
+- relay は `OutboxRepository` を使う。captures と digests の repository は、`OutboxModel` を `outbox/models.py` から読む
+- 行を足す処理(Capture の作成と retry、`claim_report`、`requeue_failed_report`)は、対象の行と同じ transaction で書く必要があるので、依頼する側の repository に残す。4 か所の重複を `OutboxRepository.add_event` にまとめるのは、この Task ではしない(変更を移動だけに絞るため)
+
+- [x] **Step 2: Run to verify nothing changed**
+
+Run: `just test-api`、`cd apps/api && uv run pytest -m integration tests/integration/test_capture_repository.py tests/integration/test_digest_repository.py`、`ruff check`、`ty check apps/api/src`
+Expected: 移す前と同じ結果(Task 6 の RED のテストだけが落ちる)
+
+- [ ] **Step 3: Commit**
+
+```bash
+git commit -m "refactor(outbox): move the outbox out of the captures module"
+```
+
+---
+
 ### Task 7: 止まった処理の回復
 
 **Files:**
