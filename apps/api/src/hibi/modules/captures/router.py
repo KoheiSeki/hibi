@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from hibi.ai.classifier_factory import (
+from hibi.ai.factory import (
     build_capture_classifier,
     build_clarification_generator,
     build_text_embedder,

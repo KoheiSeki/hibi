@@ -3,7 +3,7 @@ from uuid import UUID
 
 from arq import Retry
 
-from hibi.ai.classifier_factory import (
+from hibi.ai.factory import (
     build_capture_classifier,
     build_clarification_generator,
     build_text_embedder,
