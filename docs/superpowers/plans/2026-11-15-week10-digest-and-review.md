@@ -628,7 +628,9 @@ git commit -m "feat(digests): summarize the previous week with a fake or LLM ada
 
 - Consumes: Task 3 の `get_report`、Task 4 の `DigestService`
 - Produces:
-  - `ListDigestReportsQuery(user_id: UUID, kind: str | None, from_date: date | None, limit: int)`(`types.py`、dataclass)
+  - `DigestKind = Literal["daily", "weekly"]`、`DigestStatus = Literal["pending", "ready", "failed"]`(`types.py`。DB の check と同じ値。OpenAPI の enum と、生成される client の文字列の union になる)
+  - `DigestReport.kind: DigestKind`、`DigestReport.status: DigestStatus`(Task 3 の `str` から変える。repository の `_to_digest_report` が、DB の check を根拠に `cast` する)
+  - `ListDigestReportsQuery(user_id: UUID, kind: DigestKind | None, from_date: date | None, limit: int)`(`types.py`、dataclass)
   - `DigestReportNotFoundError(report_id)`(404、`problem_type="digest-report-not-found"`)、`DigestReportNotRetryableError()`(409、`problem_type="digest-report-not-retryable"`)(`errors.py`。`captures/errors.py` と同じ `ApplicationError` の形)
   - `DigestRepository.list_reports(user_id, *, kind, from_date, limit) -> list[DigestReport]`
   - `DigestRepository.requeue_failed_report(user_id, *, report_id, outbox_id) -> DigestReport | None`
@@ -689,7 +691,8 @@ Expected: FAIL(`hibi.modules.digests.errors` が無い、repository のメソッ
 **errors / types**
 
 - `errors.py`: `DigestReportNotFoundError`(404。`report_id` を受け取る)、`DigestReportNotRetryableError`(409)。`problem_type` は `digest-report-not-found` と `digest-report-not-retryable`
-- `types.py`: `ListDigestReportsQuery`(dataclass)
+- `types.py`: `DigestKind` と `DigestStatus`(Literal の別名)、`ListDigestReportsQuery`(dataclass)。`DigestReport` の `kind` と `status` を、この 2 つの型にする
+- `repository.py` の `_to_digest_report`: ORM の `str` を `cast(DigestKind, ...)`、`cast(DigestStatus, ...)` で写す。値は DB の check が限っている
 
 **repository**
 
@@ -703,9 +706,9 @@ Expected: FAIL(`hibi.modules.digests.errors` が無い、repository のメソッ
 
 **schema / router**(`schemas.py`、`router.py`、`api/main.py`)
 
-- `DigestReportResponse`: `id`、`kind`、`periodStart`、`timezone`、`status`、`content`(辞書)、`contentVersion`、`errorCode`、`generatedAt` の 9 つ。`summaryModel` と `createdAt` は出さない(モデル名は内部の情報で、画面でも使わない)。docstring は API の利用者向けで、`content` と `generatedAt` は `ready` のときだけ、`errorCode` は `failed` のときだけ入ることを書く
+- `DigestReportResponse`: `id`、`kind`(`DigestKind`)、`periodStart`、`timezone`、`status`(`DigestStatus`)、`content`(辞書)、`contentVersion`、`errorCode`、`generatedAt` の 9 つ。Python のフィールド名は `CaptureResponse` と同じく snake_case(`period_start` など)で書き、`ApiModel` の `to_camel` で JSON の camelCase にする。`summaryModel` と `createdAt` は出さない(モデル名は内部の情報で、画面でも使わない)。docstring は API の利用者向けで、`content` と `generatedAt` は `ready` のときだけ、`errorCode` は `failed` のときだけ入ることを書く
 - `_get_digest_service`: `DigestRepository`、`CaptureRepository`、`build_review_summarizer()` から `DigestService` を組み立てる
-- `list_digest_reports`(`GET /digest-reports`): `limit` は `Annotated[int, Query(ge=1, le=30)] = 7`、`kind` は `Literal["daily", "weekly"] | None`、`from_date` は `Query(alias="fromDate")` の `date | None`。成功は 200 で `ApiResponse[list[DigestReportResponse]]`
+- `list_digest_reports`(`GET /digest-reports`): `limit` は `Annotated[int, Query(ge=1, le=30)] = 7`、`kind` は `DigestKind | None`、`from_date` は `Query(alias="fromDate")` の `date | None`。成功は 200 で `ApiResponse[list[DigestReportResponse]]`
 - `retry_digest_report`(`POST /digest-reports/{report_id}/retry`): 成功は 202。1 件を読む endpoint が無いので `Location` は付けない。docstring に、`failed` 以外は 409、他人の行と無い行は 404 を書く
 - `api/main.py`: `digests_router` を `captures_router` と同じ形で登録する
 
