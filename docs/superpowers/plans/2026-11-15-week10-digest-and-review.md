@@ -632,7 +632,7 @@ git commit -m "feat(digests): summarize the previous week with a fake or LLM ada
   - `DigestReportNotFoundError(report_id)`(404、`problem_type="digest-report-not-found"`)、`DigestReportNotRetryableError()`(409、`problem_type="digest-report-not-retryable"`)(`errors.py`。`captures/errors.py` と同じ `ApplicationError` の形)
   - `DigestRepository.list_reports(user_id, *, kind, from_date, limit) -> list[DigestReport]`
   - `DigestRepository.requeue_failed_report(user_id, *, report_id, outbox_id) -> DigestReport | None`
-  - `DigestService.list_reports(query) -> list[DigestReport]`、`retry_report(user_id, report_id) -> DigestReport`
+  - `DigestService.list_reports(query) -> list[DigestReport]`、`retry_report(user_id, *, report_id) -> DigestReport`(UUID が 2 つ並ぶので、`report_id` はキーワード専用にして取り違えを防ぐ。router も `report_id=` で呼ぶ)
   - `_get_digest_service`(`router.py`。テストが `dependency_overrides` で差し替える)
   - `GET /api/v1/digest-reports`(`operation_id="listDigestReports"`)、`POST /api/v1/digest-reports/{report_id}/retry`(`operation_id="retryDigestReport"`)
 
@@ -699,7 +699,7 @@ Expected: FAIL(`hibi.modules.digests.errors` が無い、repository のメソッ
 **service**
 
 - `DigestService.list_reports(query)`: そのまま repository に渡す
-- `DigestService.retry_report(user_id, report_id)`: `uuid7()` で outbox の id を発行して `requeue_failed_report` を呼ぶ。None なら `get_report` で読み直し、行が無いか別ユーザーなら `DigestReportNotFoundError`(他人の行の存在を明かさない)、それ以外は `DigestReportNotRetryableError`
+- `DigestService.retry_report(user_id, *, report_id)`: `uuid7()` で outbox の id を発行して `requeue_failed_report` を呼ぶ。None なら `get_report` で読み直し、行が無いか別ユーザーなら `DigestReportNotFoundError`(他人の行の存在を明かさない)、それ以外は `DigestReportNotRetryableError`
 
 **schema / router**(`schemas.py`、`router.py`、`api/main.py`)
 
