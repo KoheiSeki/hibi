@@ -20,3 +20,8 @@
 - 引数は `@param 名前 - 説明`、戻り値は `@returns 説明`。`{型}` は書かない。型は TypeScript に任せる
 - 1 行目は「何をするか」を 1 文で書く。「なぜそうするか」を実装の説明より優先して書く
 - `packages/api-client/src/generated/` は生成物なので手で書かない。説明を変えたいときは、API 側の docstring を直して `just openapi` で再生成する
+
+## git の commit
+
+- commit メッセージに `Co-Authored-By:` の行を付けない。Claude が作る commit も、メッセージの案も同じ
+- PR の説明にも、生成ツールの署名(`Generated with ...` など)を付けない
