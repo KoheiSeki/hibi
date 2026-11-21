@@ -190,6 +190,60 @@ class DigestRepository:
         )
         return await self._session.scalar(stmt) is not None
 
+    async def requeue_failed_report(
+        self, user_id: UUID, *, report_id: UUID, outbox_id: UUID
+    ) -> DigestReport | None:
+        """所有者の failed の行を pending に戻し、生成を依頼する outbox を同じ transaction で足す。
+
+        画面の「もう一度作る」(retry の API)が使う。`UPDATE ... WHERE id = ... AND
+        user_id = ... AND status = 'failed'` の 1 回で戻すので、retry が 2 回続けて届いても、
+        戻せるのは 1 回だけで、outbox も 1 件しか増えない。読んでから更新する書き方だと、
+        2 つの要求が同時に failed を見て、outbox が 2 件になる。
+
+        戻すときに、`error_code` を消し、`updated_at` を今にする。前回の失敗の理由は、
+        もう当てはまらず、残すと画面が失敗の文言を出してしまうため。`updated_at` は、
+        止まった pending を見つける回復の処理が、戻した時刻から数えるために進める。
+        中身(`content`)は、failed の行には無いので、触らない。
+
+        行が無い、別ユーザーの行、failed でない行は、区別せず None を返し、何も変えない。
+        404 と 409 の区別は、service が行を読み直して決める。
+
+        Args:
+            user_id: 所有者。別ユーザーの行は戻さない。
+            report_id: 戻す行の id。
+            outbox_id: 新しい outbox の id。job の重複防止の id に使われる。
+
+        Returns:
+            pending に戻した行。戻さなかったときは None。
+        """
+
+        stmt = (
+            update(DigestReportModel)
+            .where(
+                DigestReportModel.id == report_id,
+                DigestReportModel.user_id == user_id,
+                DigestReportModel.status == DIGEST_STATUS_FAILED,
+            )
+            .values(status=DIGEST_STATUS_PENDING, error_code=None, updated_at=func.now())
+            .returning(DigestReportModel)
+        )
+        row = await self._session.scalar(stmt)
+        if row is None:
+            return None
+
+        self._session.add(
+            OutboxModel(
+                id=outbox_id,
+                user_id=user_id,
+                aggregate_type=DIGEST_AGGREGATE_TYPE,
+                aggregate_id=report_id,
+                event_type=DIGEST_GENERATION_REQUESTED,
+                processing_generation=1,
+            )
+        )
+        await self._session.flush()
+        return _to_digest_report(row)
+
     async def list_active_users(self, *, active_since: datetime, limit: int) -> list[ActiveUser]:
         """直近に Capture がある利用者と、その timezone を読む。
 
@@ -264,6 +318,42 @@ class DigestRepository:
             .limit(limit)
         )
         return list(await self._session.scalars(stmt))
+
+    async def list_reports(
+        self, user_id: UUID, *, kind: str | None, from_date: date | None, limit: int
+    ) -> list[DigestReport] | None:
+        """所有者のダイジェストと週次レビューを、期間の日付の新しい順に読む。
+
+        一覧の API が使う。所有者の行だけを読み、別ユーザーの行は返さない。並びは
+        `period_start` の降順で、同じ日付のときは、後に作った行を先にする。ある月曜の
+        daily と、その月曜から始まる週の weekly は、`period_start` が同じになるため。
+
+        `kind` と `from_date` は、None なら条件にしない。`from_date` は `period_start` と
+        比べる下限で、その日を含む。作った日時ではなく、期間の日付で絞る。値の範囲は、
+        router が検証済み。
+
+        Args:
+            user_id: 所有者。
+            kind: daily か weekly。None なら両方。
+            from_date: 期間の日付の下限。この日を含む。None なら下限なし。
+            limit: 返す最大件数。
+
+        Returns:
+            新しい順の行。無ければ空のリスト。
+        """
+
+        stmt = (
+            select(DigestReportModel)
+            .where(DigestReportModel.user_id == user_id)
+            .order_by(DigestReportModel.period_start.desc(), DigestReportModel.id.desc())
+            .limit(limit)
+        )
+        if kind is not None:
+            stmt = stmt.where(DigestReportModel.kind == kind)
+        if from_date is not None:
+            stmt = stmt.where(DigestReportModel.period_start >= from_date)
+        rows = await self._session.scalars(stmt)
+        return [_to_digest_report(row) for row in rows]
 
     async def count_done_between(self, user_id: UUID, *, start: datetime, end: datetime) -> int:
         """所有者が、期間の中で完了にしたシナリオの数を返す。
