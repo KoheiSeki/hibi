@@ -6,7 +6,6 @@ from decimal import Decimal
 from uuid import UUID
 
 from hibi.ai.review_summary import WeeklyReviewInput
-
 from hibi.modules.captures.today import TodayCandidate
 from hibi.modules.captures.types import CAPTURE_STATUS_COMPLETED, Capture, CaptureScenario
 from hibi.modules.digests.types import (
@@ -44,6 +43,8 @@ class FakeDigestRepository:
         done_count: int = 0,
         captured_count: int = 0,
         done_titles: Sequence[str] = (),
+        listed: Sequence[DigestReport] = (),
+        requeued: DigestReport | None = None,
     ) -> None:
         self.users = list(users)
         self.report = report
@@ -51,6 +52,10 @@ class FakeDigestRepository:
         self.done_count = done_count
         self.captured_count = captured_count
         self.done_titles = list(done_titles)
+        self.listed = list(listed)
+        self.requeued = requeued
+        self.list_calls: list[dict[str, object]] = []
+        self.requeue_calls: list[dict[str, object]] = []
         self.active_user_calls: list[dict[str, object]] = []
         self.claims: list[dict[str, object]] = []
         self.completed: list[tuple[UUID, dict[str, object], str | None]] = []
@@ -105,6 +110,22 @@ class FakeDigestRepository:
     async def count_done_between(self, user_id: UUID, *, start: datetime, end: datetime) -> int:
         self.done_calls.append((user_id, start, end))
         return self.done_count
+
+    async def list_reports(
+        self, user_id: UUID, *, kind: str | None, from_date: date | None, limit: int
+    ) -> list[DigestReport]:
+        self.list_calls.append(
+            {"user_id": user_id, "kind": kind, "from_date": from_date, "limit": limit}
+        )
+        return self.listed
+
+    async def requeue_failed_report(
+        self, user_id: UUID, *, report_id: UUID, outbox_id: UUID
+    ) -> DigestReport | None:
+        self.requeue_calls.append(
+            {"user_id": user_id, "report_id": report_id, "outbox_id": outbox_id}
+        )
+        return self.requeued
 
     async def count_captured_between(self, user_id: UUID, *, start: datetime, end: datetime) -> int:
         self.captured_calls.append((user_id, start, end))

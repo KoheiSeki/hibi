@@ -387,3 +387,115 @@ async def test_list_done_titles_between_returns_the_titles_done_in_the_range_in_
     # 完了にした順。範囲の外、未完了、他人のシナリオは入らない
     assert titles == ["一番目", "二番目", "三番目"]
     assert limited == ["一番目", "二番目"]
+
+
+@pytest.mark.integration
+async def test_list_reports_is_owner_scoped_newest_first_and_filtered(
+    session: AsyncSession,
+) -> None:
+    owner_id, other_id = uuid4(), uuid4()
+    await _insert_auth_user(session, owner_id)
+    await _insert_auth_user(session, other_id)
+    repo = DigestRepository(session)
+    for kind, period_start in (
+        (DIGEST_KIND_DAILY, date(2026, 11, 9)),
+        (DIGEST_KIND_DAILY, date(2026, 11, 11)),
+        (DIGEST_KIND_DAILY, date(2026, 11, 10)),
+        (DIGEST_KIND_WEEKLY, date(2026, 11, 2)),
+    ):
+        await _claim(repo, owner_id, kind=kind, period_start=period_start)
+    await _claim(repo, other_id, period_start=date(2026, 11, 12))  # 別ユーザー
+
+    async def periods(**kwargs: object) -> list[tuple[str, date]]:
+        reports = await repo.list_reports(owner_id, **kwargs)  # type: ignore[arg-type]
+        return [(report.kind, report.period_start) for report in reports]
+
+    # 期間の日付の新しい順。別ユーザーの行は入らない
+    assert await periods(kind=None, from_date=None, limit=10) == [
+        (DIGEST_KIND_DAILY, date(2026, 11, 11)),
+        (DIGEST_KIND_DAILY, date(2026, 11, 10)),
+        (DIGEST_KIND_DAILY, date(2026, 11, 9)),
+        (DIGEST_KIND_WEEKLY, date(2026, 11, 2)),
+    ]
+    assert await periods(kind=DIGEST_KIND_WEEKLY, from_date=None, limit=10) == [
+        (DIGEST_KIND_WEEKLY, date(2026, 11, 2)),
+    ]
+    # from_date は下限で、その日を含む
+    assert await periods(kind=None, from_date=date(2026, 11, 10), limit=10) == [
+        (DIGEST_KIND_DAILY, date(2026, 11, 11)),
+        (DIGEST_KIND_DAILY, date(2026, 11, 10)),
+    ]
+    assert await periods(kind=None, from_date=None, limit=2) == [
+        (DIGEST_KIND_DAILY, date(2026, 11, 11)),
+        (DIGEST_KIND_DAILY, date(2026, 11, 10)),
+    ]
+
+
+@pytest.mark.integration
+async def test_requeue_failed_report_moves_it_to_pending_and_adds_one_outbox_event(
+    session: AsyncSession,
+) -> None:
+    user_id = uuid4()
+    report_id = uuid7()
+    outbox_id = uuid7()
+    await _insert_auth_user(session, user_id)
+    repo = DigestRepository(session)
+    await _claim(repo, user_id, report_id=report_id)
+    await repo.fail_report(report_id, error_code="generation_failed")
+    outbox_before = await _outbox_count(session, user_id)
+
+    report = await repo.requeue_failed_report(user_id, report_id=report_id, outbox_id=outbox_id)
+
+    assert report is not None
+    assert report.id == report_id
+    assert report.status == DIGEST_STATUS_PENDING
+    # 前回の失敗の理由は、もう当てはまらないので消す
+    assert report.error_code is None
+    assert await _outbox_count(session, user_id) == outbox_before + 1
+    event = await session.get(OutboxModel, outbox_id)
+    assert event is not None
+    assert event.aggregate_type == DIGEST_AGGREGATE_TYPE
+    assert event.event_type == DIGEST_GENERATION_REQUESTED
+    assert event.aggregate_id == report_id
+
+
+@pytest.mark.integration
+async def test_requeue_failed_report_leaves_a_report_that_is_not_failed(
+    session: AsyncSession,
+) -> None:
+    user_id = uuid4()
+    pending_id, ready_id = uuid7(), uuid7()
+    await _insert_auth_user(session, user_id)
+    repo = DigestRepository(session)
+    await _claim(repo, user_id, report_id=pending_id, period_start=date(2026, 11, 10))
+    await _claim(repo, user_id, report_id=ready_id, period_start=date(2026, 11, 11))
+    await repo.complete_report(ready_id, content=_CONTENT, summary_model=None)
+    outbox_before = await _outbox_count(session, user_id)
+
+    for report_id in (pending_id, ready_id):
+        requeued = await repo.requeue_failed_report(user_id, report_id=report_id, outbox_id=uuid7())
+        assert requeued is None
+
+    assert await _outbox_count(session, user_id) == outbox_before
+    ready = await repo.get_report(ready_id)
+    assert ready is not None
+    assert ready.status == DIGEST_STATUS_READY
+
+
+@pytest.mark.integration
+async def test_requeue_failed_report_does_not_touch_another_owner(session: AsyncSession) -> None:
+    owner_id, other_id = uuid4(), uuid4()
+    report_id = uuid7()
+    await _insert_auth_user(session, owner_id)
+    await _insert_auth_user(session, other_id)
+    repo = DigestRepository(session)
+    await _claim(repo, owner_id, report_id=report_id)
+    await repo.fail_report(report_id, error_code="generation_failed")
+
+    requeued = await repo.requeue_failed_report(other_id, report_id=report_id, outbox_id=uuid7())
+
+    assert requeued is None
+    report = await repo.get_report(report_id)
+    assert report is not None
+    assert report.status == DIGEST_STATUS_FAILED
+    assert await _outbox_count(session, other_id) == 0

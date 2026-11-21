@@ -19,15 +19,18 @@ from digest_helpers import (
     make_report,
     title_of,
 )
-from hibi.ai.review_summary import ReviewSummarizer
+from hibi.modules.digests.errors import DigestReportNotFoundError, DigestReportNotRetryableError
 
+from hibi.ai.review_summary import ReviewSummarizer
 from hibi.modules.captures.repository import CaptureRepository
 from hibi.modules.digests.repository import DigestRepository
 from hibi.modules.digests.service import DigestService
 from hibi.modules.digests.types import (
     DIGEST_KIND_DAILY,
     DIGEST_STATUS_FAILED,
+    DIGEST_STATUS_PENDING,
     DIGEST_STATUS_READY,
+    ListDigestReportsQuery,
 )
 
 
@@ -286,3 +289,69 @@ async def test_generate_report_does_nothing_for_a_missing_report() -> None:
 
     assert digests.completed == []
     assert digests.failed == []
+
+
+@pytest.mark.asyncio
+async def test_list_reports_reads_the_owner_rows_with_the_query() -> None:
+    listed = [make_report()]
+    digests = FakeDigestRepository(listed=listed)
+
+    reports = await _service(digests).list_reports(
+        ListDigestReportsQuery(
+            user_id=TOKYO_USER.user_id, kind="weekly", from_date=date(2026, 11, 1), limit=7
+        )
+    )
+
+    assert reports == listed
+    assert digests.list_calls == [
+        {
+            "user_id": TOKYO_USER.user_id,
+            "kind": "weekly",
+            "from_date": date(2026, 11, 1),
+            "limit": 7,
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_retry_report_returns_the_requeued_report() -> None:
+    requeued = make_report(status=DIGEST_STATUS_PENDING)
+    digests = FakeDigestRepository(requeued=requeued)
+
+    report = await _service(digests).retry_report(TOKYO_USER.user_id, requeued.id)
+
+    assert report == requeued
+    [call] = digests.requeue_calls
+    assert call["user_id"] == TOKYO_USER.user_id
+    assert call["report_id"] == requeued.id
+    # 新しい outbox の id は、行の id と別に発行する
+    assert isinstance(call["outbox_id"], UUID)
+    assert call["outbox_id"] != requeued.id
+
+
+@pytest.mark.asyncio
+async def test_retry_report_raises_not_found_for_a_missing_report() -> None:
+    digests = FakeDigestRepository()
+
+    with pytest.raises(DigestReportNotFoundError):
+        await _service(digests).retry_report(TOKYO_USER.user_id, UUID(int=100))
+
+
+@pytest.mark.asyncio
+async def test_retry_report_hides_a_foreign_report_as_not_found() -> None:
+    # 他人の行が failed でも、存在を明かさないため 404 にする
+    digests = FakeDigestRepository(report=make_report(status=DIGEST_STATUS_FAILED))
+
+    with pytest.raises(DigestReportNotFoundError):
+        await _service(digests).retry_report(NEW_YORK_USER.user_id, UUID(int=100))
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", [DIGEST_STATUS_PENDING, DIGEST_STATUS_READY])
+async def test_retry_report_raises_not_retryable_for_a_report_that_is_not_failed(
+    status: str,
+) -> None:
+    digests = FakeDigestRepository(report=make_report(status=status))
+
+    with pytest.raises(DigestReportNotRetryableError):
+        await _service(digests).retry_report(TOKYO_USER.user_id, UUID(int=100))
