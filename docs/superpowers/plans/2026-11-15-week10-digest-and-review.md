@@ -571,7 +571,7 @@ async def test_list_done_titles_between_returns_the_titles_done_in_the_range_in_
 Run: `just test-api` と、`supabase db reset` 後に `cd apps/api && uv run pytest -m integration tests/integration/test_digest_repository.py`
 Expected: FAIL(`hibi.ai.review_summary` などの module not found、`DigestService` が `summarizer` を取らない、repository のメソッドが無い)
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 **port / adapter**(`ai/`)
 
@@ -602,12 +602,12 @@ Expected: FAIL(`hibi.ai.review_summary` などの module not found、`DigestServ
 - `run_daily_digest`、`generate_digest_report_job`: `DigestService` に `summarizer=build_review_summarizer()` を渡す
 - `generate_digest_report_job._error_code`: `ReviewProviderError` なら `DIGEST_ERROR_REVIEW_PROVIDER`、それ以外は `DIGEST_ERROR_GENERATION_FAILED`
 
-- [ ] **Step 4: Run to verify they pass**
+- [x] **Step 4: Run to verify they pass**
 
 Run: `just test-api`、integration、`ruff check`、`ty check apps/api/src`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api/src apps/api/tests
@@ -621,66 +621,92 @@ git commit -m "feat(digests): summarize the previous week with a fake or LLM ada
 **Files:**
 
 - Create: `apps/api/src/hibi/modules/digests/{schemas,router,errors}.py`
-- Modify: `apps/api/src/hibi/modules/digests/{repository,service,types}.py`、`apps/api/src/hibi/api/main.py`
-- Test: `apps/api/tests/test_digest_api.py`(新規)、`apps/api/tests/test_digest_service.py`、`apps/api/tests/integration/test_digest_repository.py`
+- Modify: `apps/api/src/hibi/modules/digests/{repository,service,types}.py`、`apps/api/src/hibi/api/main.py`、`contracts/`、`packages/api-client/src/generated/`(`just openapi`)
+- Test: `apps/api/tests/test_digest_api.py`(新規)、`apps/api/tests/test_digest_service.py`、`apps/api/tests/digest_helpers.py`、`apps/api/tests/integration/test_digest_repository.py`
 
 **Interfaces:**
 
+- Consumes: Task 3 の `get_report`、Task 4 の `DigestService`
 - Produces:
-  - `ListDigestReportsQuery(user_id, kind: str | None, from_date: date | None, limit: int)`(`types.py`)
-  - `DigestReportNotFoundError`、`DigestReportNotRetryableError`(409)(`errors.py`)
+  - `ListDigestReportsQuery(user_id: UUID, kind: str | None, from_date: date | None, limit: int)`(`types.py`、dataclass)
+  - `DigestReportNotFoundError(report_id)`(404、`problem_type="digest-report-not-found"`)、`DigestReportNotRetryableError()`(409、`problem_type="digest-report-not-retryable"`)(`errors.py`。`captures/errors.py` と同じ `ApplicationError` の形)
   - `DigestRepository.list_reports(user_id, *, kind, from_date, limit) -> list[DigestReport]`
   - `DigestRepository.requeue_failed_report(user_id, *, report_id, outbox_id) -> DigestReport | None`
   - `DigestService.list_reports(query) -> list[DigestReport]`、`retry_report(user_id, report_id) -> DigestReport`
+  - `_get_digest_service`(`router.py`。テストが `dependency_overrides` で差し替える)
   - `GET /api/v1/digest-reports`(`operation_id="listDigestReports"`)、`POST /api/v1/digest-reports/{report_id}/retry`(`operation_id="retryDigestReport"`)
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
-`tests/test_digest_api.py`(`test_capture_api.py` と同じく fake service を差し込む)
+`tests/test_digest_api.py`(20 件。`test_capture_api.py` と同じく、`_get_digest_service` を fake service に差し替え、`get_principal` を差し替える)
 
 ```python
-def test_list_returns_the_data_array_newest_first_with_default_limit() -> None:
-    # GET /api/v1/digest-reports → 200、data が配列、service に limit=7
-def test_list_passes_kind_and_from_date() -> None: ...      # ?kind=weekly&fromDate=2026-11-01
-@pytest.mark.parametrize("params", [{"limit": "0"}, {"limit": "31"}, {"kind": "bogus"}, {"fromDate": "x"}])
-def test_list_rejects_invalid_parameters(params) -> None: ...   # 422、errors[0].pointer が該当の項目
+def test_digest_endpoints_require_a_token() -> None: ...   # 2 つとも 401、type が /unauthorized
+def test_list_returns_the_data_array_in_the_service_order_with_the_default_limit() -> None:
+    # 200、data は service の並びのまま(router は並べ替えない)。クエリは kind=None、from_date=None、limit=7
+def test_list_passes_kind_from_date_and_limit() -> None: ...   # ?kind=weekly&fromDate=2026-11-01&limit=30
+def test_list_returns_an_empty_array_without_reports() -> None: ...
 def test_list_does_not_return_other_owners() -> None: ...
-def test_retry_returns_202_for_a_failed_report() -> None: ...
-def test_retry_returns_409_for_a_report_that_is_not_failed() -> None: ...   # type が /digest-report-not-retryable
-def test_retry_returns_404_for_a_missing_or_foreign_report() -> None: ...   # type が /digest-report-not-found
-def test_digest_endpoints_require_a_token() -> None: ...    # 401
-def test_response_content_is_passed_through_as_json() -> None: ...   # content の camelCase のキーがそのまま出る
+def test_list_rejects_invalid_parameters(params, pointer) -> None: ...
+    # limit の 0、31、abc は /limit、kind=monthly は /kind、fromDate=not-a-date は /fromDate。422、type が /validation-error
+def test_list_serializes_a_ready_report_in_camel_case_and_passes_the_content_through() -> None:
+    # 項目は id、kind、periodStart、timezone、status、content、contentVersion、errorCode、generatedAt の 9 つだけ
+def test_list_returns_null_content_and_the_error_code_for_a_failed_report() -> None: ...
+def test_retry_returns_202_and_the_pending_report() -> None: ...   # errorCode は null
+def test_retry_returns_409_for_a_report_that_is_not_failed(report_status) -> None: ...   # pending と ready。/digest-report-not-retryable
+def test_retry_hides_a_foreign_or_missing_report_as_not_found(owner_id) -> None: ...      # /digest-report-not-found
+def test_retry_rejects_a_malformed_report_id() -> None: ...   # 422、pointer が /report_id
 ```
 
-`tests/integration/test_digest_repository.py` に追加する。
+`tests/test_digest_service.py` に追加する(6 件。`digest_helpers.FakeDigestRepository` に `listed`、`requeued`、`list_reports`、`requeue_failed_report` を足す)
 
 ```python
-@pytest.mark.integration
-async def test_list_reports_is_owner_scoped_newest_first_and_filtered(session) -> None: ...
-@pytest.mark.integration
-async def test_requeue_failed_report_moves_it_to_pending_and_adds_one_outbox_event(session) -> None:
-    # failed → pending。outbox が 1 件増える。ready に対しては None。別ユーザーは None
+async def test_list_reports_reads_the_owner_rows_with_the_query() -> None: ...
+async def test_retry_report_returns_the_requeued_report() -> None: ...   # outbox_id は行の id と別に発行する
+async def test_retry_report_raises_not_found_for_a_missing_report() -> None: ...
+async def test_retry_report_hides_a_foreign_report_as_not_found() -> None: ...   # 他人の failed の行も 404
+async def test_retry_report_raises_not_retryable_for_a_report_that_is_not_failed(status) -> None: ...
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+`tests/integration/test_digest_repository.py` に追加する(4 件)
 
-Run: `uv run --project apps/api pytest apps/api/tests/test_digest_api.py -v`
-Expected: FAIL(module not found)
+```python
+async def test_list_reports_is_owner_scoped_newest_first_and_filtered(session) -> None:
+    # period_start の降順。kind で絞れる。from_date は下限でその日を含む。limit で切る。別ユーザーは入らない
+async def test_requeue_failed_report_moves_it_to_pending_and_adds_one_outbox_event(session) -> None:
+    # failed → pending、error_code は null、digest の outbox が 1 件増える
+async def test_requeue_failed_report_leaves_a_report_that_is_not_failed(session) -> None: ...   # pending と ready は None、outbox は増えない
+async def test_requeue_failed_report_does_not_touch_another_owner(session) -> None: ...
+```
+
+- [x] **Step 2: Run to verify they fail**
+
+Run: `just test-api` と、`cd apps/api && uv run pytest -m integration tests/integration/test_digest_repository.py`
+Expected: FAIL(`hibi.modules.digests.errors` が無い、repository のメソッドが無い)
 
 - [ ] **Step 3: Implement**
 
-**repository / service**
+**errors / types**
 
-- `DigestRepository.list_reports(user_id, *, kind, from_date, limit)`: 所有者の行を `period_start` の降順で読む。`kind` と `from_date`(`period_start` の下限)は任意
-- `DigestRepository.requeue_failed_report(user_id, *, report_id, outbox_id)`: `status = 'failed'` と所有者を条件に `pending` へ戻し、同じ transaction で outbox を足す。対象でなければ None
-- `DigestService.list_reports(query)`: そのまま読む
-- `DigestService.retry_report(user_id, report_id)`: `requeue_failed_report` が None のとき、行が無い、または別ユーザーなら `DigestReportNotFoundError`、`failed` でなければ `DigestReportNotRetryableError`
+- `errors.py`: `DigestReportNotFoundError`(404。`report_id` を受け取る)、`DigestReportNotRetryableError`(409)。`problem_type` は `digest-report-not-found` と `digest-report-not-retryable`
+- `types.py`: `ListDigestReportsQuery`(dataclass)
+
+**repository**
+
+- `DigestRepository.list_reports(user_id, *, kind, from_date, limit)`: 所有者の行を `period_start` の降順で読む。`kind` と `from_date`(`period_start` の下限で、その日を含む)は None なら条件にしない
+- `DigestRepository.requeue_failed_report(user_id, *, report_id, outbox_id)`: `UPDATE ... WHERE id AND user_id AND status = 'failed'` の 1 回で `pending` に戻し、`error_code` を null、`updated_at` を now にする。戻せたときだけ、同じ transaction で digest の outbox(`processing_generation=1`)を足して、行を返す。対象でなければ None
+
+**service**
+
+- `DigestService.list_reports(query)`: そのまま repository に渡す
+- `DigestService.retry_report(user_id, report_id)`: `uuid7()` で outbox の id を発行して `requeue_failed_report` を呼ぶ。None なら `get_report` で読み直し、行が無いか別ユーザーなら `DigestReportNotFoundError`(他人の行の存在を明かさない)、それ以外は `DigestReportNotRetryableError`
 
 **schema / router**(`schemas.py`、`router.py`、`api/main.py`)
 
-- `DigestReportResponse`: `id`、`kind`、`periodStart`、`timezone`、`status`、`content`(辞書)、`contentVersion`、`errorCode`、`generatedAt`。docstring は API の利用者向けで、`content` が `ready` のときだけ入ることを書く
-- `list_digest_reports`(`GET /digest-reports`): `limit` は `Annotated[int, Query(ge=1, le=30)] = 7`、`kind` は `daily` か `weekly`、`fromDate` は `date`。`/{report_id}` より前に登録する
-- `retry_digest_report`(`POST /digest-reports/{report_id}/retry`): 成功は 202。docstring に、`failed` 以外は 409、他人の行は 404 を書く
+- `DigestReportResponse`: `id`、`kind`、`periodStart`、`timezone`、`status`、`content`(辞書)、`contentVersion`、`errorCode`、`generatedAt` の 9 つ。`summaryModel` と `createdAt` は出さない(モデル名は内部の情報で、画面でも使わない)。docstring は API の利用者向けで、`content` と `generatedAt` は `ready` のときだけ、`errorCode` は `failed` のときだけ入ることを書く
+- `_get_digest_service`: `DigestRepository`、`CaptureRepository`、`build_review_summarizer()` から `DigestService` を組み立てる
+- `list_digest_reports`(`GET /digest-reports`): `limit` は `Annotated[int, Query(ge=1, le=30)] = 7`、`kind` は `Literal["daily", "weekly"] | None`、`from_date` は `Query(alias="fromDate")` の `date | None`。成功は 200 で `ApiResponse[list[DigestReportResponse]]`
+- `retry_digest_report`(`POST /digest-reports/{report_id}/retry`): 成功は 202。1 件を読む endpoint が無いので `Location` は付けない。docstring に、`failed` 以外は 409、他人の行と無い行は 404 を書く
 - `api/main.py`: `digests_router` を `captures_router` と同じ形で登録する
 
 **contract**
@@ -689,7 +715,7 @@ Expected: FAIL(module not found)
 
 - [ ] **Step 4: Run to verify they pass**
 
-Run: `uv run --project apps/api pytest apps/api/tests -m 'not integration' -q`、`ruff check`、`ty check apps/api/src`、`just openapi`
+Run: `just test-api`、integration、`ruff check`、`ty check apps/api/src`、`just openapi`
 Expected: PASS。`listDigestReports` と `retryDigestReport` が `sdk.gen.ts` に出る
 
 - [ ] **Step 5: Commit**
