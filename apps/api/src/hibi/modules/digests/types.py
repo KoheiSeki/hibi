@@ -63,3 +63,23 @@ class ActiveUser:
 
     user_id: UUID
     timezone: str
+
+
+@dataclass(frozen=True, slots=True)
+class ListDigestReportsQuery:
+    """ダイジェストと週次レビューの一覧の入力。
+
+    検証は router が済ませた値を受け取る。service と repository は、値の範囲を
+    もう一度確かめない。
+
+    Attributes:
+        user_id: 検証済みの所有者。この利用者の行だけを読む。
+        kind: daily か weekly。None なら両方を読む。
+        from_date: 期間の日付の下限で、その日を含む。None なら下限を付けない。
+        limit: 返す最大件数。router が 1 以上 30 以下で検証済み。
+    """
+
+    user_id: UUID
+    kind: str | None
+    from_date: date | None
+    limit: int
