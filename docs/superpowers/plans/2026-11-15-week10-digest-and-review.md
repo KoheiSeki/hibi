@@ -498,7 +498,7 @@ git commit -m "feat(digests): generate the daily digest from a quarter-hour cron
 **Files:**
 
 - Create: `apps/api/src/hibi/ai/review_summary.py`、`fake_review_summary.py`、`llm_review_summary.py`
-- Modify: `apps/api/src/hibi/ai/classifier_factory.py`、`apps/api/src/hibi/modules/digests/{content,repository,service}.py`、`apps/api/src/hibi/jobs/{run_daily_digest,generate_digest_report_job}.py`
+- Modify: `apps/api/src/hibi/ai/factory.py`、`apps/api/src/hibi/modules/digests/{content,repository,service}.py`、`apps/api/src/hibi/jobs/{run_daily_digest,generate_digest_report_job}.py`
 - Test: `apps/api/tests/test_digest_weekly.py`(新規)、`apps/api/tests/test_llm_review_summary.py`(新規)、`apps/api/tests/test_fake_review_summary.py`(新規)、`apps/api/tests/digest_helpers.py`(新規)、`apps/api/tests/test_digest_content.py`、`apps/api/tests/test_classifier_factory.py`、`apps/api/tests/integration/test_digest_repository.py`、Task 4 の `test_digest_service.py`、`test_run_daily_digest.py`、`test_generate_digest_report_job.py`
 
 **Interfaces:**
@@ -578,7 +578,7 @@ Expected: FAIL(`hibi.ai.review_summary` などの module not found、`DigestServ
 - `review_summary.py`: `WeeklyStats` と `WeeklyReviewInput`(dataclass。本文の項目を持たせず、LLM に渡せないようにする)、`ReviewSummarizer`(Protocol。`model_name` と `summarize_week`)、`ReviewProviderError`(`ClarificationProviderError` と同じ形)、`REVIEW_SUMMARY_MODEL_FAKE`
 - `fake_review_summary.py`: `FakeReviewSummarizer.summarize_week`: `record_llm_call()` を呼び、集計から決まる固定の短文を返す。network しない。`model_name` は `REVIEW_SUMMARY_MODEL_FAKE`
 - `llm_review_summary.py`: `SdkReviewClient.complete_json(*, review)`: `AsyncOpenAI`(`max_retries=0`)で `json_object` モード。system プロンプトに `JSON` の語と `{"summary":"..."}` の形、500 文字以内を書く。user には集計と題だけを入れる。timeout、接続失敗、429、5xx は `ReviewProviderError`。`LlmReviewSummarizer`: `record_llm_call()` を呼び、JSON の `summary` を取り出す。不正なら `""` を返す(定型文に直すのは service。`ai/` が `modules/digests/` を import しないため)。`model_name` は `open_ai_model`
-- `classifier_factory.py`: `build_review_summarizer()`: `open_ai_api_key` が空か空白なら fake、あれば `LlmReviewSummarizer`
+- `factory.py`: `build_review_summarizer()`: `open_ai_api_key` が空か空白なら fake、あれば `LlmReviewSummarizer`
 
 **domain**(`digests/content.py`)
 
