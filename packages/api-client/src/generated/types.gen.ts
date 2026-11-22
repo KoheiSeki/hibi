@@ -23,6 +23,13 @@ export type ApiResponseCaptureResponse = {
 };
 
 /**
+ * ApiResponse[DigestReportResponse]
+ */
+export type ApiResponseDigestReportResponse = {
+  data: DigestReportResponse;
+};
+
+/**
  * ApiResponse[EchoResponse]
  */
 export type ApiResponseEchoResponse = {
@@ -58,6 +65,16 @@ export type ApiResponseListCaptureResponse = {
    * Data
    */
   data: Array<CaptureResponse>;
+};
+
+/**
+ * ApiResponse[list[DigestReportResponse]]
+ */
+export type ApiResponseListDigestReportResponse = {
+  /**
+   * Data
+   */
+  data: Array<DigestReportResponse>;
 };
 
 /**
@@ -152,6 +169,63 @@ export type CursorMeta = {
    * Nextcursor
    */
   nextCursor: string | null;
+};
+
+/**
+ * DigestReportResponse
+ *
+ * 朝のダイジェスト、または週次レビュー 1 件。
+ *
+ * kind は daily か weekly。periodStart は、利用者の timezone での暦日で、daily は
+ * その日、weekly は対象の週の月曜。timezone は、作ったときに使った IANA 名。
+ *
+ * status は pending、ready、failed のいずれか。content と generatedAt は、ready の
+ * ときだけ入り、pending と failed では null。errorCode は、failed のときだけ入る。
+ * 値は generation_failed か review_provider_error で、知らない値は generation_failed
+ * と同じに扱う。failed の行は、retry で pending に戻せる。
+ *
+ * content の形は contentVersion で決まる。daily-digest-v1 は items、overdueCount、
+ * dueTodayCount、doneYesterdayCount を、weekly-review-v1 は stats と summary を持つ。
+ */
+export type DigestReportResponse = {
+  /**
+   * Content
+   */
+  content?: {
+    [key: string]: unknown;
+  } | null;
+  /**
+   * Contentversion
+   */
+  contentVersion: string;
+  /**
+   * Errorcode
+   */
+  errorCode?: string | null;
+  /**
+   * Generatedat
+   */
+  generatedAt?: string | null;
+  /**
+   * Id
+   */
+  id: string;
+  /**
+   * Kind
+   */
+  kind: "daily" | "weekly";
+  /**
+   * Periodstart
+   */
+  periodStart: string;
+  /**
+   * Status
+   */
+  status: "pending" | "ready" | "failed";
+  /**
+   * Timezone
+   */
+  timezone: string;
 };
 
 /**
@@ -811,6 +885,102 @@ export type MarkCaptureScenarioDoneResponses = {
 
 export type MarkCaptureScenarioDoneResponse =
   MarkCaptureScenarioDoneResponses[keyof MarkCaptureScenarioDoneResponses];
+
+export type ListDigestReportsData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Kind
+     */
+    kind?: "daily" | "weekly" | null;
+    /**
+     * Fromdate
+     */
+    fromDate?: string | null;
+    /**
+     * Limit
+     */
+    limit?: number;
+  };
+  url: "/api/v1/digest-reports";
+};
+
+export type ListDigestReportsErrors = {
+  /**
+   * Authentication failed.
+   */
+  401: ProblemDetails;
+  /**
+   * Request validation failed.
+   */
+  422: ProblemDetails;
+  /**
+   * An unexpected server error occurred.
+   */
+  500: ProblemDetails;
+};
+
+export type ListDigestReportsError =
+  ListDigestReportsErrors[keyof ListDigestReportsErrors];
+
+export type ListDigestReportsResponses = {
+  /**
+   * Successful Response
+   */
+  200: ApiResponseListDigestReportResponse;
+};
+
+export type ListDigestReportsResponse =
+  ListDigestReportsResponses[keyof ListDigestReportsResponses];
+
+export type RetryDigestReportData = {
+  body?: never;
+  path: {
+    /**
+     * Report Id
+     */
+    report_id: string;
+  };
+  query?: never;
+  url: "/api/v1/digest-reports/{report_id}/retry";
+};
+
+export type RetryDigestReportErrors = {
+  /**
+   * Authentication failed.
+   */
+  401: ProblemDetails;
+  /**
+   * The requested resource was not found.
+   */
+  404: ProblemDetails;
+  /**
+   * Conflict.
+   */
+  409: ProblemDetails;
+  /**
+   * Request validation failed.
+   */
+  422: ProblemDetails;
+  /**
+   * An unexpected server error occurred.
+   */
+  500: ProblemDetails;
+};
+
+export type RetryDigestReportError =
+  RetryDigestReportErrors[keyof RetryDigestReportErrors];
+
+export type RetryDigestReportResponses = {
+  /**
+   * Successful Response
+   */
+  202: ApiResponseDigestReportResponse;
+};
+
+export type RetryDigestReportResponse =
+  RetryDigestReportResponses[keyof RetryDigestReportResponses];
 
 export type EchoMessageData = {
   body: EchoRequest;

@@ -36,6 +36,9 @@ import type {
   ListCapturesData,
   ListCapturesErrors,
   ListCapturesResponses,
+  ListDigestReportsData,
+  ListDigestReportsErrors,
+  ListDigestReportsResponses,
   ListTodayCapturesData,
   ListTodayCapturesErrors,
   ListTodayCapturesResponses,
@@ -45,6 +48,9 @@ import type {
   RetryCaptureData,
   RetryCaptureErrors,
   RetryCaptureResponses,
+  RetryDigestReportData,
+  RetryDigestReportErrors,
+  RetryDigestReportResponses,
   SearchCapturesData,
   SearchCapturesErrors,
   SearchCapturesResponses,
@@ -338,6 +344,65 @@ export const markCaptureScenarioDone = <ThrowOnError extends boolean = false>(
   >({
     security: [{ scheme: "bearer", type: "http" }],
     url: "/api/v1/captures/{capture_id}/scenario/done",
+    ...options,
+  });
+
+/**
+ * List Digest Reports
+ *
+ * 自分の朝のダイジェストと週次レビューを、期間の日付の新しい順に返す。
+ *
+ * kind は daily か weekly で、未指定なら両方。fromDate は periodStart の下限で、
+ * その日を含む(YYYY-MM-DD)。作った日ではなく、期間の日付で絞る。limit は 1 以上
+ * 30 以下で、未指定は 7。範囲外や不正な値は 422。
+ *
+ * 作っている途中(pending)と、失敗した行(failed)も返す。対象が無ければ空の配列を
+ * 返し、404 にはしない。
+ */
+export const listDigestReports = <ThrowOnError extends boolean = false>(
+  options?: Options<ListDigestReportsData, ThrowOnError>,
+): RequestResult<
+  ListDigestReportsResponses,
+  ListDigestReportsErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListDigestReportsResponses,
+    ListDigestReportsErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/api/v1/digest-reports",
+    ...options,
+  });
+
+/**
+ * Retry Digest Report
+ *
+ * 失敗したダイジェストか週次レビューを、もう一度作るよう予約する。
+ *
+ * status が failed の行だけを pending に戻し、戻した行を 202 で返す。このとき
+ * content と errorCode は null。中身は後で作られるので、ready になったかは、
+ * 一覧(listDigestReports)を読み直して確かめる。
+ *
+ * failed でない行(pending か ready)は 409。同じ行に retry が続けて届いたときも、
+ * 2 回目からは pending なので 409 になる。自分の行でない、または無ければ 404。
+ * reportId が UUID でなければ 422。
+ */
+export const retryDigestReport = <ThrowOnError extends boolean = false>(
+  options: Options<RetryDigestReportData, ThrowOnError>,
+): RequestResult<
+  RetryDigestReportResponses,
+  RetryDigestReportErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    RetryDigestReportResponses,
+    RetryDigestReportErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/api/v1/digest-reports/{report_id}/retry",
     ...options,
   });
 
