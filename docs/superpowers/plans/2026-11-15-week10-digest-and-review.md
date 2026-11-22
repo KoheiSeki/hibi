@@ -686,7 +686,7 @@ async def test_requeue_failed_report_does_not_touch_another_owner(session) -> No
 Run: `just test-api` と、`cd apps/api && uv run pytest -m integration tests/integration/test_digest_repository.py`
 Expected: FAIL(`hibi.modules.digests.errors` が無い、repository のメソッドが無い)
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 **errors / types**
 
@@ -704,7 +704,7 @@ Expected: FAIL(`hibi.modules.digests.errors` が無い、repository のメソッ
 - `DigestService.list_reports(query)`: そのまま repository に渡す
 - `DigestService.retry_report(user_id, *, report_id)`: `uuid7()` で outbox の id を発行して `requeue_failed_report` を呼ぶ。None なら `get_report` で読み直し、行が無いか別ユーザーなら `DigestReportNotFoundError`(他人の行の存在を明かさない)、それ以外は `DigestReportNotRetryableError`
 
-**schema / router**(`schemas.py`、`router.py`、`api/main.py`)
+schema / router(`schemas.py`、`router.py`、`api/main.py`)
 
 - `DigestReportResponse`: `id`、`kind`(`DigestKind`)、`periodStart`、`timezone`、`status`(`DigestStatus`)、`content`(辞書)、`contentVersion`、`errorCode`、`generatedAt` の 9 つ。Python のフィールド名は `CaptureResponse` と同じく snake_case(`period_start` など)で書き、`ApiModel` の `to_camel` で JSON の camelCase にする。`summaryModel` と `createdAt` は出さない(モデル名は内部の情報で、画面でも使わない)。docstring は API の利用者向けで、`content` と `generatedAt` は `ready` のときだけ、`errorCode` は `failed` のときだけ入ることを書く
 - `_get_digest_service`: `DigestRepository`、`CaptureRepository`、`build_review_summarizer()` から `DigestService` を組み立てる
@@ -716,12 +716,12 @@ Expected: FAIL(`hibi.modules.digests.errors` が無い、repository のメソッ
 
 - `just openapi` で、OpenAPI と client を同じ変更で再生成する
 
-- [ ] **Step 4: Run to verify they pass**
+- [x] **Step 4: Run to verify they pass**
 
 Run: `just test-api`、integration、`ruff check`、`ty check apps/api/src`、`just openapi`
 Expected: PASS。`listDigestReports` と `retryDigestReport` が `sdk.gen.ts` に出る
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api contracts packages/api-client
@@ -759,7 +759,7 @@ Task 3 で、outbox は Capture とダイジェストが共有する仕組みに
 Run: `just test-api`、`cd apps/api && uv run pytest -m integration tests/integration/test_capture_repository.py tests/integration/test_digest_repository.py`、`ruff check`、`ty check apps/api/src`
 Expected: 移す前と同じ結果(Task 6 の RED のテストだけが落ちる)
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git commit -m "refactor(outbox): move the outbox out of the captures module"
