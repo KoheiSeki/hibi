@@ -21,6 +21,7 @@ from hibi.core.config import get_settings
 from hibi.core.logging import configure_logging
 from hibi.db.engine import dispose_engine
 from hibi.modules.captures.router import router as captures_router
+from hibi.modules.digests.router import router as digests_router
 from hibi.modules.profiles.service import get_owned_resource
 
 ResourceLookup = Callable[[UUID], str]
@@ -102,6 +103,7 @@ def create_app(resource_lookup: ResourceLookup = _default_resource_lookup) -> Fa
 
     register_exception_handlers(app)
     app.include_router(captures_router, prefix="/api/v1")
+    app.include_router(digests_router, prefix="/api/v1")
     return app
 
 
