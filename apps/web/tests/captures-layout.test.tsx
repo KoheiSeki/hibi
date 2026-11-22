@@ -9,7 +9,7 @@ vi.mock("next/font/google", () => ({
 import CapturesLayout from "@/app/captures/layout";
 
 describe("CapturesLayout", () => {
-	it("links the home, today and account pages in the header", () => {
+	it("links the home, today, digest and account pages in the header", () => {
 		const html = renderToStaticMarkup(
 			<CapturesLayout>
 				<div>child</div>
@@ -19,6 +19,8 @@ describe("CapturesLayout", () => {
 		expect(html).toContain('href="/captures"');
 		expect(html).toContain('href="/captures/today"');
 		expect(html).toContain("今日");
+		expect(html).toContain('href="/captures/digest"');
+		expect(html).toContain("ダイジェスト");
 		expect(html).toContain('href="/account"');
 		expect(html).toContain("child");
 	});

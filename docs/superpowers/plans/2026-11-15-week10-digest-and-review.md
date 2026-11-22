@@ -897,83 +897,108 @@ git commit -m "feat(jobs): recover stalled captures and pending digest reports"
 
 **Interfaces:**
 
-- Consumes: Task 6 の生成関数 `listDigestReports`、`retryDigestReport`
+- Consumes: Task 6 の生成関数 `listDigestReports`、`retryDigestReport`、型 `DigestReportResponse`
 - Produces:
-  - `listDigestReportsFromApi({ kind, limit }?)`: `Promise<ApiResult<DigestReportResponse[]>>`
+  - `listDigestReportsFromApi({ kind, limit }?)`: `Promise<ApiResult<DigestReportResponse[]>>`。省いた値は `undefined` のまま渡し、API の既定に任せる
   - `retryDigestReportFromApi(reportId)`: `Promise<ApiResult<DigestReportResponse>>`
-  - `retryDigestReportAction(reportId)`、`getDigestReportsAction()`(polling 用): `Promise<ActionState<...>>`
+  - `retryDigestReportAction(reportId)`: `Promise<ActionState<DigestReportResponse>>`。成功の `message` は「もう一度作っています。」
+  - `getLatestDigestReportAction(kind)`(polling 用): `Promise<ActionState<DigestReportResponse | null>>`。`{ kind, limit: 1 }` で、その種類の最新を読む。1 件を読む API が無いので、pending の行を、その種類の最新として読み直す
   - `DigestSection()`(server)、`DigestReportCard({ report })`(client)、`DigestEmptyState()`
+  - `useDigestPolling`(`DigestReportCard` の中で使う)
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
-`digest-api.test.ts`(`capture-api.test.ts` と同じ mock の形。`@hibi/api-client` に `listDigestReports`、`retryDigestReport` を足す)
+`digest-api.test.ts`(`capture-api.test.ts` と同じ mock の形)
 
 ```ts
-it("passes kind and limit and unwraps the data array", async () => { /* query: { kind: "daily", limit: 2 } */ });
-it("does not call the API without an authenticated context", async () => { /* … */ });
-it("retries a report by id", async () => { /* path: { report_id: "report-1" } */ });
+it("passes kind and limit and unwraps the data array", ...);     // query: { kind: "daily", limit: 1 }
+it("leaves kind and limit to the API defaults when omitted", ...); // query: { kind: undefined, limit: undefined }
+it("does not call the API without an authenticated context", ...); // 一覧と retry の両方
+it("retries a report by id and treats 202 as success", ...);       // path: { report_id: "report-1" }
 ```
 
 `digest-actions.test.ts`
 
 ```ts
-it("retryDigestReportAction revalidates /captures/digest and returns the report", async () => { /* … */ });
-it("rejects an empty id without calling the API", async () => { /* … */ });
-it("redirects unauthenticated failures to login", async () => { /* … */ });
+// retryDigestReportAction
+it("revalidates /captures/digest and returns the report", ...);  // message: "もう一度作っています。"
+it("rejects an empty id without calling the API", ...);          // message: "もう一度作れませんでした。"
+it("keeps a missing report as an in-page error", ...);           // 404 で notFound() を呼ばない
+it("redirects unauthenticated failures to login", ...);
+// getLatestDigestReportAction
+it("reads the newest report of the kind without revalidating", ...); // { kind: "daily", limit: 1 }
+it("returns null when the kind has no report", ...);
+it("returns an action error when polling fails", ...);
+it("redirects unauthenticated failures to login", ...);
 ```
 
-`digest-section.test.tsx`(`today-section.test.tsx` と同じ形)
+`digest-section.test.tsx`(`today-section.test.tsx` と同じ形。`DigestReportCard` は本物を static に描く)
 
 ```tsx
-it("renders the latest daily digest with its items and counts", async () => {
-	// 「起こして」「牛乳」、「期限が過ぎた 1 件」「昨日 3 件完了」
-});
-it("renders the latest weekly review with its summary and stats", async () => { /* … */ });
-it("renders the empty state when there are no reports", async () => { /* 「ダイジェストは毎朝 7 時に作ります」 */ });
-it("redirects to /login when unauthenticated", async () => { /* … */ });
-it("renders the API error message for other failures", async () => { /* 「通信に失敗しました」 */ });
+it("reads the newest report of each kind", ...);
+// { kind: "daily", limit: 1 } と { kind: "weekly", limit: 1 } の 2 回。1 回の一覧では、
+// 毎日の daily に押されて、periodStart が最大 13 日前の weekly が入らない
+it("renders the latest daily digest with its items and counts", ...);
+// 「朝のダイジェスト」、「起こして」「09:00」、href="/captures/capture-1"、「牛乳」「期限なし」、
+// 「期限が過ぎた 1 件」「今日が期限 2 件」「昨日 3 件完了」
+it("renders the latest weekly review with its summary and stats", ...);
+// 「週次レビュー」、要約、「記録 12 件」「完了 8 件」「未完了 4 件」「期限超過 1 件」
+it("puts the daily digest before the weekly review", ...);
+it("renders the empty state when there are no reports", ...);  // 「ダイジェストは毎朝 7 時に作ります」
+it("redirects to /login when unauthenticated", ...);
+it("renders the API error message for other failures", ...);   // 「通信に失敗しました」
 ```
 
 `digest-report-card.test.tsx`(jsdom)
 
 ```tsx
-it("shows 作っています for a pending report", () => { /* … */ });
-it("shows the reason and a retry button for a failed report", () => { /* … */ });
-it("calls retryDigestReportAction and shows 作っています after success", async () => { /* … */ });
-it("shows the failure in an alert and keeps the retry button", async () => { /* … */ });
+it("shows 作っています for a pending report", ...);                 // ボタンは出さない
+it("shows the reason and a retry button for a failed report", ...); // 「作れませんでした。」
+it("explains a provider failure of the weekly review", ...);
+// review_provider_error →「要約のサービスにつながらず、作れませんでした。」
+it("treats an unknown error code as generation_failed", ...);       // 「作れませんでした。」
+it("calls retryDigestReportAction and shows 作っています after success", ...);
+it("shows the failure in an alert and keeps the retry button", ...);
+it("polls a pending report every three seconds until it is ready", ...);
+// 3 秒後に getLatestDigestReportAction("daily")、ready の中身に替わり、その後は読まない
+it("does not poll a ready report", ...);
+it("stops polling and shows the message when polling fails", ...);
 ```
 
-`captures-digest-page.test.tsx`: `requireUser` を 1 回呼び、`DigestSection` の出力を出す。`captures-layout.test.tsx`: ヘッダーに `/captures/digest`(文言は「ダイジェスト」)を足したリンクを確かめる。
+`captures-digest-page.test.tsx`: `requireUser` を 1 回呼び、見出し「ダイジェスト」と `DigestSection` の出力を出す。`captures-layout.test.tsx`: ヘッダーに `/captures/digest`(文言は「ダイジェスト」)のリンクがある。
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `corepack pnpm --filter web exec vitest run`
-Expected: FAIL(module not found)
+Expected: FAIL(新しい 5 ファイルは module not found、layout はリンクが無く assert で)
 
 - [ ] **Step 3: Implement**
 
 **API wrapper**(`lib/api/digest.ts`)
 
-- `listDigestReportsFromApi({ kind, limit }?)`: 生成関数 `listDigestReports` を呼び、`DigestReportResponse[]` を返す。`getCaptureFromApi` と同じ形
-- `retryDigestReportFromApi(reportId)`: 生成関数 `retryDigestReport` を呼ぶ
+- `listDigestReportsFromApi({ kind, limit }?)`: 生成関数 `listDigestReports` を `query: { kind, limit }` で呼ぶ。`listTodayCapturesFromApi` と同じ形
+- `retryDigestReportFromApi(reportId)`: 生成関数 `retryDigestReport` を `path: { report_id }` で呼ぶ
 - どれも日本語の JSDoc を付ける
 
 **action**(`features/digest/actions.ts`)
 
-- `retryDigestReportAction(reportId)`: 空の id はエラー。成功したら `/captures/digest` を revalidate。404 は画面全体を 404 にせず、エラーとして返す。未認証は `/login`
-- `getDigestReportsAction()`: polling 用に、最新の一覧を返す
+- `retryDigestReportAction(reportId)`: 空の id はエラー。成功したら `/captures/digest` を revalidate。404 は画面全体を 404 にせず、`toActionErrorState` でエラーとして返す。未認証は `/login`
+- `getLatestDigestReportAction(kind)`: `listDigestReportsFromApi({ kind, limit: 1 })` の最初の行か `null` を返す。revalidate しない
 
 **component**(`features/digest/`)
 
-- `DigestSection()`(server): `daily` と `weekly` の最新を、1 回の `listDigestReportsFromApi` で読み、種類ごとに最初の行を選ぶ。未認証は `/login`、失敗は `ApiErrorMessage`、0 件は `DigestEmptyState`
-- `DigestReportCard({ report })`(client): `status` で出し分ける。`ready` は、daily なら items(title、期限は `formatJstDueLabel`)と、期限超過、今日が期限、昨日の完了の件数。weekly なら集計と要約。`pending` は「作っています」。`failed` は理由の一言と「もう一度作る」。ボタンは `useTransition` で `retryDigestReportAction` を呼ぶ。items の行は、押すと詳細へ行く
-- `DigestEmptyState()`: 「ダイジェストは毎朝 7 時に作ります」。糸の最初の節の見た目
-- `useDigestPolling`(`use-digest-polling.ts`): `pending` の行があるときだけ、3 秒おきに `getDigestReportsAction` を呼ぶ。`useCapturePolling` と同じ流儀で、失敗したら止める
+- `DigestSection()`(server): `daily` と `weekly` を、`Promise.all` で `limit: 1` ずつ読む。どちらかが失敗したら、未認証は `/login`、それ以外は `ApiErrorMessage`。両方 0 件なら `DigestEmptyState`。あれば daily、weekly の順に `DigestReportCard` を並べる
+- `DigestReportCard({ report })`(client): 見出しは daily が「朝のダイジェスト」、weekly が「週次レビュー」。`status` で出し分ける
+  - `ready`: daily は items(title、期限は `formatJstDueLabel`、無ければ「期限なし」。行は `/captures/{captureId}` へのリンク)と、「期限が過ぎた N 件」「今日が期限 N 件」「昨日 N 件完了」。weekly は要約と、「記録 N 件」「完了 N 件」「未完了 N 件」「期限超過 N 件」
+  - `pending`: 「作っています」
+  - `failed`: 理由の一言と「もう一度作る」。`review_provider_error` は「要約のサービスにつながらず、作れませんでした。」、それ以外(`generation_failed` と知らない値)は「作れませんでした。」。ボタンは `useTransition` で `retryDigestReportAction` を呼び、成功したら返った行(pending)に替える。失敗は `role="alert"` に出し、ボタンを残す
+- `useDigestPolling`(`use-digest-polling.ts`): カードの行が `pending` のときだけ、3 秒おきに `getLatestDigestReportAction(kind)` を呼び、同じ id の行が返ったら替える。`useCapturePolling` と同じ流儀で、失敗したら止めて、メッセージを出す
+- `DigestEmptyState()`: 「ダイジェストは毎朝 7 時に作ります」。`TodayEmptyState` と同じ、糸の最初の節の見た目
 
 **page / layout**
 
 - `DigestPage()`(`app/captures/digest/page.tsx`): `await requireUser()` のあと、見出し「ダイジェスト」と、`Suspense` で包んだ `DigestSection`
-- `CapturesLayout`: ヘッダーの `<nav>` に「ダイジェスト」(`/captures/digest`)を足す
+- `CapturesLayout`: ヘッダーの `<nav>` の「今日」と「アカウント」の間に、「ダイジェスト」(`/captures/digest`)を足す
 
 新しい export には、日本語の JSDoc を付ける(CLAUDE.md の方針)。
 
