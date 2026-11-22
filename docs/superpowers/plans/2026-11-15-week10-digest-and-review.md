@@ -859,7 +859,7 @@ def test_worker_registers_the_stalled_work_recovery_cron() -> None:
 Run: `uv run --project apps/api pytest apps/api/tests/test_recover_stalled_work.py apps/api/tests/test_worker_settings.py -v` と integration
 Expected: FAIL(unit は `hibi.jobs.recover_stalled_work` が無く collection で、integration はメソッドが無く `AttributeError` で、`touches_updated_at` は時刻が変わらず)
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 **repository**
 
@@ -873,12 +873,12 @@ Expected: FAIL(unit は `hibi.jobs.recover_stalled_work` が無く collection �
 - `recover_stalled_work(ctx)`(`jobs/recover_stalled_work.py`): `stalled_before = utc_now() - STALLED_AFTER` で、1 つの `session_scope` の中で 2 つの回復を呼ぶ(`outbox_id_factory=uuid7`)。件数のどちらかが 1 以上のときだけ、`logger.info("stalled_work_recovered", recovered_captures=..., requeued_digest_reports=..., stalled_before=stalled_before.isoformat())` を出す。5 分ごとに動くので、0 件のログはノイズになる。本文やユーザーの内容は出さない。失敗したら `log_job_failure(job_name=RECOVER_STALLED_WORK_JOB_NAME, attempt=1, max_attempts=1, context={})` を出して、例外を上げる(`run_daily_digest` と同じ形)
 - `WorkerSettings`: `cron(recover_stalled_work, name=RECOVER_STALLED_WORK_JOB_NAME, minute=set(range(0, 60, 5)), second=0, unique=True, max_tries=1)` を足す
 
-- [ ] **Step 4: Run to verify they pass**
+- [x] **Step 4: Run to verify they pass**
 
 Run: `uv run --project apps/api pytest apps/api/tests -m 'not integration' -q`、`supabase db reset` 後に integration、`ruff check`、`ty check apps/api/src`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api apps/api/tests
