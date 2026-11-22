@@ -7,3 +7,4 @@ relay やテストが、job の実装を import せずに、名前だけを参�
 PROCESS_CAPTURE_JOB_NAME = "process_capture_job"
 GENERATE_DIGEST_REPORT_JOB_NAME = "generate_digest_report_job"
 RUN_DAILY_DIGEST_JOB_NAME = "run_daily_digest"
+RECOVER_STALLED_WORK_JOB_NAME = "recover_stalled_work"
