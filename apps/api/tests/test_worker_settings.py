@@ -1,7 +1,12 @@
 from hibi.jobs.generate_digest_report_job import generate_digest_report_job
 from hibi.jobs.main import WorkerSettings
-from hibi.jobs.names import GENERATE_DIGEST_REPORT_JOB_NAME, PROCESS_CAPTURE_JOB_NAME
+from hibi.jobs.names import (
+    GENERATE_DIGEST_REPORT_JOB_NAME,
+    PROCESS_CAPTURE_JOB_NAME,
+    RECOVER_STALLED_WORK_JOB_NAME,
+)
 from hibi.jobs.process_capture_job import process_capture_job
+from hibi.jobs.recover_stalled_work import recover_stalled_work
 from hibi.jobs.relay_outbox_events import relay_outbox_events
 from hibi.jobs.run_daily_digest import run_daily_digest
 from hibi.modules.captures.types import CAPTURE_PROCESSING_MAX_ATTEMPTS
@@ -42,6 +47,17 @@ def test_worker_registers_the_digest_job_and_the_daily_digest_cron() -> None:
     assert function.max_tries == 3
     # 15 分ごとの、00 秒に 1 回。複数の worker が回しても、1 つだけが走る
     assert cron_job.minute == {0, 15, 30, 45}
+    assert cron_job.second == 0
+    assert cron_job.unique is True
+    assert cron_job.max_tries == 1
+
+
+def test_worker_registers_the_stalled_work_recovery_cron() -> None:
+    cron_job = _cron_job(recover_stalled_work)
+
+    assert cron_job.name == RECOVER_STALLED_WORK_JOB_NAME
+    # 5 分ごとの、00 秒に 1 回。複数の worker が回しても、1 つだけが走る
+    assert cron_job.minute == set(range(0, 60, 5))
     assert cron_job.second == 0
     assert cron_job.unique is True
     assert cron_job.max_tries == 1

@@ -772,69 +772,106 @@ git commit -m "refactor(outbox): move the outbox out of the captures module"
 **Files:**
 
 - Create: `apps/api/src/hibi/jobs/recover_stalled_work.py`
-- Modify: `apps/api/src/hibi/modules/captures/repository.py`、`apps/api/src/hibi/modules/digests/repository.py`、`apps/api/src/hibi/jobs/main.py`
+- Modify: `apps/api/src/hibi/modules/captures/repository.py`、`apps/api/src/hibi/modules/digests/repository.py`、`apps/api/src/hibi/jobs/names.py`、`apps/api/src/hibi/jobs/main.py`
 - Test: `apps/api/tests/integration/test_capture_repository.py`、`apps/api/tests/integration/test_digest_repository.py`、`apps/api/tests/test_recover_stalled_work.py`(新規)、`apps/api/tests/test_worker_settings.py`
 
 **Interfaces:**
 
 - Produces:
   - `CaptureRepository.recover_stalled_captures(*, stalled_before: datetime, outbox_id_factory: Callable[[], UUID]) -> int` — 回復した件数
-  - `DigestRepository.requeue_stalled_reports(*, stalled_before: datetime, outbox_id_factory: Callable[[], UUID]) -> int`
-  - `STALLED_AFTER = timedelta(minutes=10)`
-  - `recover_stalled_work(ctx) -> None`(cron)
+  - `DigestRepository.requeue_stalled_reports(*, stalled_before: datetime, outbox_id_factory: Callable[[], UUID]) -> int` — outbox を足した件数
+  - `RECOVER_STALLED_WORK_JOB_NAME = "recover_stalled_work"`(`jobs/names.py`)
+  - `STALLED_AFTER = timedelta(minutes=10)`(`jobs/recover_stalled_work.py`)
+  - `recover_stalled_work(ctx) -> None`(cron)。テストが差し替えるため、モジュールの名前空間に `session_scope`、`CaptureRepository`、`DigestRepository`、`utc_now`、`logger`、`log_job_failure` を import する
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
+
+integration のテストは、行の `updated_at` に 2000-01-01 前後の時刻を入れる(`_RECOVERY_NOW = 2000-01-01 00:10 UTC`、`_STALLED_BEFORE = _RECOVERY_NOW - 10 分`)。回復は全ユーザーの行を対象にするので、開発用の DB に残っている実際の行を、件数に数えないため。
 
 `tests/integration/test_capture_repository.py` に追加する。
 
 ```python
 @pytest.mark.integration
 async def test_update_processing_status_touches_updated_at(session) -> None:
-    # pending → processing で updated_at が進む(止まりの判定に使う)
+    # pending → processing で updated_at が DB の now() になる(止まりの判定に使う)
 
 @pytest.mark.integration
 async def test_recover_stalled_captures_resets_old_processing_rows_to_the_next_generation(session) -> None:
-    # processing で updated_at が 11 分前の行 → pending、世代 +1、outbox が 1 件増える。件数は 1
-    # processing で updated_at が 9 分前の行、pending、completed の行は変えない
+    # processing で updated_at が 11 分前の行 → pending、世代 2、updated_at が進み、
+    # 世代 2 の outbox が 1 件増える(id は factory が発行した値)。件数は 1
+    # processing で 9 分前の行、pending、completed の行は、状態、世代、outbox を変えない
+
+@pytest.mark.integration
+async def test_recover_stalled_captures_returns_zero_without_stalled_rows(session) -> None:
+    # 0 を返し、factory を呼ばない
 
 @pytest.mark.integration
 async def test_a_job_of_the_previous_generation_changes_nothing_after_recovery(session) -> None:
-    # 回復後、古い世代で update_processing_status を呼ぶと False
+    # 回復後、世代 1 の update_processing_status は False、世代 2 は True
 ```
 
-`tests/integration/test_digest_repository.py` に追加する。
+`tests/integration/test_digest_repository.py` に追加する。作ったときの outbox は、既定で配送済み(published)にしておく。
 
 ```python
 @pytest.mark.integration
 async def test_requeue_stalled_reports_adds_an_outbox_event_for_old_pending_rows_only(session) -> None:
-    # updated_at が 11 分前の pending は outbox が 1 件増え、9 分前の pending と ready は増えない
-    # 同じ行に pending の outbox が既にあるときは、重ねて足さない
+    # 11 分前の pending には、digest の outbox が 1 件増える。件数は 1
+    # 9 分前の pending、ready、failed の行には足さない
+
+@pytest.mark.integration
+async def test_requeue_stalled_reports_restarts_the_wait_from_the_requeue(session) -> None:
+    # 足した行の updated_at が進む。status は pending のまま
+
+@pytest.mark.integration
+async def test_requeue_stalled_reports_does_not_stack_on_an_undelivered_outbox_event(session) -> None:
+    # 未配送(pending)の outbox がある行には足さない。件数は 0
 ```
 
-`tests/test_recover_stalled_work.py`
+`tests/test_recover_stalled_work.py`(`session_scope`、2 つの repository、`utc_now`、`logger`、`log_job_failure` を monkeypatch で差し替える)
 
 ```python
+def test_stalled_after_is_ten_minutes() -> None: ...
+
 async def test_recover_stalled_work_calls_both_recoveries_with_the_cutoff_and_logs_counts() -> None:
-    # clock 固定。stalled_before = now - 10 分で、両方が呼ばれ、件数が構造化ログに出る
+    # stalled_before = now - 10 分、outbox_id_factory は uuid7 で、両方が呼ばれる
+    # 2 つの repository は同じ session で、commit される
+    # logger.info("stalled_work_recovered", recovered_captures=2,
+    #             requeued_digest_reports=1, stalled_before=<isoformat>) が 1 回
+
+async def test_recover_stalled_work_does_not_log_when_nothing_was_stalled() -> None:
+    # 件数が両方 0 ならログを出さない。commit はする
+
+async def test_recover_stalled_work_rolls_back_logs_and_raises_when_a_recovery_fails() -> None:
+    # rollback して例外を上げる。log_job_failure(job_name=RECOVER_STALLED_WORK_JOB_NAME,
+    # attempt=1, max_attempts=1, ...)
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+`tests/test_worker_settings.py` に追加する。
 
-Run: `uv run --project apps/api pytest apps/api/tests/test_recover_stalled_work.py -v` と integration
-Expected: FAIL
+```python
+def test_worker_registers_the_stalled_work_recovery_cron() -> None:
+    # name == RECOVER_STALLED_WORK_JOB_NAME、minute == set(range(0, 60, 5))、second == 0、
+    # unique is True、max_tries == 1
+```
+
+- [x] **Step 2: Run to verify they fail**
+
+Run: `uv run --project apps/api pytest apps/api/tests/test_recover_stalled_work.py apps/api/tests/test_worker_settings.py -v` と integration
+Expected: FAIL(unit は `hibi.jobs.recover_stalled_work` が無く collection で、integration はメソッドが無く `AttributeError` で、`touches_updated_at` は時刻が変わらず)
 
 - [ ] **Step 3: Implement**
 
 **repository**
 
 - `CaptureRepository.update_processing_status`: `updated_at = func.now()` も更新する。止まりの判定は `updated_at` で行うため
-- `CaptureRepository.recover_stalled_captures(*, stalled_before, outbox_id_factory)`: `status = 'processing'` かつ `updated_at < stalled_before` の行を、`pending` に戻し、`processing_generation` を 1 増やす。行ごとに、新しい世代の outbox を同じ transaction で足す。件数を返す。`retry_failed_capture` と同じ仕組みをシステムが使う
-- `DigestRepository.requeue_stalled_reports(*, stalled_before, outbox_id_factory)`: `status = 'pending'` かつ `updated_at < stalled_before` で、未配送の outbox が無い行に、outbox を足す。件数を返す
+- `CaptureRepository.recover_stalled_captures(*, stalled_before, outbox_id_factory)`: `status = 'processing'` かつ `updated_at < stalled_before` の行を、`pending` に戻し、`processing_generation` を 1 増やし、`updated_at = func.now()` にする。行ごとに、新しい世代の outbox を同じ transaction で足す。件数を返す。`retry_failed_capture` と同じ仕組みをシステムが使う
+- `DigestRepository.requeue_stalled_reports(*, stalled_before, outbox_id_factory)`: `status = 'pending'` かつ `updated_at < stalled_before` で、未配送(`status = 'pending'`)の outbox が無い行に、outbox を足し、`updated_at = func.now()` にする。件数を返す。`updated_at` を進めないと、job が動く前に、5 分後の次の回復が同じ行にもう一度足してしまう
 
 **job**
 
-- `recover_stalled_work(ctx)`(`jobs/recover_stalled_work.py`): `stalled_before = now - STALLED_AFTER` で、2 つの回復を呼び、件数を `stuck_capture_recovered` などの構造化ログに出す。本文やユーザーの内容は出さない
-- `WorkerSettings`: `cron(recover_stalled_work, minute=set(range(0, 60, 5)), second=0, unique=True, max_tries=1)` を足す
+- `jobs/names.py`: `RECOVER_STALLED_WORK_JOB_NAME = "recover_stalled_work"` を足す
+- `recover_stalled_work(ctx)`(`jobs/recover_stalled_work.py`): `stalled_before = utc_now() - STALLED_AFTER` で、1 つの `session_scope` の中で 2 つの回復を呼ぶ(`outbox_id_factory=uuid7`)。件数のどちらかが 1 以上のときだけ、`logger.info("stalled_work_recovered", recovered_captures=..., requeued_digest_reports=..., stalled_before=stalled_before.isoformat())` を出す。5 分ごとに動くので、0 件のログはノイズになる。本文やユーザーの内容は出さない。失敗したら `log_job_failure(job_name=RECOVER_STALLED_WORK_JOB_NAME, attempt=1, max_attempts=1, context={})` を出して、例外を上げる(`run_daily_digest` と同じ形)
+- `WorkerSettings`: `cron(recover_stalled_work, name=RECOVER_STALLED_WORK_JOB_NAME, minute=set(range(0, 60, 5)), second=0, unique=True, max_tries=1)` を足す
 
 - [ ] **Step 4: Run to verify they pass**
 

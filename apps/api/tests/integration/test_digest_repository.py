@@ -15,6 +15,7 @@ from hibi.modules.captures.policies import (
     CAPTURE_SCENARIO_STATUS_PROPOSED,
 )
 from hibi.modules.captures.repository import CaptureRepository
+from hibi.modules.digests.models import DigestReportModel
 from hibi.modules.digests.repository import DigestRepository
 from hibi.modules.digests.types import (
     DIGEST_AGGREGATE_TYPE,
@@ -26,6 +27,7 @@ from hibi.modules.digests.types import (
     DIGEST_STATUS_READY,
 )
 from hibi.modules.outbox.models import OutboxModel
+from hibi.modules.outbox.types import OUTBOX_STATUS_PENDING, OUTBOX_STATUS_PUBLISHED
 
 _DAY = date(2026, 11, 10)
 # 開発用の DB に、実際の時刻の行が残っていても、数えないように、遠い未来の日時を使う
@@ -500,3 +502,139 @@ async def test_requeue_failed_report_does_not_touch_another_owner(session: Async
     assert report is not None
     assert report.status == DIGEST_STATUS_FAILED
     assert await _outbox_count(session, other_id) == 0
+
+
+# 止まった pending の回復のテスト。開発用の DB に残っている実際の行を数えないよう、
+# どの行の updated_at よりも古い、遠い過去の時刻を使う
+_RECOVERY_NOW = datetime(2000, 1, 1, 0, 10, tzinfo=UTC)
+_STALLED_BEFORE = _RECOVERY_NOW - timedelta(minutes=10)
+
+
+async def _claim_stalled(
+    session: AsyncSession,
+    repo: DigestRepository,
+    user_id: UUID,
+    *,
+    period_start: date,
+    status: str = DIGEST_STATUS_PENDING,
+    minutes_ago: int = 11,
+    outbox_published: bool = True,
+) -> UUID:
+    """行を作り、状態と updated_at を置き換える。作ったときの outbox は、既定で配送済みにする。"""
+
+    report_id = uuid7()
+    await _claim(repo, user_id, report_id=report_id, period_start=period_start)
+    await session.execute(
+        update(DigestReportModel)
+        .where(DigestReportModel.id == report_id)
+        .values(status=status, updated_at=_RECOVERY_NOW - timedelta(minutes=minutes_ago))
+    )
+    if outbox_published:
+        await session.execute(
+            update(OutboxModel)
+            .where(OutboxModel.aggregate_id == report_id)
+            .values(status=OUTBOX_STATUS_PUBLISHED, published_at=func.now())
+        )
+    return report_id
+
+
+async def _report_outbox_events(session: AsyncSession, report_id: UUID) -> list[OutboxModel]:
+    return list(
+        (
+            await session.scalars(
+                select(OutboxModel)
+                .where(OutboxModel.aggregate_id == report_id)
+                .order_by(OutboxModel.created_at, OutboxModel.id)
+            )
+        ).all()
+    )
+
+
+class _OutboxIds:
+    """回復が発行した outbox の id を、順に記録する。"""
+
+    def __init__(self) -> None:
+        self.issued: list[UUID] = []
+
+    def __call__(self) -> UUID:
+        outbox_id = uuid7()
+        self.issued.append(outbox_id)
+        return outbox_id
+
+
+@pytest.mark.integration
+async def test_requeue_stalled_reports_adds_an_outbox_event_for_old_pending_rows_only(
+    session: AsyncSession,
+) -> None:
+    user_id = uuid4()
+    await _insert_auth_user(session, user_id)
+    repo = DigestRepository(session)
+    stalled_id = await _claim_stalled(session, repo, user_id, period_start=date(2026, 11, 1))
+    fresh_id = await _claim_stalled(
+        session, repo, user_id, period_start=date(2026, 11, 2), minutes_ago=9
+    )
+    ready_id = await _claim_stalled(
+        session, repo, user_id, period_start=date(2026, 11, 3), status=DIGEST_STATUS_READY
+    )
+    failed_id = await _claim_stalled(
+        session, repo, user_id, period_start=date(2026, 11, 4), status=DIGEST_STATUS_FAILED
+    )
+    outbox_ids = _OutboxIds()
+
+    requeued = await repo.requeue_stalled_reports(
+        stalled_before=_STALLED_BEFORE, outbox_id_factory=outbox_ids
+    )
+
+    assert requeued == 1
+    events = await _report_outbox_events(session, stalled_id)
+    assert len(events) == 2
+    new_event = next(event for event in events if event.status == OUTBOX_STATUS_PENDING)
+    assert outbox_ids.issued == [new_event.id]
+    assert new_event.user_id == user_id
+    assert new_event.aggregate_type == DIGEST_AGGREGATE_TYPE
+    assert new_event.event_type == DIGEST_GENERATION_REQUESTED
+    for report_id in (fresh_id, ready_id, failed_id):
+        assert len(await _report_outbox_events(session, report_id)) == 1
+
+
+@pytest.mark.integration
+async def test_requeue_stalled_reports_restarts_the_wait_from_the_requeue(
+    session: AsyncSession,
+) -> None:
+    # updated_at を進めないと、job が動き出す前の、5 分後の次の回復が、同じ行に
+    # もう一度 outbox を足してしまう
+    user_id = uuid4()
+    await _insert_auth_user(session, user_id)
+    repo = DigestRepository(session)
+    report_id = await _claim_stalled(session, repo, user_id, period_start=date(2026, 11, 1))
+
+    await repo.requeue_stalled_reports(
+        stalled_before=_STALLED_BEFORE, outbox_id_factory=_OutboxIds()
+    )
+
+    row = await session.get(DigestReportModel, report_id, populate_existing=True)
+    assert row is not None
+    assert row.status == DIGEST_STATUS_PENDING
+    assert row.updated_at > _RECOVERY_NOW
+
+
+@pytest.mark.integration
+async def test_requeue_stalled_reports_does_not_stack_on_an_undelivered_outbox_event(
+    session: AsyncSession,
+) -> None:
+    # relay が止まっているだけなら、未配送の outbox が届けば job が動くので、重ねて足さない
+    user_id = uuid4()
+    await _insert_auth_user(session, user_id)
+    repo = DigestRepository(session)
+    report_id = await _claim_stalled(
+        session, repo, user_id, period_start=date(2026, 11, 1), outbox_published=False
+    )
+    outbox_ids = _OutboxIds()
+
+    requeued = await repo.requeue_stalled_reports(
+        stalled_before=_STALLED_BEFORE, outbox_id_factory=outbox_ids
+    )
+
+    assert requeued == 0
+    assert outbox_ids.issued == []
+    assert len(await _report_outbox_events(session, report_id)) == 1

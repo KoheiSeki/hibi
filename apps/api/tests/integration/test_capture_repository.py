@@ -1009,3 +1009,181 @@ async def test_list_captures_by_ids_returns_an_empty_list_without_ids(
     repository = CaptureRepository(session=session)
 
     assert await repository.list_captures_by_ids(owner_id, capture_ids=[]) == []
+
+
+# 止まった処理の回復のテスト。開発用の DB に残っている実際の行を数えないよう、
+# どの行の updated_at よりも古い、遠い過去の時刻を使う
+_RECOVERY_NOW = datetime(2000, 1, 1, 0, 10, tzinfo=UTC)
+_STALLED_BEFORE = _RECOVERY_NOW - timedelta(minutes=10)
+
+
+async def _set_status_and_updated_at(
+    session: AsyncSession, capture_id: UUID, *, status: str, updated_at: datetime
+) -> None:
+    await session.execute(
+        update(CaptureModel)
+        .where(CaptureModel.id == capture_id)
+        .values(status=status, updated_at=updated_at)
+    )
+
+
+async def _capture_row(session: AsyncSession, capture_id: UUID) -> CaptureModel:
+    row = await session.get(CaptureModel, capture_id, populate_existing=True)
+    assert row is not None
+    return row
+
+
+async def _capture_outbox_events(session: AsyncSession, capture_id: UUID) -> list[OutboxModel]:
+    return list(
+        (
+            await session.scalars(
+                select(OutboxModel)
+                .where(OutboxModel.aggregate_id == capture_id)
+                .order_by(OutboxModel.processing_generation)
+            )
+        ).all()
+    )
+
+
+class _OutboxIds:
+    """回復が発行した outbox の id を、順に記録する。"""
+
+    def __init__(self) -> None:
+        self.issued: list[UUID] = []
+
+    def __call__(self) -> UUID:
+        outbox_id = uuid7()
+        self.issued.append(outbox_id)
+        return outbox_id
+
+
+@pytest.mark.integration
+async def test_update_processing_status_touches_updated_at(session: AsyncSession) -> None:
+    # 止まりの判定は updated_at で行うので、pending → processing で時刻が進む
+    user_id = uuid4()
+    await _insert_auth_user(session, user_id)
+    repo = CaptureRepository(session)
+    capture = await _create_capture(repo, user_id)
+    await _set_status_and_updated_at(
+        session, capture.id, status=CAPTURE_STATUS_PENDING, updated_at=_RECOVERY_NOW
+    )
+
+    updated = await repo.update_processing_status(
+        capture_id=capture.id,
+        processing_generation=1,
+        expected_status=CAPTURE_STATUS_PENDING,
+        status=CAPTURE_STATUS_PROCESSING,
+    )
+
+    assert updated is True
+    row = await _capture_row(session, capture.id)
+    assert row.status == CAPTURE_STATUS_PROCESSING
+    assert row.updated_at == await session.scalar(select(func.now()))
+
+
+@pytest.mark.integration
+async def test_recover_stalled_captures_resets_old_processing_rows_to_the_next_generation(
+    session: AsyncSession,
+) -> None:
+    user_id = uuid4()
+    await _insert_auth_user(session, user_id)
+    repo = CaptureRepository(session)
+    stalled = await _create_capture(repo, user_id, raw_text="止まった")
+    fresh = await _create_capture(repo, user_id, raw_text="処理中")
+    pending = await _create_capture(repo, user_id, raw_text="待っている")
+    completed = await _create_capture(repo, user_id, raw_text="終わった")
+    eleven_minutes_ago = _RECOVERY_NOW - timedelta(minutes=11)
+    await _set_status_and_updated_at(
+        session, stalled.id, status=CAPTURE_STATUS_PROCESSING, updated_at=eleven_minutes_ago
+    )
+    await _set_status_and_updated_at(
+        session,
+        fresh.id,
+        status=CAPTURE_STATUS_PROCESSING,
+        updated_at=_RECOVERY_NOW - timedelta(minutes=9),
+    )
+    await _set_status_and_updated_at(
+        session, pending.id, status=CAPTURE_STATUS_PENDING, updated_at=eleven_minutes_ago
+    )
+    await _set_status_and_updated_at(
+        session, completed.id, status=CAPTURE_STATUS_COMPLETED, updated_at=eleven_minutes_ago
+    )
+    outbox_ids = _OutboxIds()
+
+    recovered = await repo.recover_stalled_captures(
+        stalled_before=_STALLED_BEFORE, outbox_id_factory=outbox_ids
+    )
+
+    assert recovered == 1
+    row = await _capture_row(session, stalled.id)
+    assert row.status == CAPTURE_STATUS_PENDING
+    assert row.processing_generation == 2
+    # 戻した時刻から数え直すので、次の回復の実行で、すぐには拾われない
+    assert row.updated_at > eleven_minutes_ago
+    events = await _capture_outbox_events(session, stalled.id)
+    assert [event.processing_generation for event in events] == [1, 2]
+    new_event = events[-1]
+    assert new_event.id in outbox_ids.issued
+    assert new_event.user_id == user_id
+    assert new_event.event_type == CAPTURE_PROCESSING_REQUESTED
+    assert new_event.status == OUTBOX_STATUS_PENDING
+    assert len(outbox_ids.issued) == 1
+
+    for capture, status in (
+        (fresh, CAPTURE_STATUS_PROCESSING),
+        (pending, CAPTURE_STATUS_PENDING),
+        (completed, CAPTURE_STATUS_COMPLETED),
+    ):
+        untouched = await _capture_row(session, capture.id)
+        assert untouched.status == status
+        assert untouched.processing_generation == 1
+        assert len(await _capture_outbox_events(session, capture.id)) == 1
+
+
+@pytest.mark.integration
+async def test_recover_stalled_captures_returns_zero_without_stalled_rows(
+    session: AsyncSession,
+) -> None:
+    outbox_ids = _OutboxIds()
+
+    recovered = await CaptureRepository(session).recover_stalled_captures(
+        stalled_before=_STALLED_BEFORE, outbox_id_factory=outbox_ids
+    )
+
+    assert recovered == 0
+    assert outbox_ids.issued == []
+
+
+@pytest.mark.integration
+async def test_a_job_of_the_previous_generation_changes_nothing_after_recovery(
+    session: AsyncSession,
+) -> None:
+    user_id = uuid4()
+    await _insert_auth_user(session, user_id)
+    repo = CaptureRepository(session)
+    capture = await _create_capture(repo, user_id)
+    await _set_status_and_updated_at(
+        session,
+        capture.id,
+        status=CAPTURE_STATUS_PROCESSING,
+        updated_at=_RECOVERY_NOW - timedelta(minutes=11),
+    )
+    await repo.recover_stalled_captures(
+        stalled_before=_STALLED_BEFORE, outbox_id_factory=_OutboxIds()
+    )
+
+    # 止まっていた古い世代の job が、遅れて動き出しても、行を進められない
+    old_generation = await repo.update_processing_status(
+        capture_id=capture.id,
+        processing_generation=1,
+        expected_status=CAPTURE_STATUS_PENDING,
+        status=CAPTURE_STATUS_PROCESSING,
+    )
+    new_generation = await repo.update_processing_status(
+        capture_id=capture.id,
+        processing_generation=2,
+        expected_status=CAPTURE_STATUS_PENDING,
+        status=CAPTURE_STATUS_PROCESSING,
+    )
+
+    assert (old_generation, new_generation) == (False, True)
