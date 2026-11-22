@@ -1,5 +1,5 @@
 import hashlib
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
@@ -397,7 +397,7 @@ class CaptureRepository:
                 CaptureModel.status == expected_status,
                 CaptureModel.processing_generation == processing_generation,
             )
-            .values(status=status)
+            .values(status=status, updated_at=func.now())
             .returning(CaptureModel.id)
         )
         return await self._session.scalar(stmt) is not None
@@ -487,6 +487,63 @@ class CaptureRepository:
         await self._session.flush()
 
         return _to_capture(row)
+
+    async def recover_stalled_captures(
+        self, *, stalled_before: datetime, outbox_id_factory: Callable[[], UUID]
+    ) -> int:
+        """processing のまま止まった Capture を、次の世代の pending に戻して再処理を予約する。
+
+        worker が job の途中で落ちると、行は processing のまま残り、誰も進めない。
+        `updated_at` が `stalled_before` より前の processing の行を、止まったと見なす。
+        `retry_failed_capture` と同じく、`processing_generation` を 1 増やし、その世代の
+        outbox を同じ transaction で足す。利用者の操作ではなくシステムが戻すので、
+        所有者では絞らず、全ユーザーの行を対象にする。
+
+        世代を進めるのは、止まったと見なした job が、実は遅れて動いていた場合に備えるため。
+        古い世代の job は、世代が合わず、行を何も変えない。`updated_at` も今にするので、
+        戻した行が、次の回復の実行で、すぐにまた拾われることはない。
+
+        戻すのは `UPDATE ... RETURNING` の 1 回で、条件に合う行だけが変わる。回復が
+        同時に 2 つ走っても、同じ行を 2 回戻すことはなく、outbox も行ごとに 1 件になる。
+        pending、completed、failed の行には触れない。
+
+        Args:
+            stalled_before: これより前に更新された processing の行を、止まったと見なす。
+                呼び出し側が、今から `STALLED_AFTER` を引いて渡す。
+            outbox_id_factory: 戻した行ごとに呼び、新しい outbox の id を発行する。
+                戻した行が無ければ呼ばない。
+
+        Returns:
+            戻した行の数。止まった行が無ければ 0。
+        """
+
+        stmt = (
+            update(CaptureModel)
+            .where(
+                CaptureModel.status == CAPTURE_STATUS_PROCESSING,
+                CaptureModel.updated_at < stalled_before,
+            )
+            .values(
+                status=CAPTURE_STATUS_PENDING,
+                processing_generation=CaptureModel.processing_generation + 1,
+                updated_at=func.now(),
+            )
+            .returning(CaptureModel)
+        )
+        rows = (await self._session.scalars(stmt)).all()
+        for row in rows:
+            self._session.add(
+                OutboxModel(
+                    id=outbox_id_factory(),
+                    user_id=row.user_id,
+                    aggregate_type=CAPTURE_AGGREGATE_TYPE,
+                    aggregate_id=row.id,
+                    event_type=CAPTURE_PROCESSING_REQUESTED,
+                    processing_generation=row.processing_generation,
+                )
+            )
+        await self._session.flush()
+        return len(rows)
 
     async def complete_capture_classification(
         self,

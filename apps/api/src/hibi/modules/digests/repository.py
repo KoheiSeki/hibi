@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from datetime import date, datetime
 from typing import cast
 from uuid import UUID
@@ -20,6 +21,7 @@ from hibi.modules.digests.types import (
     DigestStatus,
 )
 from hibi.modules.outbox.models import OutboxModel
+from hibi.modules.outbox.types import OUTBOX_STATUS_PENDING
 from hibi.modules.profiles.models import ProfileModel
 
 
@@ -248,6 +250,71 @@ class DigestRepository:
         )
         await self._session.flush()
         return _to_digest_report(row)
+
+    async def requeue_stalled_reports(
+        self, *, stalled_before: datetime, outbox_id_factory: Callable[[], UUID]
+    ) -> int:
+        """pending のまま止まった行に、生成を依頼する outbox をもう一度足す。
+
+        outbox が配送されたあとに、worker が落ちたり、job が失われたりすると、行は
+        pending のまま残り、誰も中身を作らない。`updated_at` が `stalled_before` より前の
+        pending の行を、止まったと見なす。利用者の操作ではなくシステムが戻すので、
+        所有者では絞らず、全ユーザーの行を対象にする。
+
+        capture と違い、世代は持たず、状態も変えない。digest の job は、何度動いても
+        同じ行に同じ中身を作るだけで、`complete_report` は pending の行しか ready に
+        しない。止まったと見なした job が、実は遅れて動いていても、どちらか先に終わった
+        方だけが行を進める。画面は、pending のまま「作っています」を出し続ける。
+
+        未配送(pending)の outbox が残っている行には、足さない。relay が届ければ job は
+        動くので、重ねると、同じ行の job が 2 つ走る。足した行は `updated_at` を今にする。
+        進めないと、job が動き出す前に、5 分後の次の回復が、同じ行にもう一度足してしまう。
+
+        対象を選ぶことと、`updated_at` を進めることを、`UPDATE ... RETURNING` の 1 回で
+        行う。回復が同時に 2 つ走っても、後の方は、進んだ `updated_at` を見て、その行を
+        飛ばす。ready と failed の行には触れない。
+
+        Args:
+            stalled_before: これより前に更新された pending の行を、止まったと見なす。
+                呼び出し側が、今から `STALLED_AFTER` を引いて渡す。
+            outbox_id_factory: outbox を足す行ごとに呼び、新しい outbox の id を発行する。
+                足す行が無ければ呼ばない。
+
+        Returns:
+            outbox を足した行の数。止まった行が無ければ 0。
+        """
+
+        undelivered = (
+            select(OutboxModel.id)
+            .where(
+                OutboxModel.aggregate_id == DigestReportModel.id,
+                OutboxModel.status == OUTBOX_STATUS_PENDING,
+            )
+            .exists()
+        )
+        stmt = (
+            update(DigestReportModel)
+            .where(
+                DigestReportModel.status == DIGEST_STATUS_PENDING,
+                DigestReportModel.updated_at < stalled_before,
+                ~undelivered,
+            )
+            .values(updated_at=func.now())
+            .returning(DigestReportModel.id, DigestReportModel.user_id)
+        )
+        rows = (await self._session.execute(stmt)).all()
+        for row in rows:
+            self._session.add(
+                OutboxModel(
+                    id=outbox_id_factory(),
+                    user_id=row.user_id,
+                    aggregate_type=DIGEST_AGGREGATE_TYPE,
+                    aggregate_id=row.id,
+                    event_type=DIGEST_GENERATION_REQUESTED,
+                )
+            )
+        await self._session.flush()
+        return len(rows)
 
     async def list_active_users(self, *, active_since: datetime, limit: int) -> list[ActiveUser]:
         """直近に Capture がある利用者と、その timezone を読む。

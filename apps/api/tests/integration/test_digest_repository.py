@@ -3,7 +3,7 @@ from datetime import UTC, date, datetime, timedelta
 from uuid import UUID, uuid4, uuid7
 
 import pytest
-from sqlalchemy import func, select, text, update
+from sqlalchemy import func, null, select, text, update
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -527,7 +527,13 @@ async def _claim_stalled(
     await session.execute(
         update(DigestReportModel)
         .where(DigestReportModel.id == report_id)
-        .values(status=status, updated_at=_RECOVERY_NOW - timedelta(minutes=minutes_ago))
+        .values(
+            status=status,
+            # DB の check で、ready の行だけが content を持つ。None は JSON の null になるので、
+            # SQL の NULL を明示する
+            content=_CONTENT if status == DIGEST_STATUS_READY else null(),
+            updated_at=_RECOVERY_NOW - timedelta(minutes=minutes_ago),
+        )
     )
     if outbox_published:
         await session.execute(
