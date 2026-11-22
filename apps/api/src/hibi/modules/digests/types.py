@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import date, datetime
+from typing import Literal
 from uuid import UUID
 
 DIGEST_AGGREGATE_TYPE = "digest_report"
@@ -12,8 +13,15 @@ DIGEST_STATUS_FAILED = "failed"
 
 DIGEST_GENERATION_MAX_ATTEMPTS = 3
 
+# 取り得る値を型で表す。DB の check と同じ値で、API の OpenAPI と、生成される client の型にも出る
+DigestKind = Literal["daily", "weekly"]
+DigestStatus = Literal["pending", "ready", "failed"]
+
 DIGEST_ERROR_GENERATION_FAILED = "generation_failed"
 DIGEST_ERROR_REVIEW_PROVIDER = "review_provider_error"
+
+DIGEST_LIST_DEFAULT_LIMIT = 7
+DIGEST_LIST_MAX_LIMIT = 30
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,10 +46,10 @@ class DigestReport:
 
     id: UUID
     user_id: UUID
-    kind: str
+    kind: DigestKind
     period_start: date
     timezone: str
-    status: str
+    status: DigestStatus
     content: dict[str, object] | None
     content_version: str
     summary_model: str | None
@@ -80,6 +88,6 @@ class ListDigestReportsQuery:
     """
 
     user_id: UUID
-    kind: str | None
+    kind: DigestKind | None
     from_date: date | None
     limit: int

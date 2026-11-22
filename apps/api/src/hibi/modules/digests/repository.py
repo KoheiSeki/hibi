@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import cast
 from uuid import UUID
 
 from sqlalchemy import func, select, update
@@ -14,7 +15,9 @@ from hibi.modules.digests.types import (
     DIGEST_STATUS_PENDING,
     DIGEST_STATUS_READY,
     ActiveUser,
+    DigestKind,
     DigestReport,
+    DigestStatus,
 )
 from hibi.modules.outbox.models import OutboxModel
 from hibi.modules.profiles.models import ProfileModel
@@ -423,15 +426,18 @@ class DigestRepository:
 
 
 def _to_digest_report(row: DigestReportModel) -> DigestReport:
-    """ORM の行を、session の外でも読めるドメインの型に写す。"""
+    """ORM の行を、session の外でも読めるドメインの型に写す。
+
+    `kind` と `status` は、DB の check が値を限っているので、Literal の型に cast する。
+    """
 
     return DigestReport(
         id=row.id,
         user_id=row.user_id,
-        kind=row.kind,
+        kind=cast(DigestKind, row.kind),
         period_start=row.period_start,
         timezone=row.timezone,
-        status=row.status,
+        status=cast(DigestStatus, row.status),
         content=row.content,
         content_version=row.content_version,
         summary_model=row.summary_model,
