@@ -972,7 +972,7 @@ it("stops polling and shows the message when polling fails", ...);
 Run: `corepack pnpm --filter web exec vitest run`
 Expected: FAIL(新しい 5 ファイルは module not found、layout はリンクが無く assert で)
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 **API wrapper**(`lib/api/digest.ts`)
 
@@ -1002,12 +1002,12 @@ Expected: FAIL(新しい 5 ファイルは module not found、layout はリン�
 
 新しい export には、日本語の JSDoc を付ける(CLAUDE.md の方針)。
 
-- [ ] **Step 4: Run the web gate**
+- [x] **Step 4: Run the web gate**
 
 Run: `corepack pnpm typecheck && corepack pnpm lint && corepack pnpm test && corepack pnpm build`
 Expected: すべて PASS。`git checkout apps/web/next-env.d.ts`
 
-- [ ] **Step 5: Manual check**(`docs/architecture/28-week10-digest-and-review.md` の手動確認)
+- [x] **Step 5: Manual check**(`docs/architecture/28-week10-digest-and-review.md` の手動確認)
 
 `just dev-api`、`just dev-worker`、`just dev-web` を起動する。worker は 15 分ごとの cron を持つので、確認のときは、`run_daily_digest` を一度手で呼ぶ(`uv run --project apps/api python -c ...` で `DigestService.schedule_due_reports` を実行する)。
 
@@ -1018,7 +1018,7 @@ Expected: すべて PASS。`git checkout apps/web/next-env.d.ts`
 5. `failed` の行(job を失敗させて作る)に「もう一度作る」が出て、押すと「作っています」になり、再び `ready` になる
 6. `processing` のまま止まった Capture(DB で `updated_at` を 11 分前にする)が、5 分以内に、`pending` に戻り、完了する
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/web
