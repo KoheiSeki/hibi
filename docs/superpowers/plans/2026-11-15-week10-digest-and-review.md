@@ -1029,12 +1029,12 @@ git commit -m "feat(web): show the daily digest and the weekly review"
 
 ### Task 9: 全ゲート
 
-- [ ] **Step 1: Run every gate**
+- [x] **Step 1: Run every gate**
 
 Run: `uv run --project apps/api ruff format --check apps/api/src apps/api/tests scripts`、`ruff check`、`ty check apps/api/src`、`uv run --project apps/api pytest apps/api/tests`、`supabase db reset` 後に `-m integration`、`corepack pnpm typecheck && corepack pnpm lint && corepack pnpm test && corepack pnpm build`、`just openapi` で差分が出ない
 Expected: すべて GREEN(`format:check` は対象外。`test_auth_supabase_local.py` の 2 件は、テスト用ユーザーの認証情報が合わないことによる既存の失敗)
 
-- [ ] **Step 2: Commit the plan and spec**
+- [x] **Step 2: Commit the plan and spec**
 
 ```bash
 git add docs/architecture/28-week10-digest-and-review.md docs/architecture/11-implementation-schedule.md docs/superpowers/plans/2026-11-15-week10-digest-and-review.md
