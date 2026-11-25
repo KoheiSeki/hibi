@@ -38,7 +38,8 @@
 | ファイル | 責務 |
 | --- | --- |
 | `apps/api/src/hibi/evals/__init__.py` (新規) | 空 |
-| `apps/api/src/hibi/evals/datasets.py` (新規) | 評価データの読み込みと検証、`REPO_ROOT` と既定のパス |
+| `apps/api/src/hibi/evals/constants.py` (新規) | `REPO_ROOT`、評価データとレポートの既定のパス、`DISPUTED_TAG` |
+| `apps/api/src/hibi/evals/datasets.py` (新規) | 評価データの読み込みと検証 |
 | `apps/api/src/hibi/evals/metrics.py` (新規) | 指標の計算。純粋関数 |
 | `apps/api/src/hibi/evals/report.py` (新規) | 実行の metadata、git の状態、レポートのパスと書き出し |
 | `apps/api/src/hibi/evals/classification.py` (新規) | 分類の run、集計、Markdown |
@@ -58,14 +59,14 @@
 
 **Files:**
 
-- Create: `apps/api/src/hibi/evals/__init__.py`、`apps/api/src/hibi/evals/datasets.py`
+- Create: `apps/api/src/hibi/evals/__init__.py`、`apps/api/src/hibi/evals/constants.py`、`apps/api/src/hibi/evals/datasets.py`
 - Test: `apps/api/tests/test_eval_datasets.py`
 
 **Interfaces:**
 
-- Consumes: `hibi.modules.captures.policies.CAPTURE_CATEGORIES`
+- Consumes: `hibi.ai.classification.CAPTURE_CATEGORIES`
 - Produces:
-  - `REPO_ROOT: Path`(`Path(__file__).resolve().parents[5]`)、`EVALS_DIR = REPO_ROOT / "docs" / "ai" / "evals"`、`REPORTS_DIR = REPO_ROOT / "docs" / "ai" / "reports"`
+  - `evals/constants.py`: `REPO_ROOT: Path`(`Path(__file__).resolve().parents[5]`)、`EVALS_DIR = REPO_ROOT / "docs" / "ai" / "evals"`、`REPORTS_DIR = REPO_ROOT / "docs" / "ai" / "reports"`
   - `CLASSIFICATION_DATASET = EVALS_DIR / "capture-classification-v1.jsonl"`、`SEARCH_CORPUS = EVALS_DIR / "capture-search-corpus-v1.jsonl"`、`SEARCH_QUERIES = EVALS_DIR / "capture-search-queries-v1.jsonl"`
   - `DISPUTED_TAG = "disputed"`
   - `ClassificationCase(case_id: str, raw_text: str, expected_category: str, should_clarify: bool, tags: tuple[str, ...])`(frozen dataclass)
@@ -75,7 +76,7 @@
   - `load_classification_cases(path: Path) -> LoadedDataset[ClassificationCase]`
   - `load_search_dataset(corpus_path: Path, queries_path: Path) -> tuple[LoadedDataset[SearchDocumentCase], LoadedDataset[SearchQueryCase]]`
 
-- [ ] **Step 1: Write the failing tests** in `tests/test_eval_datasets.py`(`tmp_path` にファイルを書いて読む)
+- [x] **Step 1: Write the failing tests** in `tests/test_eval_datasets.py`(`tmp_path` にファイルを書いて読む)
 
 ```python
 def test_loads_classification_cases_and_hashes_the_file(tmp_path): ...
@@ -97,12 +98,12 @@ def test_rejects_a_query_whose_relevant_doc_is_not_in_the_corpus(tmp_path): ...
 def test_rejects_a_query_without_relevant_docs(tmp_path): ...   # "relevantDocIds": []
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `uv run --project apps/api pytest apps/api/tests/test_eval_datasets.py -v`
 Expected: FAIL(`ModuleNotFoundError: hibi.evals`)
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 **evals**(`evals/datasets.py`)
 
@@ -133,7 +134,7 @@ git commit -m "feat(evals): load and validate versioned evaluation datasets"
 
 **Interfaces:**
 
-- Consumes: Task 1 の `load_classification_cases`、`CLASSIFICATION_DATASET`
+- Consumes: Task 1 の `load_classification_cases`、`constants.CLASSIFICATION_DATASET`
 
 - [ ] **Step 1: Write the failing test**
 
