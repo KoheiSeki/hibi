@@ -5,7 +5,9 @@ from sqlalchemy import DateTime, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from hibi.db.base import Base
-from hibi.modules.outbox.types import OUTBOX_STATUS_PENDING
+from hibi.modules.outbox.constants import (
+    OUTBOX_STATUS_PENDING,
+)
 
 
 class OutboxModel(Base):

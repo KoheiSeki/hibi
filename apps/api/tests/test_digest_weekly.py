@@ -15,6 +15,9 @@ from digest_helpers import (
 
 from hibi.ai.review_summary import ReviewProviderError, ReviewSummarizer, WeeklyReviewInput
 from hibi.modules.captures.repository import CaptureRepository
+from hibi.modules.digests.constants import (
+    DIGEST_KIND_WEEKLY,
+)
 from hibi.modules.digests.content import (
     EMPTY_WEEK_SUMMARY,
     SUMMARY_FALLBACK_TEXT,
@@ -22,7 +25,6 @@ from hibi.modules.digests.content import (
 )
 from hibi.modules.digests.repository import DigestRepository
 from hibi.modules.digests.service import DigestService
-from hibi.modules.digests.types import DIGEST_KIND_WEEKLY
 
 # 2026-11-09 は月曜。東京は 09:00。先週は 11-02 の月曜から 11-08 の日曜まで
 _MONDAY = datetime(2026, 11, 9, 0, 0, tzinfo=UTC)

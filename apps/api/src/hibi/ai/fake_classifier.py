@@ -2,7 +2,7 @@ import json
 from decimal import Decimal
 from pathlib import Path
 
-from hibi.ai.classification import Classification
+from hibi.ai.classification import CAPTURE_CATEGORY_CHAT, Classification
 
 _DATASET_PATH = (
     Path(__file__).resolve().parents[5] / "docs" / "ai" / "evals" / "capture-route-v1.jsonl"
@@ -27,7 +27,7 @@ class FakeCaptureClassifier:
         cases = _load_cases()
         matched = cases.get(text)
         if matched is None:
-            category, confidence = "chat", Decimal("0.5")
+            category, confidence = CAPTURE_CATEGORY_CHAT, Decimal("0.5")
         else:
             category, confidence = matched
         return Classification(

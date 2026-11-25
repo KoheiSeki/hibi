@@ -8,20 +8,24 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hibi.modules.captures.models import CaptureModel, CaptureScenarioModel
-from hibi.modules.digests.models import DigestReportModel
-from hibi.modules.digests.types import (
+from hibi.modules.digests.constants import (
     DIGEST_AGGREGATE_TYPE,
     DIGEST_GENERATION_REQUESTED,
     DIGEST_STATUS_FAILED,
     DIGEST_STATUS_PENDING,
     DIGEST_STATUS_READY,
-    ActiveUser,
     DigestKind,
-    DigestReport,
     DigestStatus,
 )
+from hibi.modules.digests.models import DigestReportModel
+from hibi.modules.digests.types import (
+    ActiveUser,
+    DigestReport,
+)
+from hibi.modules.outbox.constants import (
+    OUTBOX_STATUS_PENDING,
+)
 from hibi.modules.outbox.models import OutboxModel
-from hibi.modules.outbox.types import OUTBOX_STATUS_PENDING
 from hibi.modules.profiles.models import ProfileModel
 
 

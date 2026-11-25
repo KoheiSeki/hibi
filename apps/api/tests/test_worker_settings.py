@@ -9,7 +9,9 @@ from hibi.jobs.process_capture_job import process_capture_job
 from hibi.jobs.recover_stalled_work import recover_stalled_work
 from hibi.jobs.relay_outbox_events import relay_outbox_events
 from hibi.jobs.run_daily_digest import run_daily_digest
-from hibi.modules.captures.types import CAPTURE_PROCESSING_MAX_ATTEMPTS
+from hibi.modules.captures.constants import (
+    CAPTURE_PROCESSING_MAX_ATTEMPTS,
+)
 
 
 def _function(name: str):

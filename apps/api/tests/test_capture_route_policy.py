@@ -4,7 +4,16 @@ from pathlib import Path
 
 import pytest
 
-from hibi.ai.classification import CAPTURE_QUESTION_VERSION, Classification
+from hibi.ai.classification import (
+    CAPTURE_CATEGORIES,
+    CAPTURE_CATEGORY_CHAT,
+    CAPTURE_CATEGORY_EXPENSE,
+    CAPTURE_CATEGORY_NOTE,
+    CAPTURE_CATEGORY_REMINDER,
+    CAPTURE_CATEGORY_SHOPPING,
+    CAPTURE_QUESTION_VERSION,
+    Classification,
+)
 from hibi.modules.captures.policies import (
     decide_capture_route,
     normalize_classification,
@@ -89,3 +98,13 @@ def test_normalize_classification_replaces_invalid_schema(overrides: dict[str, o
 )
 def test_normalize_urgency_score(score: float, expected: Decimal | None) -> None:
     assert normalize_urgency_score(score) == expected
+
+
+def test_the_category_constants_match_the_category_literal() -> None:
+    assert {
+        CAPTURE_CATEGORY_SHOPPING,
+        CAPTURE_CATEGORY_REMINDER,
+        CAPTURE_CATEGORY_EXPENSE,
+        CAPTURE_CATEGORY_NOTE,
+        CAPTURE_CATEGORY_CHAT,
+    } == CAPTURE_CATEGORIES

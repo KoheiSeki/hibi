@@ -1,8 +1,8 @@
 import pytest
-from hibi.ai.fake_review_summary import FakeReviewSummarizer
-from hibi.ai.review_summary import REVIEW_SUMMARY_MODEL_FAKE, WeeklyReviewInput
 
+from hibi.ai.fake_review_summary import FakeReviewSummarizer
 from hibi.ai.metrics import llm_call_count, reset_llm_call
+from hibi.ai.review_summary import REVIEW_SUMMARY_MODEL_FAKE, WeeklyReviewInput
 from hibi.modules.digests.content import WEEKLY_SUMMARY_MAX_LENGTH, WeeklyStats, normalize_summary
 
 _REVIEW = WeeklyReviewInput(

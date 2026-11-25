@@ -22,14 +22,16 @@ from digest_helpers import (
 
 from hibi.ai.review_summary import ReviewSummarizer
 from hibi.modules.captures.repository import CaptureRepository
-from hibi.modules.digests.errors import DigestReportNotFoundError, DigestReportNotRetryableError
-from hibi.modules.digests.repository import DigestRepository
-from hibi.modules.digests.service import DigestService
-from hibi.modules.digests.types import (
+from hibi.modules.digests.constants import (
     DIGEST_KIND_DAILY,
     DIGEST_STATUS_FAILED,
     DIGEST_STATUS_PENDING,
     DIGEST_STATUS_READY,
+)
+from hibi.modules.digests.errors import DigestReportNotFoundError, DigestReportNotRetryableError
+from hibi.modules.digests.repository import DigestRepository
+from hibi.modules.digests.service import DigestService
+from hibi.modules.digests.types import (
     ListDigestReportsQuery,
 )
 

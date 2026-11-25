@@ -7,7 +7,9 @@ from sqlalchemy import DateTime, Numeric, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from hibi.db.base import Base
-from hibi.modules.captures.types import CAPTURE_STATUS_PENDING
+from hibi.modules.captures.constants import (
+    CAPTURE_STATUS_PENDING,
+)
 
 
 class CaptureModel(Base):

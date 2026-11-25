@@ -6,7 +6,9 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from hibi.db.base import Base
-from hibi.modules.digests.types import DIGEST_STATUS_PENDING
+from hibi.modules.digests.constants import (
+    DIGEST_STATUS_PENDING,
+)
 
 
 class DigestReportModel(Base):

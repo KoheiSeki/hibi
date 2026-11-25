@@ -9,10 +9,24 @@ from typesafe_sdk._core.errors import (
 from typesafe_sdk._core.response_types import ChoiceAnswer, ScoreAnswer
 
 from hibi.ai.classification import (
+    CAPTURE_CATEGORY_CHAT,
+    CAPTURE_CATEGORY_EXPENSE,
+    CAPTURE_CATEGORY_NOTE,
+    CAPTURE_CATEGORY_REMINDER,
+    CAPTURE_CATEGORY_SHOPPING,
     Classification,
     ClassificationTimeoutError,
 )
 from hibi.core.config import get_settings
+
+# Jev に渡す、category ごとの判断基準。キーが Jev の返す category になる
+_CATEGORY_CRITERIA: dict[str, str] = {
+    CAPTURE_CATEGORY_SHOPPING: "買う、注文する、在庫を補う",
+    CAPTURE_CATEGORY_REMINDER: "時刻や日付を伴う予定、想起",
+    CAPTURE_CATEGORY_EXPENSE: "金額を伴う支出の記録",
+    CAPTURE_CATEGORY_NOTE: "後で読む、保管する情報",
+    CAPTURE_CATEGORY_CHAT: "会話、感想、上のどれにも決まらない雑談",
+}
 
 
 class JevCaptureClassifier:
@@ -28,13 +42,7 @@ class JevCaptureClassifier:
                     questions={
                         "category": Choice(
                             instructions="次の一文を、許可された category のどれか1つに分類する。",
-                            criteria={
-                                "shopping": "買う、注文する、在庫を補う",
-                                "reminder": "時刻や日付を伴う予定、想起",
-                                "expense": "金額を伴う支出の記録",
-                                "note": "後で読む、保管する情報",
-                                "chat": "会話、感想、上のどれにも決まらない雑談",
-                            },
+                            criteria=_CATEGORY_CRITERIA,
                         ),
                         "urgency": Score(
                             instructions="この一文の緊急度を0から1で採点する。",

@@ -4,12 +4,15 @@ import pytest
 
 from hibi.ai.embedding import CAPTURE_EMBED_DIMENSIONS, CAPTURE_EMBED_VERSION, Embedding
 from hibi.ai.fake_embedder import CAPTURE_EMBED_FAKE_MODEL, FakeTextEmbedder
+from hibi.modules.captures.constants import (
+    CAPTURE_STATUS_COMPLETED,
+    CAPTURE_STATUS_PENDING,
+)
 from hibi.modules.captures.search import (
     SearchDocument,
     rank_capture_by_keyword,
     rank_captures_by_semantic,
 )
-from hibi.modules.captures.types import CAPTURE_STATUS_COMPLETED, CAPTURE_STATUS_PENDING
 
 _OWNER_ID = UUID(int=1)
 _OTHER_USER_ID = UUID(int=2)

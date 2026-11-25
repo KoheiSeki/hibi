@@ -25,20 +25,22 @@ from hibi.ai.fake_clarification import FakeClarificationGenerator
 from hibi.ai.fake_classifier import FakeCaptureClassifier
 from hibi.ai.fake_embedder import CAPTURE_EMBED_FAKE_MODEL, FakeTextEmbedder
 from hibi.ai.metrics import llm_call_count, reset_llm_call
+from hibi.modules.captures.constants import (
+    CAPTURE_SCENARIO_STATUS_PROPOSED,
+    CAPTURE_STATUS_COMPLETED,
+    CAPTURE_STATUS_FAILED,
+    CAPTURE_STATUS_PENDING,
+    CAPTURE_STATUS_PROCESSING,
+)
 from hibi.modules.captures.policies import (
     CAPTURE_ROUTE_POLICY_VERSION,
     CAPTURE_SCENARIO_POLICY_VERSION,
-    CAPTURE_SCENARIO_STATUS_PROPOSED,
     ScenarioProposal,
     propose_capture_scenario,
 )
 from hibi.modules.captures.repository import CaptureRepository
 from hibi.modules.captures.service import CaptureService
 from hibi.modules.captures.types import (
-    CAPTURE_STATUS_COMPLETED,
-    CAPTURE_STATUS_FAILED,
-    CAPTURE_STATUS_PENDING,
-    CAPTURE_STATUS_PROCESSING,
     Capture,
 )
 

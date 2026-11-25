@@ -2,9 +2,11 @@ from datetime import UTC, datetime
 
 import pytest
 
+from hibi.modules.captures.constants import (
+    CAPTURE_SCENARIO_STATUS_PROPOSED,
+)
 from hibi.modules.captures.policies import (
     CAPTURE_SCENARIO_POLICY_VERSION,
-    CAPTURE_SCENARIO_STATUS_PROPOSED,
     propose_capture_scenario,
 )
 

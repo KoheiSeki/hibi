@@ -1,28 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal
 from uuid import UUID
-
-CAPTURE_AGGREGATE_TYPE = "capture"
-CAPTURE_PROCESSING_REQUESTED = "capture.processing_requested"
-
-CAPTURE_STATUS_PENDING = "pending"
-CAPTURE_STATUS_PROCESSING = "processing"
-CAPTURE_STATUS_COMPLETED = "completed"
-CAPTURE_STATUS_FAILED = "failed"
-
-CAPTURE_PROCESSING_MAX_ATTEMPTS = 3
-
-CAPTURE_SEARCH_MODE_KEYWORD = "keyword"
-CAPTURE_SEARCH_MODE_SEMANTIC = "semantic"
-CAPTURE_SEARCH_LIMIT = 20
-
-TODAY_MAX_LIMIT = 20
-TODAY_DEFAULT_LIMIT = 5
-
-
-CaptureSearchMode = Literal["keyword", "semantic"]
 
 
 @dataclass(frozen=True, slots=True)

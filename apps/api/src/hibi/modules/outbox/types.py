@@ -1,9 +1,6 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-OUTBOX_STATUS_PENDING = "pending"
-OUTBOX_STATUS_PUBLISHED = "published"
-
 
 @dataclass(frozen=True, slots=True)
 class OutboxEvent:

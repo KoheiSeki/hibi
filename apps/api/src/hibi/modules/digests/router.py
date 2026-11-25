@@ -12,13 +12,15 @@ from hibi.api.schemas import ApiResponse
 from hibi.auth.principal import Principal
 from hibi.db import get_session
 from hibi.modules.captures.repository import CaptureRepository
+from hibi.modules.digests.constants import (
+    DIGEST_LIST_DEFAULT_LIMIT,
+    DIGEST_LIST_MAX_LIMIT,
+    DigestKind,
+)
 from hibi.modules.digests.repository import DigestRepository
 from hibi.modules.digests.schemas import DigestReportResponse
 from hibi.modules.digests.service import DigestService
 from hibi.modules.digests.types import (
-    DIGEST_LIST_DEFAULT_LIMIT,
-    DIGEST_LIST_MAX_LIMIT,
-    DigestKind,
     DigestReport,
     ListDigestReportsQuery,
 )

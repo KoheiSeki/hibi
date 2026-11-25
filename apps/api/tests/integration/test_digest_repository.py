@@ -9,15 +9,15 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from hibi.core.config import get_settings
 from hibi.db.engine import dispose_engine, get_engine
+from hibi.modules.captures.constants import (
+    CAPTURE_SCENARIO_STATUS_PROPOSED,
+)
 from hibi.modules.captures.models import CaptureModel, CaptureScenarioModel
 from hibi.modules.captures.policies import (
     CAPTURE_SCENARIO_POLICY_VERSION,
-    CAPTURE_SCENARIO_STATUS_PROPOSED,
 )
 from hibi.modules.captures.repository import CaptureRepository
-from hibi.modules.digests.models import DigestReportModel
-from hibi.modules.digests.repository import DigestRepository
-from hibi.modules.digests.types import (
+from hibi.modules.digests.constants import (
     DIGEST_AGGREGATE_TYPE,
     DIGEST_GENERATION_REQUESTED,
     DIGEST_KIND_DAILY,
@@ -26,8 +26,13 @@ from hibi.modules.digests.types import (
     DIGEST_STATUS_PENDING,
     DIGEST_STATUS_READY,
 )
+from hibi.modules.digests.models import DigestReportModel
+from hibi.modules.digests.repository import DigestRepository
+from hibi.modules.outbox.constants import (
+    OUTBOX_STATUS_PENDING,
+    OUTBOX_STATUS_PUBLISHED,
+)
 from hibi.modules.outbox.models import OutboxModel
-from hibi.modules.outbox.types import OUTBOX_STATUS_PENDING, OUTBOX_STATUS_PUBLISHED
 
 _DAY = date(2026, 11, 10)
 # 開発用の DB に、実際の時刻の行が残っていても、数えないように、遠い未来の日時を使う

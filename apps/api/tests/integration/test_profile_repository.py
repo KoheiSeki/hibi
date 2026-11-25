@@ -2,13 +2,13 @@ from collections.abc import AsyncGenerator
 from uuid import UUID, uuid4
 
 import pytest
-from hibi.modules.profiles.repository import ProfileRepository
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from hibi.core.config import get_settings
 from hibi.db.engine import dispose_engine, get_engine
+from hibi.modules.profiles.repository import ProfileRepository
 
 
 @pytest.fixture

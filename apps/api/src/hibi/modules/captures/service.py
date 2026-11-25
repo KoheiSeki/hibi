@@ -17,6 +17,16 @@ from hibi.ai.classification import (
 )
 from hibi.ai.embedding import Embedding, TextEmbedder
 from hibi.core.timezone import utc_now
+from hibi.modules.captures.constants import (
+    CAPTURE_ROUTE_CLARIFY,
+    CAPTURE_ROUTE_REMINDER,
+    CAPTURE_SEARCH_LIMIT,
+    CAPTURE_SEARCH_MODE_SEMANTIC,
+    CAPTURE_STATUS_COMPLETED,
+    CAPTURE_STATUS_FAILED,
+    CAPTURE_STATUS_PENDING,
+    CAPTURE_STATUS_PROCESSING,
+)
 from hibi.modules.captures.errors import (
     CaptureNotEditableError,
     CaptureNotFoundError,
@@ -29,9 +39,7 @@ from hibi.modules.captures.errors import (
     ScenarioNotAcceptableError,
 )
 from hibi.modules.captures.policies import (
-    CAPTURE_ROUTE_CLARIFY,
     CAPTURE_ROUTE_POLICY_VERSION,
-    CAPTURE_ROUTE_REMINDER,
     decide_capture_route,
     normalize_classification,
     normalize_urgency_score,
@@ -41,12 +49,6 @@ from hibi.modules.captures.repository import CaptureRepository
 from hibi.modules.captures.search import rank_capture_by_keyword, rank_captures_by_semantic
 from hibi.modules.captures.today import rank_today
 from hibi.modules.captures.types import (
-    CAPTURE_SEARCH_LIMIT,
-    CAPTURE_SEARCH_MODE_SEMANTIC,
-    CAPTURE_STATUS_COMPLETED,
-    CAPTURE_STATUS_FAILED,
-    CAPTURE_STATUS_PENDING,
-    CAPTURE_STATUS_PROCESSING,
     Capture,
     CapturePage,
     CreateCaptureCommand,

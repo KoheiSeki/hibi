@@ -6,6 +6,11 @@ from hibi.ai.review_summary import ReviewSummarizer, WeeklyReviewInput, WeeklySt
 from hibi.core.timezone import local_day_start, utc_now
 from hibi.modules.captures.repository import CaptureRepository
 from hibi.modules.captures.today import rank_today
+from hibi.modules.digests.constants import (
+    DIGEST_KIND_DAILY,
+    DIGEST_KIND_WEEKLY,
+    DIGEST_STATUS_PENDING,
+)
 from hibi.modules.digests.content import (
     DAILY_CONTENT_VERSION,
     DAILY_ITEM_LIMIT,
@@ -21,9 +26,6 @@ from hibi.modules.digests.errors import DigestReportNotFoundError, DigestReportN
 from hibi.modules.digests.repository import DigestRepository
 from hibi.modules.digests.schedule import daily_period_start, weekly_period_start
 from hibi.modules.digests.types import (
-    DIGEST_KIND_DAILY,
-    DIGEST_KIND_WEEKLY,
-    DIGEST_STATUS_PENDING,
     ActiveUser,
     DigestReport,
     ListDigestReportsQuery,

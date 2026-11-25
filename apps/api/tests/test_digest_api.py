@@ -3,7 +3,6 @@ from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
-from hibi.modules.digests.router import _get_digest_service
 
 from hibi.api.dependencies import get_principal
 from hibi.api.main import create_app
@@ -12,7 +11,11 @@ from hibi.modules.digests.errors import (
     DigestReportNotFoundError,
     DigestReportNotRetryableError,
 )
-from hibi.modules.digests.types import DigestReport, ListDigestReportsQuery
+from hibi.modules.digests.router import _get_digest_service
+from hibi.modules.digests.types import (
+    DigestReport,
+    ListDigestReportsQuery,
+)
 
 OWNER_ID = UUID("11111111-1111-4111-8111-111111111111")
 OTHER_ID = UUID("22222222-2222-4222-8222-222222222222")

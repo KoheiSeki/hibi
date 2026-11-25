@@ -31,7 +31,9 @@ from hibi.modules.captures.types import (
 )
 
 if TYPE_CHECKING:
-    from hibi.modules.captures.types import TodayCapturesQuery
+    from hibi.modules.captures.types import (
+        TodayCapturesQuery,
+    )
 
 OWNER_ID = UUID("11111111-1111-4111-8111-111111111111")
 OTHER_ID = UUID("22222222-2222-4222-8222-222222222222")

@@ -3,8 +3,14 @@ from uuid import UUID
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from hibi.modules.outbox.constants import (
+    OUTBOX_STATUS_PENDING,
+    OUTBOX_STATUS_PUBLISHED,
+)
 from hibi.modules.outbox.models import OutboxModel
-from hibi.modules.outbox.types import OUTBOX_STATUS_PENDING, OUTBOX_STATUS_PUBLISHED, OutboxEvent
+from hibi.modules.outbox.types import (
+    OutboxEvent,
+)
 
 
 class OutboxRepository:

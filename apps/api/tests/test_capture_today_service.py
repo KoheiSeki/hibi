@@ -11,12 +11,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from hibi.ai.fake_clarification import FakeClarificationGenerator
 from hibi.ai.fake_classifier import FakeCaptureClassifier
 from hibi.ai.fake_embedder import FakeTextEmbedder
+from hibi.modules.captures.constants import (
+    CAPTURE_STATUS_COMPLETED,
+)
 from hibi.modules.captures.errors import CaptureNotFoundError
 from hibi.modules.captures.repository import CaptureRepository
 from hibi.modules.captures.service import CaptureService
 from hibi.modules.captures.today import TodayCandidate
 from hibi.modules.captures.types import (
-    CAPTURE_STATUS_COMPLETED,
     Capture,
     TodayCapturesQuery,
 )

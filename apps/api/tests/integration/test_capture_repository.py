@@ -14,6 +14,14 @@ from hibi.ai.embedding import CAPTURE_EMBED_DIMENSIONS, CAPTURE_EMBED_VERSION, E
 from hibi.ai.fake_embedder import CAPTURE_EMBED_FAKE_MODEL
 from hibi.core.config import get_settings
 from hibi.db.engine import dispose_engine, get_engine
+from hibi.modules.captures.constants import (
+    CAPTURE_PROCESSING_REQUESTED,
+    CAPTURE_SCENARIO_STATUS_PROPOSED,
+    CAPTURE_STATUS_COMPLETED,
+    CAPTURE_STATUS_FAILED,
+    CAPTURE_STATUS_PENDING,
+    CAPTURE_STATUS_PROCESSING,
+)
 from hibi.modules.captures.models import (
     CaptureEmbeddingModel,
     CaptureModel,
@@ -22,22 +30,19 @@ from hibi.modules.captures.models import (
 from hibi.modules.captures.policies import (
     CAPTURE_ROUTE_POLICY_VERSION,
     CAPTURE_SCENARIO_POLICY_VERSION,
-    CAPTURE_SCENARIO_STATUS_PROPOSED,
     ScenarioProposal,
     propose_capture_scenario,
 )
 from hibi.modules.captures.repository import CaptureRepository
 from hibi.modules.captures.types import (
-    CAPTURE_PROCESSING_REQUESTED,
-    CAPTURE_STATUS_COMPLETED,
-    CAPTURE_STATUS_FAILED,
-    CAPTURE_STATUS_PENDING,
-    CAPTURE_STATUS_PROCESSING,
     Capture,
+)
+from hibi.modules.outbox.constants import (
+    OUTBOX_STATUS_PENDING,
+    OUTBOX_STATUS_PUBLISHED,
 )
 from hibi.modules.outbox.models import OutboxModel
 from hibi.modules.outbox.repository import OutboxRepository
-from hibi.modules.outbox.types import OUTBOX_STATUS_PENDING, OUTBOX_STATUS_PUBLISHED
 
 _HASH_A = "a" * 64
 _HASH_B = "b" * 64

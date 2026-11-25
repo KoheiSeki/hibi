@@ -2,7 +2,10 @@ from datetime import date, datetime
 from uuid import UUID
 
 from hibi.core.models import ApiModel
-from hibi.modules.digests.types import DigestKind, DigestStatus
+from hibi.modules.digests.constants import (
+    DigestKind,
+    DigestStatus,
+)
 
 
 class DigestReportResponse(ApiModel):

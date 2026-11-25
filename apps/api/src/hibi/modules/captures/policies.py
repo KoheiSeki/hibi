@@ -3,26 +3,32 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from decimal import Decimal
 
-from hibi.ai.classification import CAPTURE_QUESTION_VERSION, Classification
+from hibi.ai.classification import (
+    CAPTURE_CATEGORIES,
+    CAPTURE_CATEGORY_CHAT,
+    CAPTURE_QUESTION_VERSION,
+    Classification,
+)
+from hibi.modules.captures.constants import (
+    CAPTURE_ROUTE_CLARIFY,
+    CAPTURE_ROUTE_EXPENSE,
+    CAPTURE_ROUTE_REMINDER,
+    CAPTURE_ROUTE_SHOPPING,
+    CAPTURE_SCENARIO_ROUTES,
+    CAPTURE_SCENARIO_STATUS_PROPOSED,
+)
 from hibi.modules.captures.due import extract_remind_text, parse_due_at
 
+# 閾値と版は、ルールを変えたら一緒に変える値なので、ルールの隣に置く
 CAPTURE_ROUTE_CONFIDENCE_THRESHOLD = Decimal("0.70")
-CAPTURE_ROUTE_CLARIFY = "clarify"
-CAPTURE_ROUTE_REMINDER = "reminder"
 CAPTURE_ROUTE_POLICY_VERSION = "capture-route-v1"
-
-CAPTURE_CATEGORIES = frozenset({"shopping", "reminder", "expense", "note", "chat"})
-
 CAPTURE_SCENARIO_POLICY_VERSION = "capture-scenario-v1"
-CAPTURE_SCENARIO_STATUS_PROPOSED = "proposed"
-CAPTURE_SCENARIO_STATUS_ACCEPTED = "accepted"
-CAPTURE_SCENARIO_ROUTES = frozenset({"shopping", "reminder", "expense"})
 
 _EXACT_SCENARIOS: dict[tuple[str, str], tuple[str, int | None, str | None]] = {
-    ("shopping", "牛乳を買う"): ("牛乳", None, None),
-    ("shopping", "境界の牛乳"): ("牛乳", None, None),
-    ("reminder", "明日の 9 時に起こして"): ("起こして", None, "明日の 9 時"),
-    ("expense", "ランチ 1200 円"): ("ランチ", 1200, None),
+    (CAPTURE_ROUTE_SHOPPING, "牛乳を買う"): ("牛乳", None, None),
+    (CAPTURE_ROUTE_SHOPPING, "境界の牛乳"): ("牛乳", None, None),
+    (CAPTURE_ROUTE_REMINDER, "明日の 9 時に起こして"): ("起こして", None, "明日の 9 時"),
+    (CAPTURE_ROUTE_EXPENSE, "ランチ 1200 円"): ("ランチ", 1200, None),
 }
 
 
@@ -88,7 +94,7 @@ def normalize_classification(classification: Classification) -> Classification:
     ):
         return replace(
             classification,
-            category="chat",
+            category=CAPTURE_CATEGORY_CHAT,
             confidence=Decimal("0"),
             question_version=CAPTURE_QUESTION_VERSION,
         )
@@ -165,7 +171,7 @@ def _expense_amount(route: str, raw_text: str) -> int | None:
         金額。expense でない、または `N円` の形が無ければ None。
     """
 
-    if route != "expense":
+    if route != CAPTURE_ROUTE_EXPENSE:
         return None
     matched = re.search(r"(\d+)\s*円", raw_text)
     if matched is None:

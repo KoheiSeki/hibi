@@ -7,7 +7,9 @@ import numpy as np
 
 from hibi.ai.embedding import Embedding, TextEmbedder
 from hibi.ai.tokens import tokenize_text
-from hibi.modules.captures.types import CAPTURE_STATUS_COMPLETED
+from hibi.modules.captures.constants import (
+    CAPTURE_STATUS_COMPLETED,
+)
 
 
 @dataclass(frozen=True, slots=True)

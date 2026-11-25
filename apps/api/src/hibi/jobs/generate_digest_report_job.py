@@ -10,13 +10,13 @@ from hibi.jobs.job_logging import log_job_failure
 from hibi.jobs.names import GENERATE_DIGEST_REPORT_JOB_NAME
 from hibi.jobs.retry import retry_delay
 from hibi.modules.captures.repository import CaptureRepository
-from hibi.modules.digests.repository import DigestRepository
-from hibi.modules.digests.service import DigestService
-from hibi.modules.digests.types import (
+from hibi.modules.digests.constants import (
     DIGEST_ERROR_GENERATION_FAILED,
     DIGEST_ERROR_REVIEW_PROVIDER,
     DIGEST_GENERATION_MAX_ATTEMPTS,
 )
+from hibi.modules.digests.repository import DigestRepository
+from hibi.modules.digests.service import DigestService
 
 
 async def generate_digest_report_job(ctx: dict[str, Any], report_id: UUID) -> None:

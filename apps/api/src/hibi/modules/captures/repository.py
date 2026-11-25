@@ -8,25 +8,25 @@ from sqlalchemy import delete, func, select, tuple_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hibi.ai.embedding import Embedding
+from hibi.modules.captures.constants import (
+    CAPTURE_AGGREGATE_TYPE,
+    CAPTURE_PROCESSING_REQUESTED,
+    CAPTURE_SCENARIO_STATUS_ACCEPTED,
+    CAPTURE_SCENARIO_STATUS_PROPOSED,
+    CAPTURE_STATUS_COMPLETED,
+    CAPTURE_STATUS_FAILED,
+    CAPTURE_STATUS_PENDING,
+    CAPTURE_STATUS_PROCESSING,
+)
 from hibi.modules.captures.models import (
     CaptureEmbeddingModel,
     CaptureModel,
     CaptureScenarioModel,
 )
-from hibi.modules.captures.policies import (
-    CAPTURE_SCENARIO_STATUS_ACCEPTED,
-    CAPTURE_SCENARIO_STATUS_PROPOSED,
-    ScenarioProposal,
-)
+from hibi.modules.captures.policies import ScenarioProposal
 from hibi.modules.captures.search import SearchDocument
 from hibi.modules.captures.today import TodayCandidate
 from hibi.modules.captures.types import (
-    CAPTURE_AGGREGATE_TYPE,
-    CAPTURE_PROCESSING_REQUESTED,
-    CAPTURE_STATUS_COMPLETED,
-    CAPTURE_STATUS_FAILED,
-    CAPTURE_STATUS_PENDING,
-    CAPTURE_STATUS_PROCESSING,
     Capture,
     CaptureScenario,
 )

@@ -6,11 +6,19 @@ from decimal import Decimal
 from uuid import UUID
 
 from hibi.ai.review_summary import WeeklyReviewInput
+from hibi.modules.captures.constants import (
+    CAPTURE_STATUS_COMPLETED,
+)
 from hibi.modules.captures.today import TodayCandidate
-from hibi.modules.captures.types import CAPTURE_STATUS_COMPLETED, Capture, CaptureScenario
-from hibi.modules.digests.types import (
+from hibi.modules.captures.types import (
+    Capture,
+    CaptureScenario,
+)
+from hibi.modules.digests.constants import (
     DIGEST_KIND_DAILY,
     DIGEST_STATUS_PENDING,
+)
+from hibi.modules.digests.types import (
     ActiveUser,
     DigestReport,
 )

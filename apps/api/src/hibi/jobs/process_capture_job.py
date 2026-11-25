@@ -12,9 +12,11 @@ from hibi.db.session import session_scope
 from hibi.jobs.job_logging import log_job_failure
 from hibi.jobs.names import PROCESS_CAPTURE_JOB_NAME
 from hibi.jobs.retry import retry_delay
+from hibi.modules.captures.constants import (
+    CAPTURE_PROCESSING_MAX_ATTEMPTS,
+)
 from hibi.modules.captures.repository import CaptureRepository
 from hibi.modules.captures.service import CaptureService
-from hibi.modules.captures.types import CAPTURE_PROCESSING_MAX_ATTEMPTS
 from hibi.modules.profiles.repository import ProfileRepository
 
 
