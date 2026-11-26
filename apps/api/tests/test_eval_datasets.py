@@ -1,9 +1,13 @@
 import hashlib
 import json
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
 import pytest
+
+from hibi.ai.classification import CAPTURE_CATEGORIES
+from hibi.evals.constants import CLASSIFICATION_DATASET, DISPUTED_TAG
 from hibi.evals.datasets import (
     ClassificationCase,
     DatasetError,
@@ -267,3 +271,55 @@ def test_rejects_a_duplicate_doc_id_in_the_corpus(tmp_path: Path) -> None:
 
     assert "corpus.jsonl line 2" in str(error.value)
     assert "doc-001" in str(error.value)
+
+
+# 分類の評価データ v1 で使ってよい tag。書き間違えた tag は、tag ごとの集計で別の行になってしまう
+_CLASSIFICATION_TAGS = frozenset(
+    {
+        "basic",
+        "relative-date",
+        "amount",
+        "colloquial",
+        "notation",
+        "mixed",
+        "ambiguous",
+        DISPUTED_TAG,
+    }
+)
+
+
+def _scored_classification_cases() -> list[ClassificationCase]:
+    # disputed のケースは指標から外れるので、件数の条件も外した後の件数で確かめる
+    dataset = load_classification_cases(CLASSIFICATION_DATASET)
+    return [case for case in dataset.cases if DISPUTED_TAG not in case.tags]
+
+
+def test_the_committed_classification_dataset_is_valid_and_balanced() -> None:
+    cases = _scored_classification_cases()
+    counts = Counter(case.expected_category for case in cases)
+
+    assert len(cases) >= 60
+    assert {
+        category: counts[category] for category in CAPTURE_CATEGORIES if counts[category] < 10
+    } == {}
+    assert sum(case.should_clarify for case in cases) >= 10
+
+
+def test_the_committed_classification_dataset_uses_only_known_tags() -> None:
+    dataset = load_classification_cases(CLASSIFICATION_DATASET)
+    unknown = {
+        case.case_id: sorted(set(case.tags) - _CLASSIFICATION_TAGS)
+        for case in dataset.cases
+        if not set(case.tags) <= _CLASSIFICATION_TAGS
+    }
+
+    assert unknown == {}
+
+
+def test_each_category_has_more_than_basic_cases() -> None:
+    cases = _scored_classification_cases()
+    for category in CAPTURE_CATEGORIES:
+        in_category = [case for case in cases if case.expected_category == category]
+        harder = [case for case in in_category if set(case.tags) - {"basic"}]
+
+        assert len(harder) * 2 >= len(in_category), category
