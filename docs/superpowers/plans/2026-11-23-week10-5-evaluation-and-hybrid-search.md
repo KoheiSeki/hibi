@@ -111,12 +111,12 @@ Expected: FAIL(`ModuleNotFoundError: hibi.evals`)
 - `load_search_dataset(corpus_path, queries_path)`: 2 つを同じ規則で読み、`relevantDocIds` が空でないこと、すべて corpus にあることを確かめる
 - JSON の項目名(camelCase)と dataclass の名前(snake_case)の対応は、この file の中で閉じる
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `uv run --project apps/api pytest apps/api/tests/test_eval_datasets.py -v`、`ruff check`、`ty check apps/api/src`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api/src/hibi/evals apps/api/tests/test_eval_datasets.py
@@ -136,7 +136,7 @@ git commit -m "feat(evals): load and validate versioned evaluation datasets"
 
 - Consumes: Task 1 の `load_classification_cases`、`constants.CLASSIFICATION_DATASET`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 def test_the_committed_classification_dataset_is_valid_and_balanced() -> None:
@@ -147,24 +147,24 @@ def test_the_committed_classification_dataset_is_valid_and_balanced() -> None:
     assert sum(case.should_clarify for case in dataset.cases) >= 10
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `uv run --project apps/api pytest apps/api/tests/test_eval_datasets.py -v -k committed`
 Expected: FAIL(`FileNotFoundError`)
 
-- [ ] **Step 3: Claude が案を作る**
+- [x] **Step 3: Claude が案を作る**
 
 - 5 つの category を 10〜12 件ずつ、`shouldClarify: true` を 10〜12 件。ID は `cls-001` から連番
 - tags は `basic`、`relative-date`、`amount`、`colloquial`、`notation`、`mixed`、`ambiguous` から付ける。各 category に `basic` 以外の tag を半分以上入れる
 - `shouldClarify: true` の `expectedCategory` は、人が一番ありそうだと思う category にする(例: 「あれやっといて」は `chat`)
 
-- [ ] **Step 4: ユーザーが全件を確かめて確定する**
+- [x] **Step 4: ユーザーが全件を確かめて確定する**
 
 迷った行は `disputed` を tags に足す(指標から外れる)。確定したら、Step 1 のテストを流す。
 Run: `uv run --project apps/api pytest apps/api/tests/test_eval_datasets.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add docs/ai/evals/capture-classification-v1.jsonl apps/api/tests/test_eval_datasets.py
@@ -197,7 +197,7 @@ git commit -m "test(evals): add the capture classification dataset v1"
   - `ndcg_at_k(ranked, relevant, k: int) -> float` — 関連は 2 値、割引は `1 / log2(rank + 1)`
   - `mean_and_std(values: Sequence[float]) -> tuple[float, float]` — std は標本標準偏差。1 件なら 0.0
 
-- [ ] **Step 1: Write the failing tests** in `tests/test_eval_metrics.py`
+- [x] **Step 1: Write the failing tests** in `tests/test_eval_metrics.py`
 
 ```python
 _EXPECTED = ["shopping", "shopping", "note", "chat"]
@@ -255,7 +255,7 @@ def test_mean_and_std() -> None:
     assert mean_and_std([0.7, 0.9]) == (pytest.approx(0.8), pytest.approx(0.14142, abs=1e-5))
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `uv run --project apps/api pytest apps/api/tests/test_eval_metrics.py -v`
 Expected: FAIL(`ModuleNotFoundError: hibi.evals.metrics`)
@@ -266,7 +266,7 @@ Expected: FAIL(`ModuleNotFoundError: hibi.evals.metrics`)
 
 - 割り算の分母が 0 のときは 0.0 を返す(precision、recall、f1、accuracy、recall の relevant が空)
 - `calibration_bins`: 区間の番号は `min(int(Decimal(str(c)) * bin_count), bin_count - 1)`。浮動小数のまま掛けない
-- `percentile`: 昇順に並べ、`ceil(q / 100 * n)` 番目(1 始まり)
+- `percentile`: 昇順に並べ、`max(1, ceil(q * n / 100))` 番目(1 始まり)。下限を 1 にするのは、q = 0 で 0 番目になり、`[-1]` が黙って最大値を返すのを防ぐため。`q * n / 100` の順にするのは、整数のまま掛けてから割るため
 - `mean_and_std`: `statistics.mean` と `statistics.stdev`
 
 - [ ] **Step 4: Run to verify it passes**
