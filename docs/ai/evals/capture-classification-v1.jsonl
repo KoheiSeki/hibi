@@ -1,0 +1,60 @@
+{"caseId": "cls-001", "rawText": "牛乳を買う", "expectedCategory": "shopping", "shouldClarify": false, "tags": ["basic"]}
+{"caseId": "cls-002", "rawText": "トイレットペーパーを買っておく", "expectedCategory": "shopping", "shouldClarify": false, "tags": ["basic"]}
+{"caseId": "cls-003", "rawText": "Amazonで単3電池を注文する", "expectedCategory": "shopping", "shouldClarify": false, "tags": ["basic"]}
+{"caseId": "cls-004", "rawText": "たまご、ぎゅうにゅう、パン", "expectedCategory": "shopping", "shouldClarify": false, "tags": ["notation"]}
+{"caseId": "cls-005", "rawText": "ﾃｨｯｼｭ 2箱", "expectedCategory": "shopping", "shouldClarify": false, "tags": ["notation"]}
+{"caseId": "cls-006", "rawText": "シャンプー切れた", "expectedCategory": "shopping", "shouldClarify": false, "tags": ["colloquial"]}
+{"caseId": "cls-007", "rawText": "洗剤の詰め替え、そろそろストック無い", "expectedCategory": "shopping", "shouldClarify": false, "tags": ["colloquial"]}
+{"caseId": "cls-008", "rawText": "明日までにプリンターのインク買う", "expectedCategory": "shopping", "shouldClarify": false, "tags": ["relative-date", "mixed"]}
+{"caseId": "cls-009", "rawText": "コーヒー豆、980円くらいのやつ", "expectedCategory": "shopping", "shouldClarify": false, "tags": ["amount", "mixed"]}
+{"caseId": "cls-010", "rawText": "子どもの上履き、ワンサイズ大きいの", "expectedCategory": "shopping", "shouldClarify": false, "tags": ["colloquial"]}
+{"caseId": "cls-011", "rawText": "あれ買わなきゃ", "expectedCategory": "shopping", "shouldClarify": true, "tags": ["ambiguous"]}
+{"caseId": "cls-012", "rawText": "例のやつ注文しといて", "expectedCategory": "shopping", "shouldClarify": true, "tags": ["ambiguous", "colloquial"]}
+{"caseId": "cls-013", "rawText": "15時に会議", "expectedCategory": "reminder", "shouldClarify": false, "tags": ["basic"]}
+{"caseId": "cls-014", "rawText": "毎朝 6 時半に起こして", "expectedCategory": "reminder", "shouldClarify": false, "tags": ["basic"]}
+{"caseId": "cls-015", "rawText": "明日の朝 7 時に歯医者", "expectedCategory": "reminder", "shouldClarify": false, "tags": ["relative-date"]}
+{"caseId": "cls-016", "rawText": "金曜に燃えないゴミを出す", "expectedCategory": "reminder", "shouldClarify": false, "tags": ["relative-date"]}
+{"caseId": "cls-017", "rawText": "来週の月曜、母に電話", "expectedCategory": "reminder", "shouldClarify": false, "tags": ["relative-date"]}
+{"caseId": "cls-018", "rawText": "あさって 10じ びよういん", "expectedCategory": "reminder", "shouldClarify": false, "tags": ["notation", "relative-date"]}
+{"caseId": "cls-019", "rawText": "１５：３０から打ち合わせ", "expectedCategory": "reminder", "shouldClarify": false, "tags": ["notation"]}
+{"caseId": "cls-020", "rawText": "忘れずに薬飲む", "expectedCategory": "reminder", "shouldClarify": false, "tags": ["colloquial"]}
+{"caseId": "cls-021", "rawText": "月末までに家賃を振り込む", "expectedCategory": "reminder", "shouldClarify": false, "tags": ["relative-date", "mixed"]}
+{"caseId": "cls-022", "rawText": "今夜ゴミ出し忘れないで", "expectedCategory": "reminder", "shouldClarify": false, "tags": ["relative-date", "colloquial"]}
+{"caseId": "cls-023", "rawText": "そのうち車検", "expectedCategory": "reminder", "shouldClarify": true, "tags": ["ambiguous"]}
+{"caseId": "cls-024", "rawText": "あとで連絡", "expectedCategory": "reminder", "shouldClarify": true, "tags": ["ambiguous", "colloquial"]}
+{"caseId": "cls-025", "rawText": "ランチ 900円", "expectedCategory": "expense", "shouldClarify": false, "tags": ["basic"]}
+{"caseId": "cls-026", "rawText": "飲み会で 5000 円払った", "expectedCategory": "expense", "shouldClarify": false, "tags": ["basic"]}
+{"caseId": "cls-027", "rawText": "タクシー代 2,400円", "expectedCategory": "expense", "shouldClarify": false, "tags": ["amount"]}
+{"caseId": "cls-028", "rawText": "コンビニ ¥580", "expectedCategory": "expense", "shouldClarify": false, "tags": ["amount"]}
+{"caseId": "cls-029", "rawText": "電気代 8千円", "expectedCategory": "expense", "shouldClarify": false, "tags": ["amount"]}
+{"caseId": "cls-030", "rawText": "Suicaに3000チャージ", "expectedCategory": "expense", "shouldClarify": false, "tags": ["amount"]}
+{"caseId": "cls-031", "rawText": "本屋で1500", "expectedCategory": "expense", "shouldClarify": false, "tags": ["amount", "colloquial"]}
+{"caseId": "cls-032", "rawText": "カフェ　４５０円", "expectedCategory": "expense", "shouldClarify": false, "tags": ["notation", "amount"]}
+{"caseId": "cls-033", "rawText": "スーパーで2380円、牛乳とパン", "expectedCategory": "expense", "shouldClarify": false, "tags": ["mixed", "amount"]}
+{"caseId": "cls-034", "rawText": "昨日のガソリン代 6,120円", "expectedCategory": "expense", "shouldClarify": false, "tags": ["relative-date", "amount"]}
+{"caseId": "cls-035", "rawText": "3000", "expectedCategory": "expense", "shouldClarify": true, "tags": ["ambiguous"]}
+{"caseId": "cls-036", "rawText": "立て替えた分", "expectedCategory": "expense", "shouldClarify": true, "tags": ["ambiguous"]}
+{"caseId": "cls-037", "rawText": "あとで読む: 非同期処理の設計の記事", "expectedCategory": "note", "shouldClarify": false, "tags": ["basic"]}
+{"caseId": "cls-038", "rawText": "Wi-Fi のパスワードはルーターの裏", "expectedCategory": "note", "shouldClarify": false, "tags": ["basic"]}
+{"caseId": "cls-039", "rawText": "駐車場は B2 の 34 番", "expectedCategory": "note", "shouldClarify": false, "tags": ["basic"]}
+{"caseId": "cls-040", "rawText": "保険の証券番号 A-12345", "expectedCategory": "note", "shouldClarify": false, "tags": ["basic"]}
+{"caseId": "cls-041", "rawText": "https://example.com/articles/42", "expectedCategory": "note", "shouldClarify": false, "tags": ["basic"]}
+{"caseId": "cls-042", "rawText": "勧められた本、「ファクトフルネス」", "expectedCategory": "note", "shouldClarify": false, "tags": ["colloquial"]}
+{"caseId": "cls-043", "rawText": "気になるカフェ、駅の北口のとこ", "expectedCategory": "note", "shouldClarify": false, "tags": ["colloquial"]}
+{"caseId": "cls-044", "rawText": "ﾚｼﾋﾟ 塩小さじ1 醤油大さじ2", "expectedCategory": "note", "shouldClarify": false, "tags": ["notation"]}
+{"caseId": "cls-045", "rawText": "旅行の持ち物 充電器 パスポート 常備薬", "expectedCategory": "note", "shouldClarify": false, "tags": ["mixed"]}
+{"caseId": "cls-046", "rawText": "来期は採用を 2 人増やす方針、と会議で決まった", "expectedCategory": "note", "shouldClarify": false, "tags": ["relative-date"]}
+{"caseId": "cls-047", "rawText": "これ後で見る", "expectedCategory": "note", "shouldClarify": true, "tags": ["ambiguous"]}
+{"caseId": "cls-048", "rawText": "さっきの番号", "expectedCategory": "note", "shouldClarify": true, "tags": ["ambiguous", "colloquial"]}
+{"caseId": "cls-049", "rawText": "今日は疲れた", "expectedCategory": "chat", "shouldClarify": false, "tags": ["basic"]}
+{"caseId": "cls-050", "rawText": "ありがとう", "expectedCategory": "chat", "shouldClarify": false, "tags": ["basic"]}
+{"caseId": "cls-051", "rawText": "おはよう", "expectedCategory": "chat", "shouldClarify": false, "tags": ["basic"]}
+{"caseId": "cls-052", "rawText": "雨やだなー", "expectedCategory": "chat", "shouldClarify": false, "tags": ["colloquial"]}
+{"caseId": "cls-053", "rawText": "最近よく眠れない", "expectedCategory": "chat", "shouldClarify": false, "tags": ["colloquial"]}
+{"caseId": "cls-054", "rawText": "それな", "expectedCategory": "chat", "shouldClarify": false, "tags": ["colloquial"]}
+{"caseId": "cls-055", "rawText": "ｗｗｗ", "expectedCategory": "chat", "shouldClarify": false, "tags": ["notation"]}
+{"caseId": "cls-056", "rawText": "週末なにしようかな", "expectedCategory": "chat", "shouldClarify": false, "tags": ["relative-date", "colloquial"]}
+{"caseId": "cls-057", "rawText": "ランチ美味しかった", "expectedCategory": "chat", "shouldClarify": false, "tags": ["mixed"]}
+{"caseId": "cls-058", "rawText": "あれやっといて", "expectedCategory": "chat", "shouldClarify": true, "tags": ["ambiguous"]}
+{"caseId": "cls-059", "rawText": "うーん", "expectedCategory": "chat", "shouldClarify": true, "tags": ["ambiguous"]}
+{"caseId": "cls-060", "rawText": "例の件どうなった？", "expectedCategory": "chat", "shouldClarify": true, "tags": ["ambiguous"]}

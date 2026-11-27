@@ -1,0 +1,1954 @@
+{
+  "components": {
+    "schemas": {
+      "ApiResponseWithMeta_list_CaptureResponse__CursorMeta_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/CaptureResponse"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/CursorMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "ApiResponseWithMeta[list[CaptureResponse], CursorMeta]",
+        "type": "object"
+      },
+      "ApiResponse_CaptureResponse_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CaptureResponse"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiResponse[CaptureResponse]",
+        "type": "object"
+      },
+      "ApiResponse_DigestReportResponse_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DigestReportResponse"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiResponse[DigestReportResponse]",
+        "type": "object"
+      },
+      "ApiResponse_EchoResponse_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/EchoResponse"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiResponse[EchoResponse]",
+        "type": "object"
+      },
+      "ApiResponse_HealthResponse_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/HealthResponse"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiResponse[HealthResponse]",
+        "type": "object"
+      },
+      "ApiResponse_ProtectedResourceResponse_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ProtectedResourceResponse"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiResponse[ProtectedResourceResponse]",
+        "type": "object"
+      },
+      "ApiResponse_UserResponse_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/UserResponse"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiResponse[UserResponse]",
+        "type": "object"
+      },
+      "ApiResponse_list_CaptureResponse__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/CaptureResponse"
+            },
+            "title": "Data",
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiResponse[list[CaptureResponse]]",
+        "type": "object"
+      },
+      "ApiResponse_list_DigestReportResponse__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/DigestReportResponse"
+            },
+            "title": "Data",
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiResponse[list[DigestReportResponse]]",
+        "type": "object"
+      },
+      "CaptureResponse": {
+        "description": "\u8a18\u9332 1 \u4ef6\u3002\n\nstatus \u306f pending\u3001processing\u3001completed\u3001failed \u306e\u3044\u305a\u308c\u304b\u3002category\u3001route\u3001\nurgency\u3001confidence\u3001policyVersion\u3001questionVersion\u3001processedAt \u306f\u3001\u51e6\u7406\u304c\n\u7d42\u308f\u308b\u307e\u3067 null\u3002clarificationText \u306f\u3001route \u304c clarify \u306e\u3068\u304d\u3060\u3051\u5165\u308b\u3002\nscenario \u306f\u3001completed \u3067 route \u304c shopping\u3001reminder\u3001expense \u306e\u3068\u304d\u3060\u3051\u5165\u308b\u3002",
+        "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "clarificationText": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clarificationtext"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "title": "Createdat",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "policyVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policyversion"
+          },
+          "processedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Processedat"
+          },
+          "questionVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Questionversion"
+          },
+          "rawText": {
+            "title": "Rawtext",
+            "type": "string"
+          },
+          "route": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route"
+          },
+          "scenario": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScenarioResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "title": "Updatedat",
+            "type": "string"
+          },
+          "urgency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Urgency"
+          }
+        },
+        "required": [
+          "id",
+          "rawText",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ],
+        "title": "CaptureResponse",
+        "type": "object"
+      },
+      "CreateCaptureRequest": {
+        "description": "\u8a18\u9332\u306e\u4f5c\u6210\u306e\u5165\u529b\u3002\n\nrawText \u306f\u524d\u5f8c\u306e\u7a7a\u767d\u3092\u9664\u3044\u3066 1 \u6587\u5b57\u4ee5\u4e0a 2000 \u6587\u5b57\u4ee5\u4e0b\u3002\u9055\u53cd\u306f 422\u3002",
+        "properties": {
+          "rawText": {
+            "title": "Rawtext",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rawText"
+        ],
+        "title": "CreateCaptureRequest",
+        "type": "object"
+      },
+      "CursorMeta": {
+        "properties": {
+          "hasNextPage": {
+            "title": "Hasnextpage",
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextcursor"
+          }
+        },
+        "required": [
+          "nextCursor",
+          "hasNextPage"
+        ],
+        "title": "CursorMeta",
+        "type": "object"
+      },
+      "DigestReportResponse": {
+        "description": "\u671d\u306e\u30c0\u30a4\u30b8\u30a7\u30b9\u30c8\u3001\u307e\u305f\u306f\u9031\u6b21\u30ec\u30d3\u30e5\u30fc 1 \u4ef6\u3002\n\nkind \u306f daily \u304b weekly\u3002periodStart \u306f\u3001\u5229\u7528\u8005\u306e timezone \u3067\u306e\u66a6\u65e5\u3067\u3001daily \u306f\n\u305d\u306e\u65e5\u3001weekly \u306f\u5bfe\u8c61\u306e\u9031\u306e\u6708\u66dc\u3002timezone \u306f\u3001\u4f5c\u3063\u305f\u3068\u304d\u306b\u4f7f\u3063\u305f IANA \u540d\u3002\n\nstatus \u306f pending\u3001ready\u3001failed \u306e\u3044\u305a\u308c\u304b\u3002content \u3068 generatedAt \u306f\u3001ready \u306e\n\u3068\u304d\u3060\u3051\u5165\u308a\u3001pending \u3068 failed \u3067\u306f null\u3002errorCode \u306f\u3001failed \u306e\u3068\u304d\u3060\u3051\u5165\u308b\u3002\n\u5024\u306f generation_failed \u304b review_provider_error \u3067\u3001\u77e5\u3089\u306a\u3044\u5024\u306f generation_failed\n\u3068\u540c\u3058\u306b\u6271\u3046\u3002failed \u306e\u884c\u306f\u3001retry \u3067 pending \u306b\u623b\u305b\u308b\u3002\n\ncontent \u306e\u5f62\u306f contentVersion \u3067\u6c7a\u307e\u308b\u3002daily-digest-v1 \u306f items\u3001overdueCount\u3001\ndueTodayCount\u3001doneYesterdayCount \u3092\u3001weekly-review-v1 \u306f stats \u3068 summary \u3092\u6301\u3064\u3002",
+        "properties": {
+          "content": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          },
+          "contentVersion": {
+            "title": "Contentversion",
+            "type": "string"
+          },
+          "errorCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Errorcode"
+          },
+          "generatedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generatedat"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "daily",
+              "weekly"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "periodStart": {
+            "format": "date",
+            "title": "Periodstart",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "ready",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "periodStart",
+          "timezone",
+          "status",
+          "contentVersion"
+        ],
+        "title": "DigestReportResponse",
+        "type": "object"
+      },
+      "EchoRequest": {
+        "properties": {
+          "message": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "title": "EchoRequest",
+        "type": "object"
+      },
+      "EchoResponse": {
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "title": "EchoResponse",
+        "type": "object"
+      },
+      "FieldProblem": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "pointer": {
+            "title": "Pointer",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pointer",
+          "code",
+          "detail"
+        ],
+        "title": "FieldProblem",
+        "type": "object"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "HealthResponse",
+        "type": "object"
+      },
+      "ProblemDetails": {
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FieldProblem"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Errors"
+          },
+          "instance": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instance"
+          },
+          "requestId": {
+            "title": "Requestid",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "detail",
+          "requestId"
+        ],
+        "title": "ProblemDetails",
+        "type": "object"
+      },
+      "ProtectedResourceResponse": {
+        "properties": {
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "title": "ProtectedResourceResponse",
+        "type": "object"
+      },
+      "ScenarioResponse": {
+        "description": "\u8a18\u9332\u304b\u3089\u4f5c\u3063\u305f\u3001\u3084\u308b\u3053\u3068\u306e\u63d0\u6848\u3068\u3001\u305d\u306e\u9032\u307f\u5177\u5408\u3002\n\nstatus \u304c proposed \u306a\u3089\u63d0\u6848\u3001accepted \u306a\u3089\u30e6\u30fc\u30b6\u30fc\u304c\u78ba\u8a8d\u6e08\u307f\u3002doneAt \u304c\u5165\u3063\u3066\n\u3044\u308c\u3070\u5b8c\u4e86\u6e08\u307f\u3067\u3001status \u3068\u306f\u72ec\u7acb\u3057\u3066\u3044\u308b\u3002amount \u306f\u652f\u51fa\u3067\u91d1\u984d\u304c\u53d6\u308c\u305f\u3068\u304d\u3060\u3051\u3001\nremindText \u3068 dueAt \u306f\u4e88\u5b9a\u3067\u6642\u523b\u3092\u8aad\u307f\u53d6\u308c\u305f\u3068\u304d\u3060\u3051\u5165\u308b\u3002",
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "doneAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doneat"
+          },
+          "dueAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dueat"
+          },
+          "policyVersion": {
+            "title": "Policyversion",
+            "type": "string"
+          },
+          "remindText": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remindtext"
+          },
+          "route": {
+            "title": "Route",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "route",
+          "status",
+          "title",
+          "policyVersion"
+        ],
+        "title": "ScenarioResponse",
+        "type": "object"
+      },
+      "UpdateCaptureRequest": {
+        "description": "\u8a18\u9332\u306e\u672c\u6587\u306e\u66f4\u65b0\u306e\u5165\u529b\u3002\n\nrawText \u306f\u4f5c\u6210\u306e\u3068\u304d\u3068\u540c\u3058\u5236\u7d04\u3002\u66f4\u65b0\u3067\u304d\u308b\u306e\u306f pending \u3068 failed \u306e\u8a18\u9332\u3060\u3051\u3002",
+        "properties": {
+          "rawText": {
+            "title": "Rawtext",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rawText"
+        ],
+        "title": "UpdateCaptureRequest",
+        "type": "object"
+      },
+      "UserResponse": {
+        "properties": {
+          "userId": {
+            "title": "Userid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "userId"
+        ],
+        "title": "UserResponse",
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "title": "Hibi API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/captures": {
+      "get": {
+        "description": "\u81ea\u5206\u306e\u8a18\u9332\u3092\u3001\u65b0\u3057\u3044\u9806\u306b\u4e00\u89a7\u3067\u8fd4\u3059\u3002\n\nlimit \u306f 1 \u4ee5\u4e0a 50 \u4ee5\u4e0b\u3067\u3001\u672a\u6307\u5b9a\u306f 20\u3002\u7d9a\u304d\u306f\u3001\u524d\u306e\u5fdc\u7b54\u306e meta.nextCursor \u3092\ncursor \u306b\u6e21\u3057\u3066\u53d6\u5f97\u3059\u308b\u3002cursor \u304c\u4e0d\u6b63\u306a\u3089 400\u3002",
+        "operationId": "listCaptures",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseWithMeta_list_CaptureResponse__CursorMeta_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Bad request."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "An unexpected server error occurred."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Captures",
+        "tags": [
+          "captures"
+        ]
+      },
+      "post": {
+        "description": "\u8a18\u9332\u3092\u4f5c\u308a\u3001AI \u306b\u3088\u308b\u51e6\u7406\u3092\u4e88\u7d04\u3059\u308b\u3002\n\n\u51e6\u7406\u306f\u975e\u540c\u671f\u3067\u3001\u4f5c\u6210\u76f4\u5f8c\u306e status \u306f pending\u3002\u51e6\u7406\u304c\u7d42\u308f\u308b\u307e\u3067\u3001\u5358\u4f53\u53d6\u5f97\u3067\nstatus \u3092\u78ba\u304b\u3081\u308b\u3002Idempotency-Key \u30d8\u30c3\u30c0\u30fc\u304c\u5fc5\u9808\u3067\u3001\u540c\u3058\u30ad\u30fc\u3068\u672c\u6587\u306e\u518d\u9001\u306f\n\u65b0\u3057\u304f\u4f5c\u3089\u305a\u3001\u65e2\u5b58\u306e\u8a18\u9332\u3092 200 \u3067\u8fd4\u3059\u3002\u65b0\u898f\u306f 202\u3002\u30ad\u30fc\u304c\u7121\u3044\u3001\u307e\u305f\u306f\u5f62\u5f0f\u304c\n\u4e0d\u6b63\u306a\u3089 400\u3002\u540c\u3058\u30ad\u30fc\u3067\u672c\u6587\u304c\u9055\u3048\u3070 409\u3002\u672c\u6587\u306f\u524d\u5f8c\u306e\u7a7a\u767d\u3092\u9664\u3044\u3066 1 \u6587\u5b57\u4ee5\u4e0a\n2000 \u6587\u5b57\u4ee5\u4e0b\u3067\u3001\u9055\u53cd\u306f 422\u3002",
+        "operationId": "createCapture",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCaptureRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_CaptureResponse_"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_CaptureResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Bad request."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Conflict."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "An unexpected server error occurred."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Capture",
+        "tags": [
+          "captures"
+        ]
+      }
+    },
+    "/api/v1/captures/search": {
+      "get": {
+        "description": "\u5b8c\u4e86\u3057\u305f\u8a18\u9332\u3092\u3001\u81ea\u5206\u306e\u5206\u3060\u3051\u691c\u7d22\u3059\u308b\u3002\n\nmode=keyword \u306f\u672c\u6587\u306e\u8a9e\u306e\u91cd\u306a\u308a\u3001mode=semantic \u306f\u610f\u5473\u306e\u8fd1\u3055\u3067\u9078\u3076\u3002\n\u8fd1\u3044\u9806\u306b\u6700\u592720\u4ef6\u3092\u8fd4\u3057\u3001\u898b\u3064\u304b\u3089\u306a\u3051\u308c\u3070\u7a7a\u914d\u5217\u3092\u8fd4\u3059\u3002",
+        "operationId": "searchCaptures",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "mode",
+            "required": false,
+            "schema": {
+              "default": "keyword",
+              "enum": [
+                "keyword",
+                "semantic"
+              ],
+              "title": "Mode",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_list_CaptureResponse__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "An unexpected server error occurred."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Search Captures",
+        "tags": [
+          "captures"
+        ]
+      }
+    },
+    "/api/v1/captures/today": {
+      "get": {
+        "description": "\u4eca\u65e5\u3084\u308b\u3053\u3068\u3092\u3001\u512a\u5148\u5ea6\u306e\u9ad8\u3044\u9806\u306b\u8fd4\u3059\u3002\n\n\u81ea\u5206\u306e\u672a\u5b8c\u4e86\u306e\u30b7\u30ca\u30ea\u30aa\u306e\u3046\u3061\u3001\u671f\u9650\u304c\u4eca\u65e5\u307e\u3067\u306e\u3082\u306e\u304c\u5bfe\u8c61\u3002\u671f\u9650\u3092\u904e\u304e\u305f\u3082\u306e\u3082\n\u542b\u3080\u3002\u4eca\u65e5\u306e\u7d42\u308f\u308a\u306f\u3001\u30d7\u30ed\u30d5\u30a3\u30fc\u30eb\u306e timezone \u306e\u66a6\u65e5\u3067\u6c7a\u307e\u308b\u3002\u7dca\u6025\u5ea6\u304c\u9ad8\u3044\n\u3082\u306e\u3068\u3001\u671f\u9650\u304c\u8fd1\u3044\u3082\u306e\u304c\u4e0a\u306b\u6765\u308b\u3002\u540c\u3058\u512a\u5148\u5ea6\u306e\u3068\u304d\u306e\u9806\u5e8f\u306f\u3001\u6bce\u56de\u540c\u3058\u306b\u306a\u308b\u3002\n\nlimit \u306f 1 \u4ee5\u4e0a 20 \u4ee5\u4e0b\u3067\u3001\u672a\u6307\u5b9a\u306f 5\u3002\u7bc4\u56f2\u5916\u306f 422\u3002\u5bfe\u8c61\u304c\u7121\u3051\u308c\u3070\u7a7a\u306e\u914d\u5217\u3092\n\u8fd4\u3057\u3001404 \u306b\u306f\u3057\u306a\u3044\u3002",
+        "operationId": "listTodayCaptures",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 5,
+              "maximum": 20,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_list_CaptureResponse__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "An unexpected server error occurred."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Today Captures",
+        "tags": [
+          "captures"
+        ]
+      }
+    },
+    "/api/v1/captures/{capture_id}": {
+      "delete": {
+        "description": "\u8a18\u9332\u3092\u524a\u9664\u3059\u308b\u3002\n\n\u30b7\u30ca\u30ea\u30aa\u3068 embedding \u3082\u4e00\u7dd2\u306b\u6d88\u3048\u308b\u3002\u6210\u529f\u306f 204 \u3067\u672c\u6587\u306f\u7121\u3044\u3002\u81ea\u5206\u306e\u8a18\u9332\u3067\u306a\u3044\u3001\n\u307e\u305f\u306f\u7121\u3051\u308c\u3070 404\u3002",
+        "operationId": "deleteCapture",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "capture_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Capture Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "The requested resource was not found."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "An unexpected server error occurred."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Capture",
+        "tags": [
+          "captures"
+        ]
+      },
+      "get": {
+        "description": "\u8a18\u9332\u3092 1 \u4ef6\u53d6\u5f97\u3059\u308b\u3002\u30b7\u30ca\u30ea\u30aa\u3068\u805e\u304d\u8fd4\u3057\u6587\u304c\u3042\u308c\u3070\u3001\u3042\u308f\u305b\u3066\u8fd4\u3059\u3002\n\n\u51e6\u7406\u4e2d\u304b\u3069\u3046\u304b\u306f status \u3067\u5206\u304b\u308b\u3002\u81ea\u5206\u306e\u8a18\u9332\u3067\u306a\u3044\u3001\u307e\u305f\u306f\u7121\u3051\u308c\u3070 404\u3002",
+        "operationId": "getCapture",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "capture_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Capture Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_CaptureResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "The requested resource was not found."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "An unexpected server error occurred."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Capture",
+        "tags": [
+          "captures"
+        ]
+      },
+      "patch": {
+        "description": "\u8a18\u9332\u306e\u672c\u6587\u3092\u66f4\u65b0\u3059\u308b\u3002\n\n\u66f4\u65b0\u3067\u304d\u308b\u306e\u306f pending \u3068 failed \u306e\u8a18\u9332\u3060\u3051\u3002\u51e6\u7406\u4e2d\u3068\u5b8c\u4e86\u6e08\u307f\u306f 409\u3002\u672c\u6587\u306f\n\u524d\u5f8c\u306e\u7a7a\u767d\u3092\u9664\u3044\u3066 1 \u6587\u5b57\u4ee5\u4e0a 2000 \u6587\u5b57\u4ee5\u4e0b\u3067\u3001\u9055\u53cd\u306f 422\u3002\u81ea\u5206\u306e\u8a18\u9332\u3067\u306a\u3044\u3001\n\u307e\u305f\u306f\u7121\u3051\u308c\u3070 404\u3002",
+        "operationId": "updateCapture",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "capture_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Capture Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCaptureRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_CaptureResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "The requested resource was not found."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Conflict."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "An unexpected server error occurred."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Capture",
+        "tags": [
+          "captures"
+        ]
+      }
+    },
+    "/api/v1/captures/{capture_id}/retry": {
+      "post": {
+        "description": "failed \u306e\u8a18\u9332\u3092\u3001\u3082\u3046\u4e00\u5ea6\u51e6\u7406\u306b\u56de\u3059\u3002\n\n\u51e6\u7406\u306e\u4e16\u4ee3\u304c 1 \u3064\u9032\u307f\u3001status \u306f pending \u306b\u623b\u308b\u3002\u6210\u529f\u306f 202\u3002failed \u4ee5\u5916\u306e\n\u8a18\u9332\u306f 409\u3002\u81ea\u5206\u306e\u8a18\u9332\u3067\u306a\u3044\u3001\u307e\u305f\u306f\u7121\u3051\u308c\u3070 404\u3002",
+        "operationId": "retryCapture",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "capture_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Capture Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_CaptureResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "The requested resource was not found."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Conflict."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "An unexpected server error occurred."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Retry Capture",
+        "tags": [
+          "captures"
+        ]
+      }
+    },
+    "/api/v1/captures/{capture_id}/scenario/accept": {
+      "post": {
+        "description": "\u63d0\u6848\u3055\u308c\u305f\u30b7\u30ca\u30ea\u30aa\u3092\u3001\u78ba\u8a8d\u3057\u3066 accepted \u306b\u3059\u308b\u3002\n\n\u78ba\u8a8d\u3067\u304d\u308b\u306e\u306f\u6240\u6709\u8005\u3060\u3051\u3067\u3001proposed \u306e\u30b7\u30ca\u30ea\u30aa\u306b\u9650\u308b\u3002\u6210\u529f\u306f 200 \u3067\u3001\u66f4\u65b0\u5f8c\u306e\n\u8a18\u9332\u3092\u8fd4\u3059\u3002\u81ea\u5206\u306e\u8a18\u9332\u3067\u306a\u3044\u3001\u307e\u305f\u306f\u30b7\u30ca\u30ea\u30aa\u304c\u7121\u3051\u308c\u3070 404\u3002\u78ba\u8a8d\u6e08\u307f\u306a\u3069\u3001\nproposed \u3067\u306a\u3044\u30b7\u30ca\u30ea\u30aa\u306f 409\u3002",
+        "operationId": "acceptCaptureScenario",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "capture_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Capture Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_CaptureResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "The requested resource was not found."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Conflict."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "An unexpected server error occurred."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Accept Capture Scenario",
+        "tags": [
+          "captures"
+        ]
+      }
+    },
+    "/api/v1/captures/{capture_id}/scenario/done": {
+      "delete": {
+        "description": "\u8a18\u9332\u306e\u30b7\u30ca\u30ea\u30aa\u3092\u3001\u672a\u5b8c\u4e86\u306b\u623b\u3059\u3002\n\n\u5b8c\u4e86\u306b\u3057\u3066\u3044\u306a\u304f\u3066\u3082\u547c\u3079\u3066\u3001\u305d\u306e\u5834\u5408\u3082 200 \u3092\u8fd4\u3059\u3002\u623b\u3057\u305f\u8a18\u9332\u306f\u3001\u671f\u9650\u306a\u3069\u306e\n\u6761\u4ef6\u304c\u5408\u3048\u3070\u3001\u4eca\u65e5\u3084\u308b\u3053\u3068\u306b\u518d\u3073\u51fa\u308b\u3002\u6210\u529f\u306f 200 \u3067\u3001\u66f4\u65b0\u5f8c\u306e\u8a18\u9332\u3092\u8fd4\u3059\u3002\u672c\u6587\u306f\n\u7a7a\u306b\u306a\u3089\u305a\u3001204 \u3067\u306f\u306a\u3044\u3002\u81ea\u5206\u306e\u8a18\u9332\u3067\u306a\u3044\u3001\u8a18\u9332\u304c\u7121\u3044\u3001\u307e\u305f\u306f\u30b7\u30ca\u30ea\u30aa\u304c\u7121\u3051\u308c\u3070\u3001\n\u7406\u7531\u3092\u533a\u5225\u305b\u305a 404\u3002",
+        "operationId": "unmarkCaptureScenarioDone",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "capture_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Capture Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_CaptureResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "The requested resource was not found."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "An unexpected server error occurred."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Unmark Capture Scenario Done",
+        "tags": [
+          "captures"
+        ]
+      },
+      "post": {
+        "description": "\u8a18\u9332\u306e\u30b7\u30ca\u30ea\u30aa\u3092\u3001\u5b8c\u4e86\u306b\u3059\u308b\u3002\n\n\u4eca\u65e5\u3084\u308b\u3053\u3068\u304b\u3089\u5916\u308c\u308b\u3002\u7e70\u308a\u8fd4\u3057\u547c\u3093\u3067\u3082\u7d50\u679c\u306f\u540c\u3058\u3067\u3001200 \u3092\u8fd4\u3059\u3002\u5b8c\u4e86\u306b\u3057\u305f\n\u6642\u523b\u306f\u3001\u6700\u521d\u306b\u547c\u3093\u3060\u3068\u304d\u306e\u3082\u306e\u304c\u6b8b\u308b\u3002\u30b7\u30ca\u30ea\u30aa\u3092\u78ba\u8a8d\u6e08\u307f(accepted)\u306b\u3057\u3066\n\u3044\u306a\u304f\u3066\u3082\u3001\u5b8c\u4e86\u306b\u3067\u304d\u308b\u3002\u6210\u529f\u306f 200 \u3067\u3001\u66f4\u65b0\u5f8c\u306e\u8a18\u9332\u3092\u8fd4\u3059\u3002\u81ea\u5206\u306e\u8a18\u9332\u3067\u306a\u3044\u3001\n\u8a18\u9332\u304c\u7121\u3044\u3001\u307e\u305f\u306f\u30b7\u30ca\u30ea\u30aa\u304c\u7121\u3051\u308c\u3070\u3001\u7406\u7531\u3092\u533a\u5225\u305b\u305a 404\u3002",
+        "operationId": "markCaptureScenarioDone",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "capture_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Capture Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_CaptureResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "The requested resource was not found."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "An unexpected server error occurred."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Mark Capture Scenario Done",
+        "tags": [
+          "captures"
+        ]
+      }
+    },
+    "/api/v1/digest-reports": {
+      "get": {
+        "description": "\u81ea\u5206\u306e\u671d\u306e\u30c0\u30a4\u30b8\u30a7\u30b9\u30c8\u3068\u9031\u6b21\u30ec\u30d3\u30e5\u30fc\u3092\u3001\u671f\u9593\u306e\u65e5\u4ed8\u306e\u65b0\u3057\u3044\u9806\u306b\u8fd4\u3059\u3002\n\nkind \u306f daily \u304b weekly \u3067\u3001\u672a\u6307\u5b9a\u306a\u3089\u4e21\u65b9\u3002fromDate \u306f periodStart \u306e\u4e0b\u9650\u3067\u3001\n\u305d\u306e\u65e5\u3092\u542b\u3080(YYYY-MM-DD)\u3002\u4f5c\u3063\u305f\u65e5\u3067\u306f\u306a\u304f\u3001\u671f\u9593\u306e\u65e5\u4ed8\u3067\u7d5e\u308b\u3002limit \u306f 1 \u4ee5\u4e0a\n30 \u4ee5\u4e0b\u3067\u3001\u672a\u6307\u5b9a\u306f 7\u3002\u7bc4\u56f2\u5916\u3084\u4e0d\u6b63\u306a\u5024\u306f 422\u3002\n\n\u4f5c\u3063\u3066\u3044\u308b\u9014\u4e2d(pending)\u3068\u3001\u5931\u6557\u3057\u305f\u884c(failed)\u3082\u8fd4\u3059\u3002\u5bfe\u8c61\u304c\u7121\u3051\u308c\u3070\u7a7a\u306e\u914d\u5217\u3092\n\u8fd4\u3057\u3001404 \u306b\u306f\u3057\u306a\u3044\u3002",
+        "operationId": "listDigestReports",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "daily",
+                    "weekly"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fromDate",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fromdate"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 7,
+              "maximum": 30,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_list_DigestReportResponse__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "An unexpected server error occurred."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Digest Reports",
+        "tags": [
+          "digest-reports"
+        ]
+      }
+    },
+    "/api/v1/digest-reports/{report_id}/retry": {
+      "post": {
+        "description": "\u5931\u6557\u3057\u305f\u30c0\u30a4\u30b8\u30a7\u30b9\u30c8\u304b\u9031\u6b21\u30ec\u30d3\u30e5\u30fc\u3092\u3001\u3082\u3046\u4e00\u5ea6\u4f5c\u308b\u3088\u3046\u4e88\u7d04\u3059\u308b\u3002\n\nstatus \u304c failed \u306e\u884c\u3060\u3051\u3092 pending \u306b\u623b\u3057\u3001\u623b\u3057\u305f\u884c\u3092 202 \u3067\u8fd4\u3059\u3002\u3053\u306e\u3068\u304d\ncontent \u3068 errorCode \u306f null\u3002\u4e2d\u8eab\u306f\u5f8c\u3067\u4f5c\u3089\u308c\u308b\u306e\u3067\u3001ready \u306b\u306a\u3063\u305f\u304b\u306f\u3001\n\u4e00\u89a7(listDigestReports)\u3092\u8aad\u307f\u76f4\u3057\u3066\u78ba\u304b\u3081\u308b\u3002\n\nfailed \u3067\u306a\u3044\u884c(pending \u304b ready)\u306f 409\u3002\u540c\u3058\u884c\u306b retry \u304c\u7d9a\u3051\u3066\u5c4a\u3044\u305f\u3068\u304d\u3082\u3001\n2 \u56de\u76ee\u304b\u3089\u306f pending \u306a\u306e\u3067 409 \u306b\u306a\u308b\u3002\u81ea\u5206\u306e\u884c\u3067\u306a\u3044\u3001\u307e\u305f\u306f\u7121\u3051\u308c\u3070 404\u3002\nreportId \u304c UUID \u3067\u306a\u3051\u308c\u3070 422\u3002",
+        "operationId": "retryDigestReport",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "report_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Report Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_DigestReportResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "The requested resource was not found."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Conflict."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "An unexpected server error occurred."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Retry Digest Report",
+        "tags": [
+          "digest-reports"
+        ]
+      }
+    },
+    "/api/v1/echo": {
+      "post": {
+        "operationId": "echoMessage",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EchoRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_EchoResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed."
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "An unexpected server error occurred."
+          }
+        },
+        "summary": "Echo Message"
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_HealthResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "An unexpected server error occurred."
+          }
+        },
+        "summary": "Get Health"
+      }
+    },
+    "/api/v1/me": {
+      "get": {
+        "operationId": "getCurrentUser",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_UserResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "An unexpected server error occurred."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Current User"
+      }
+    },
+    "/api/v1/protected-resource": {
+      "get": {
+        "operationId": "getProtectedResource",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_ProtectedResourceResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Authentication failed."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "The requested resource was not found."
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "An unexpected server error occurred."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Protected Resource"
+      }
+    }
+  }
+}

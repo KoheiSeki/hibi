@@ -1,0 +1,757 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const {
+	createCaptureFromApiMock,
+	getCaptureFromApiMock,
+	listCapturesFromApiMock,
+	notFoundMock,
+	redirectMock,
+	revalidatePathMock,
+	retryCaptureFromApiMock,
+	updateCaptureFromApiMock,
+	deleteCaptureFromApiMock,
+	markCaptureScenarioDoneFromApiMock,
+	unmarkCaptureScenarioDoneFromApiMock,
+} = vi.hoisted(() => ({
+	createCaptureFromApiMock: vi.fn(),
+	getCaptureFromApiMock: vi.fn(),
+	listCapturesFromApiMock: vi.fn(),
+	notFoundMock: vi.fn(),
+	redirectMock: vi.fn(),
+	revalidatePathMock: vi.fn(),
+	retryCaptureFromApiMock: vi.fn(),
+	updateCaptureFromApiMock: vi.fn(),
+	deleteCaptureFromApiMock: vi.fn(),
+	markCaptureScenarioDoneFromApiMock: vi.fn(),
+	unmarkCaptureScenarioDoneFromApiMock: vi.fn(),
+}));
+
+vi.mock("@/lib/api/capture", () => ({
+	createCaptureFromApi: createCaptureFromApiMock,
+	deleteCaptureFromApi: deleteCaptureFromApiMock,
+	getCaptureFromApi: getCaptureFromApiMock,
+	listCapturesFromApi: listCapturesFromApiMock,
+	markCaptureScenarioDoneFromApi: markCaptureScenarioDoneFromApiMock,
+	unmarkCaptureScenarioDoneFromApi: unmarkCaptureScenarioDoneFromApiMock,
+	retryCaptureFromApi: retryCaptureFromApiMock,
+	updateCaptureFromApi: updateCaptureFromApiMock,
+}));
+vi.mock("next/navigation", () => ({
+	notFound: notFoundMock,
+	redirect: redirectMock,
+}));
+vi.mock("next/cache", () => ({ revalidatePath: revalidatePathMock }));
+
+import {
+	createCaptureAction,
+	deleteCaptureAction,
+	getCaptureAction,
+	listCapturesAction,
+	markScenarioDoneAction,
+	retryCaptureAction,
+	unmarkScenarioDoneAction,
+	updateCaptureAction,
+} from "@/features/capture/actions";
+import {
+	initialCreateCaptureActionState,
+	initialUpdateCaptureActionState,
+} from "@/features/capture/capture-action-state";
+
+function createFormData() {
+	const formData = new FormData();
+	formData.set("rawText", "牛乳を買う");
+	formData.set("idempotencyKey", "capture-key");
+	return formData;
+}
+
+describe("createCaptureAction", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it("returns the created capture and revalidates the captures page", async () => {
+		const capture = {
+			id: "capture-1",
+			rawText: "牛乳を買う",
+			status: "active",
+			createdAt: "2026-10-04T09:00:00Z",
+			updatedAt: "2026-10-04T09:00:00Z",
+		};
+		createCaptureFromApiMock.mockResolvedValue({
+			ok: true,
+			data: capture,
+		});
+
+		const state = await createCaptureAction(
+			initialCreateCaptureActionState,
+			createFormData(),
+		);
+
+		expect(createCaptureFromApiMock).toHaveBeenCalledWith(
+			"牛乳を買う",
+			"capture-key",
+		);
+		expect(revalidatePathMock).toHaveBeenCalledWith("/captures");
+		expect(state).toEqual({
+			status: "success",
+			data: capture,
+			message: "記録しました。",
+		});
+	});
+
+	it("maps the API rawText field error to the composer state", async () => {
+		createCaptureFromApiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "problem",
+				problem: {
+					type: "https://api.hibi.example/problems/validation-error",
+					title: "Validation error",
+					status: 422,
+					detail: "Request validation failed.",
+					requestId: "request-422",
+					errors: [
+						{
+							pointer: "/rawText",
+							code: "string_too_long",
+							detail: "2000文字以内で入力してください。",
+						},
+					],
+				},
+			},
+		});
+
+		const state = await createCaptureAction(
+			initialCreateCaptureActionState,
+			createFormData(),
+		);
+
+		expect(state).toEqual({
+			status: "error",
+			fieldErrors: {
+				rawText: "2000文字以内で入力してください。",
+			},
+			message: "Request validation failed.（参照 ID: request-422）",
+		});
+		expect(revalidatePathMock).not.toHaveBeenCalled();
+	});
+
+	it("redirects unauthenticated failures without revalidating", async () => {
+		createCaptureFromApiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "unauthenticated",
+				message: "Authentication is required.",
+			},
+		});
+		redirectMock.mockImplementation(() => {
+			throw new Error("NEXT_REDIRECT");
+		});
+
+		await expect(
+			createCaptureAction(
+				initialCreateCaptureActionState,
+				createFormData(),
+			),
+		).rejects.toThrow("NEXT_REDIRECT");
+		expect(redirectMock).toHaveBeenCalledWith("/login");
+		expect(revalidatePathMock).not.toHaveBeenCalled();
+	});
+});
+
+describe("listCapturesAction", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it("passes the cursor and preserves the response metadata", async () => {
+		const response = {
+			data: [
+				{
+					id: "capture-2",
+					rawText: "資料を送る",
+					status: "active",
+					createdAt: "2026-10-04T08:00:00Z",
+					updatedAt: "2026-10-04T08:00:00Z",
+				},
+			],
+			meta: {
+				nextCursor: "next-cursor",
+				hasNextPage: true,
+			},
+		};
+		listCapturesFromApiMock.mockResolvedValue({
+			ok: true,
+			data: response,
+		});
+
+		const state = await listCapturesAction("current-cursor");
+
+		expect(listCapturesFromApiMock).toHaveBeenCalledWith({
+			cursor: "current-cursor",
+		});
+		expect(state).toEqual({
+			status: "success",
+			data: response,
+		});
+	});
+
+	it("rejects an empty cursor without calling the API", async () => {
+		const state = await listCapturesAction("");
+
+		expect(listCapturesFromApiMock).not.toHaveBeenCalled();
+		expect(state).toEqual({
+			status: "error",
+			message: "カーソルが不正です。",
+		});
+	});
+
+	it("converts API failures to an action error", async () => {
+		listCapturesFromApiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "network",
+				message: "fetch failed",
+			},
+		});
+
+		const state = await listCapturesAction("current-cursor");
+
+		expect(state).toEqual({
+			status: "error",
+			message: "ネットワーク接続を確認して、もう一度お試しください。",
+		});
+	});
+
+	it("returns an invalid cursor problem with its request ID", async () => {
+		listCapturesFromApiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "problem",
+				problem: {
+					type: "https://api.hibi.example/problems/invalid-cursor",
+					title: "Invalid cursor",
+					status: 400,
+					detail: "カーソルが不正です。",
+					requestId: "request-400",
+				},
+			},
+		});
+
+		const state = await listCapturesAction("invalid-cursor");
+
+		expect(state).toEqual({
+			status: "error",
+			message: "カーソルが不正です。（参照 ID: request-400）",
+		});
+	});
+
+	it("redirects unauthenticated failures to login", async () => {
+		listCapturesFromApiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "unauthenticated",
+				message: "Authentication is required.",
+			},
+		});
+		redirectMock.mockImplementation(() => {
+			throw new Error("NEXT_REDIRECT");
+		});
+
+		await expect(
+			listCapturesAction("current-cursor"),
+		).rejects.toThrow("NEXT_REDIRECT");
+		expect(redirectMock).toHaveBeenCalledWith("/login");
+	});
+});
+
+describe("updateCaptureAction", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it("returns the updated capture and revalidates both pages", async () => {
+		const capture = {
+			id: "capture-1",
+			rawText: "牛乳を買った",
+			status: "active",
+			createdAt: "2026-10-04T09:00:00Z",
+			updatedAt: "2026-10-04T10:00:00Z",
+		};
+		updateCaptureFromApiMock.mockResolvedValue({
+			ok: true,
+			data: capture,
+		});
+		const formData = new FormData();
+		formData.set("rawText", "牛乳を買った");
+
+		const state = await updateCaptureAction(
+			"capture-1",
+			initialUpdateCaptureActionState,
+			formData,
+		);
+
+		expect(updateCaptureFromApiMock).toHaveBeenCalledWith(
+			"capture-1",
+			"牛乳を買った",
+		);
+		expect(revalidatePathMock).toHaveBeenCalledWith("/captures");
+		expect(revalidatePathMock).toHaveBeenCalledWith("/captures/capture-1");
+		expect(state).toEqual({
+			status: "success",
+			data: capture,
+			message: "更新しました。",
+		});
+	});
+
+	it("maps the API rawText field error to the editor state", async () => {
+		updateCaptureFromApiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "problem",
+				problem: {
+					type: "https://api.hibi.example/problems/validation-error",
+					title: "Validation error",
+					status: 422,
+					detail: "Request validation failed.",
+					requestId: "request-422",
+					errors: [
+						{
+							pointer: "/rawText",
+							code: "string_too_long",
+							detail: "2000文字以内で入力してください。",
+						},
+					],
+				},
+			},
+		});
+
+		const state = await updateCaptureAction(
+			"capture-1",
+			initialUpdateCaptureActionState,
+			createFormData(),
+		);
+
+		expect(state).toEqual({
+			status: "error",
+			fieldErrors: {
+				rawText: "2000文字以内で入力してください。",
+			},
+			message: "Request validation failed.（参照 ID: request-422）",
+		});
+		expect(revalidatePathMock).not.toHaveBeenCalled();
+	});
+
+	it("renders the not-found boundary when the capture no longer exists", async () => {
+		updateCaptureFromApiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "problem",
+				problem: {
+					type: "https://api.hibi.example/problems/not-found",
+					title: "Not found",
+					status: 404,
+					detail: "Capture was not found.",
+					requestId: "request-404",
+				},
+			},
+		});
+		notFoundMock.mockImplementation(() => {
+			throw new Error("NEXT_NOT_FOUND");
+		});
+
+		await expect(
+			updateCaptureAction(
+				"missing",
+				initialUpdateCaptureActionState,
+				createFormData(),
+			),
+		).rejects.toThrow("NEXT_NOT_FOUND");
+		expect(notFoundMock).toHaveBeenCalledOnce();
+		expect(revalidatePathMock).not.toHaveBeenCalled();
+	});
+
+	it("redirects unauthenticated failures to login", async () => {
+		updateCaptureFromApiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "unauthenticated",
+				message: "Authentication is required.",
+			},
+		});
+		redirectMock.mockImplementation(() => {
+			throw new Error("NEXT_REDIRECT");
+		});
+
+		await expect(
+			updateCaptureAction(
+				"capture-1",
+				initialUpdateCaptureActionState,
+				createFormData(),
+			),
+		).rejects.toThrow("NEXT_REDIRECT");
+		expect(redirectMock).toHaveBeenCalledWith("/login");
+	});
+});
+
+describe("deleteCaptureAction", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		redirectMock.mockReset();
+	});
+
+	it("revalidates the list and redirects after deletion", async () => {
+		deleteCaptureFromApiMock.mockResolvedValue({
+			ok: true,
+			data: undefined,
+		});
+		redirectMock.mockImplementation(() => {
+			throw new Error("NEXT_REDIRECT");
+		});
+
+		await expect(deleteCaptureAction("capture-1")).rejects.toThrow(
+			"NEXT_REDIRECT",
+		);
+		expect(deleteCaptureFromApiMock).toHaveBeenCalledWith("capture-1");
+		expect(revalidatePathMock).toHaveBeenCalledWith("/captures");
+		expect(revalidatePathMock).not.toHaveBeenCalledWith(
+			"/captures/capture-1",
+		);
+		expect(redirectMock).toHaveBeenCalledWith("/captures");
+	});
+
+	it("rejects an empty capture ID without calling the API", async () => {
+		const state = await deleteCaptureAction("");
+
+		expect(deleteCaptureFromApiMock).not.toHaveBeenCalled();
+		expect(state).toEqual({
+			status: "error",
+			message: "削除に失敗しました。",
+		});
+	});
+
+	it("returns a server failure without leaving the detail page", async () => {
+		deleteCaptureFromApiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "problem",
+				problem: {
+					type: "https://api.hibi.example/problems/internal-error",
+					title: "Internal server error",
+					status: 500,
+					detail: "An unexpected error occurred.",
+					requestId: "request-500",
+				},
+			},
+		});
+
+		const state = await deleteCaptureAction("capture-1");
+
+		expect(state).toEqual({
+			status: "error",
+			message:
+				"処理を完了できませんでした。時間をおいて再度お試しください。改善しない場合は、参照 ID を添えてお問い合わせください。（参照 ID: request-500）",
+		});
+		expect(redirectMock).not.toHaveBeenCalled();
+	});
+
+	it("renders the not-found boundary when the capture no longer exists", async () => {
+		deleteCaptureFromApiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "problem",
+				problem: {
+					type: "https://api.hibi.example/problems/not-found",
+					title: "Not found",
+					status: 404,
+					detail: "Capture was not found.",
+					requestId: "request-404",
+				},
+			},
+		});
+		notFoundMock.mockImplementation(() => {
+			throw new Error("NEXT_NOT_FOUND");
+		});
+
+		await expect(deleteCaptureAction("missing")).rejects.toThrow(
+			"NEXT_NOT_FOUND",
+		);
+		expect(redirectMock).not.toHaveBeenCalled();
+	});
+
+	it("redirects unauthenticated failures to login", async () => {
+		deleteCaptureFromApiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "unauthenticated",
+				message: "Authentication is required.",
+			},
+		});
+		redirectMock.mockImplementation(() => {
+			throw new Error("NEXT_REDIRECT");
+		});
+
+		await expect(deleteCaptureAction("capture-1")).rejects.toThrow(
+			"NEXT_REDIRECT",
+		);
+		expect(redirectMock).toHaveBeenCalledWith("/login");
+	});
+});
+
+describe("getCaptureAction", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it("returns the latest capture without revalidating the route", async () => {
+		const capture = {
+			id: "capture-1",
+			rawText: "牛乳を買う",
+			status: "completed",
+			createdAt: "2026-10-04T09:00:00Z",
+			updatedAt: "2026-10-04T10:00:00Z",
+		};
+		getCaptureFromApiMock.mockResolvedValue({ ok: true, data: capture });
+
+		const state = await getCaptureAction("capture-1");
+
+		expect(getCaptureFromApiMock).toHaveBeenCalledWith("capture-1");
+		expect(revalidatePathMock).not.toHaveBeenCalled();
+		expect(state).toEqual({ status: "success", data: capture });
+	});
+
+	it("returns an action error when polling fails", async () => {
+		getCaptureFromApiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "network",
+				message: "fetch failed",
+			},
+		});
+
+		const state = await getCaptureAction("capture-1");
+
+		expect(state).toEqual({
+			status: "error",
+			message: "ネットワーク接続を確認して、もう一度お試しください。",
+		});
+	});
+
+	it("keeps a missing capture as an in-page error during polling", async () => {
+		getCaptureFromApiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "problem",
+				problem: {
+					type: "https://api.hibi.example/problems/capture-not-found",
+					title: "Capture not found",
+					status: 404,
+					detail: "The requested capture does not exist.",
+					requestId: "request-404",
+				},
+			},
+		});
+
+		const state = await getCaptureAction("missing");
+
+		expect(notFoundMock).not.toHaveBeenCalled();
+		expect(state).toEqual({
+			status: "error",
+			message:
+				"The requested capture does not exist.（参照 ID: request-404）",
+		});
+	});
+
+	it("rejects an empty capture ID without calling the API", async () => {
+		const state = await getCaptureAction("");
+
+		expect(getCaptureFromApiMock).not.toHaveBeenCalled();
+		expect(state).toEqual({
+			status: "error",
+			message: "記録を取得できませんでした。",
+		});
+	});
+
+	it("redirects unauthenticated failures to login", async () => {
+		getCaptureFromApiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "unauthenticated",
+				message: "Authentication is required.",
+			},
+		});
+		redirectMock.mockImplementation(() => {
+			throw new Error("NEXT_REDIRECT");
+		});
+
+		await expect(getCaptureAction("capture-1")).rejects.toThrow(
+			"NEXT_REDIRECT",
+		);
+		expect(redirectMock).toHaveBeenCalledWith("/login");
+	});
+});
+
+describe("retryCaptureAction", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it("returns the pending capture and revalidates list and detail", async () => {
+		const capture = {
+			id: "capture-1",
+			rawText: "牛乳を買う",
+			status: "pending",
+			createdAt: "2026-10-04T09:00:00Z",
+			updatedAt: "2026-10-04T10:00:00Z",
+		};
+		retryCaptureFromApiMock.mockResolvedValue({ ok: true, data: capture });
+
+		const state = await retryCaptureAction("capture-1");
+
+		expect(retryCaptureFromApiMock).toHaveBeenCalledWith("capture-1");
+		expect(revalidatePathMock).toHaveBeenCalledWith("/captures");
+		expect(revalidatePathMock).toHaveBeenCalledWith("/captures/capture-1");
+		expect(state).toEqual({
+			status: "success",
+			data: capture,
+			message: "もう一度整えています。",
+		});
+	});
+
+	it("rejects an empty capture ID without calling the API", async () => {
+		const state = await retryCaptureAction("");
+
+		expect(retryCaptureFromApiMock).not.toHaveBeenCalled();
+		expect(state).toEqual({
+			status: "error",
+			message: "やり直しを開始できませんでした。",
+		});
+	});
+
+	it("converts a conflict into an action error", async () => {
+		retryCaptureFromApiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "problem",
+				problem: {
+					type: "https://api.hibi.example/problems/capture-not-retryable",
+					title: "Capture cannot be retried",
+					status: 409,
+					detail: "Only failed captures can be retried.",
+					requestId: "request-409",
+				},
+			},
+		});
+
+		const state = await retryCaptureAction("capture-1");
+
+		expect(revalidatePathMock).not.toHaveBeenCalled();
+		expect(state).toEqual({
+			status: "error",
+			message:
+				"Only failed captures can be retried.（参照 ID: request-409）",
+		});
+	});
+
+	it("redirects unauthenticated failures to login", async () => {
+		retryCaptureFromApiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "unauthenticated",
+				message: "Authentication is required.",
+			},
+		});
+		redirectMock.mockImplementation(() => {
+			throw new Error("NEXT_REDIRECT");
+		});
+
+		await expect(retryCaptureAction("capture-1")).rejects.toThrow(
+			"NEXT_REDIRECT",
+		);
+		expect(redirectMock).toHaveBeenCalledWith("/login");
+	});
+});
+
+describe.each([
+	{
+		name: "markScenarioDoneAction",
+		action: markScenarioDoneAction,
+		apiMock: markCaptureScenarioDoneFromApiMock,
+		failure: "完了にできませんでした。",
+	},
+	{
+		name: "unmarkScenarioDoneAction",
+		action: unmarkScenarioDoneAction,
+		apiMock: unmarkCaptureScenarioDoneFromApiMock,
+		failure: "未完了に戻せませんでした。",
+	},
+])("$name", ({ action, apiMock, failure }) => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it("returns the capture and revalidates today and the detail", async () => {
+		const capture = {
+			id: "capture-1",
+			rawText: "牛乳を買う",
+			status: "completed",
+			createdAt: "2026-11-10T05:00:00Z",
+			updatedAt: "2026-11-10T05:00:00Z",
+		};
+		apiMock.mockResolvedValue({ ok: true, data: capture });
+
+		const state = await action("capture-1");
+
+		expect(apiMock).toHaveBeenCalledWith("capture-1");
+		expect(revalidatePathMock).toHaveBeenCalledWith("/captures/today");
+		expect(revalidatePathMock).toHaveBeenCalledWith("/captures/capture-1");
+		expect(state).toEqual({ status: "success", data: capture });
+	});
+
+	it("rejects an empty capture ID without calling the API", async () => {
+		const state = await action("");
+
+		expect(apiMock).not.toHaveBeenCalled();
+		expect(state).toEqual({ status: "error", message: failure });
+	});
+
+	it("converts a missing scenario into an action error", async () => {
+		apiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "problem",
+				problem: {
+					type: "https://api.hibi.example/problems/capture-not-found",
+					title: "Capture not found",
+					status: 404,
+					detail: "Capture was not found.",
+					requestId: "request-404",
+				},
+			},
+		});
+
+		const state = await action("capture-1");
+
+		expect(revalidatePathMock).not.toHaveBeenCalled();
+		expect(state).toEqual({
+			status: "error",
+			message: "Capture was not found.（参照 ID: request-404）",
+		});
+	});
+
+	it("redirects unauthenticated failures to login", async () => {
+		apiMock.mockResolvedValue({
+			ok: false,
+			error: {
+				kind: "unauthenticated",
+				message: "Authentication is required.",
+			},
+		});
+		redirectMock.mockImplementation(() => {
+			throw new Error("NEXT_REDIRECT");
+		});
+
+		await expect(action("capture-1")).rejects.toThrow("NEXT_REDIRECT");
+		expect(redirectMock).toHaveBeenCalledWith("/login");
+	});
+});

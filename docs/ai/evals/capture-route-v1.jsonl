@@ -1,0 +1,7 @@
+{"rawText": "牛乳を買う", "category": "shopping", "confidence": 0.9, "route": "shopping"}
+{"rawText": "明日の 9 時に起こして", "category": "reminder", "confidence": 0.9, "route": "reminder"}
+{"rawText": "ランチ 1200 円", "category": "expense", "confidence": 0.9, "route": "expense"}
+{"rawText": "あとで読む記事", "category": "note", "confidence": 0.9, "route": "note"}
+{"rawText": "今日どうだった", "category": "chat", "confidence": 0.9, "route": "chat"}
+{"rawText": "境界の牛乳", "category": "shopping", "confidence": 0.7, "route": "shopping"}
+{"rawText": "境界未満の牛乳", "category": "shopping", "confidence": 0.69, "route": "clarify"}

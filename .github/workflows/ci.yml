@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.17.1 }
+      - uses: actions/setup-node@v5
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder
+  api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.17.1 }
+      - uses: actions/setup-node@v5
+        with: { node-version: 22, cache: pnpm }
+      - uses: astral-sh/setup-uv@v7
+        with: { version: "0.11.26", enable-cache: true }
+      - run: pnpm install --frozen-lockfile
+      - run: uv sync --project apps/api --frozen --python 3.14
+      - run: uv run --project apps/api ruff format --check apps/api/src apps/api/tests scripts
+      - run: uv run --project apps/api ruff check apps/api/src apps/api/tests scripts
+      - run: uv run --project apps/api ty check apps/api/src
+      - run: uv run --project apps/api pytest apps/api/tests
+      - run: uv run --project apps/api python scripts/export_openapi.py
+      - run: pnpm --filter @hibi/api-client generate
+      - run: git diff --exit-code -- contracts packages/api-client/src/generated
+  database:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: bash scripts/verify_migration.sh
+  containers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: docker compose build
+      - name: Smoke test API health
+        run: |
+          set -euo pipefail
+          container_id=$(docker run --detach --publish 18000:8000 hibi-api)
+          trap 'docker rm --force "${container_id}" >/dev/null 2>&1' EXIT
+          for attempt in {1..30}; do
+            if body=$(curl --fail --silent http://127.0.0.1:18000/api/v1/health); then
+              test "${body}" = '{"data":{"status":"ok"}}'
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs "${container_id}"
+          exit 1
+      - name: Smoke test Web root
+        run: |
+          set -euo pipefail
+          container_id=$(docker run --detach --publish 13000:3000 hibi-web)
+          trap 'docker rm --force "${container_id}" >/dev/null 2>&1' EXIT
+          for attempt in {1..30}; do
+            if body=$(curl --fail --silent http://127.0.0.1:13000/); then
+              grep --quiet '<h1>Hibi</h1>' <<<"${body}"
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs "${container_id}"
+          exit 1
